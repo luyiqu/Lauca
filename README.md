@@ -5,7 +5,7 @@
 
 ## Quick Start for TiDB with PingCAP
 
-- We can simply use the following commands to simulate data and workloads.  The TiDB example in [LaucaExample](LaucaExample). Here, we provides a configuration file about TiDB in both [LaucaProduction] (./LaucaExample/Production/lauca-tidb.config) and [LaucaTesting](./LaucaExample/Testing/lauca-tidb.conf)，and according jar files in [LaucaProduction.jar](./LaucaExample/Prodution/LaucaProduction.jar)  and [LaucaTesting.jar](./LaucaExample/Testing/LaucaTesting.jar).
+- We can simply use the following commands to simulate data and workloads.  The TiDB example in [LaucaExample](LaucaExample). Here, we provides a configuration file about TiDB in both [LaucaProduction(./LaucaExample/Production/lauca-tidb.config) and [LaucaTesting](./LaucaExample/Testing/lauca-tidb.conf)，and according jar files in [LaucaProduction.jar](./LaucaExample/Prodution/LaucaProduction.jar)  and [LaucaTesting.jar](./LaucaExample/Testing/LaucaTesting.jar).
 
 ```shell
 
@@ -44,7 +44,7 @@ vim config/tpcc_config_tidb.xml
 ./oltpbenchmarkSkywalking -b tpcc -c config/tpcc_config_tidb.xml --execute=true
 ```
 
-- But we also provide a workload trace about TPC-C with 20 warehouses, 20 connections and 100 second running time available in [workload trace](./oltpbench/lauca-log)
+- But we also provide a workload trace about TPC-C with 20 warehouses, 20 connections and 100 second running time available in [workload trace](./lauca-log)
 
 
 
