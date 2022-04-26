@@ -5,7 +5,7 @@
 
 ## Quick Start for TiDB with PingCAP
 
-- We can simply use the following commands to simulate data and workloads.  The TiDB example in [LaucaExample](LaucaExample). Here, we provides a configuration file about TiDB in both [LaucaProduction(./LaucaExample/Production/lauca-tidb.config) and [LaucaTesting](./LaucaExample/Testing/lauca-tidb.conf)，and according jar files in [LaucaProduction.jar](./LaucaExample/Prodution/LaucaProduction.jar)  and [LaucaTesting.jar](./LaucaExample/Testing/LaucaTesting.jar).
+- We can simply use the following commands to simulate data and workloads.  The TiDB example in [LaucaExample](LaucaExample). Here, we provides a configuration file about TiDB in both [LaucaProduction](./LaucaExample/Production/lauca-tidb.config) and [LaucaTesting](./LaucaExample/Testing/lauca-tidb.conf)，and according jar files in [LaucaProduction.jar](./LaucaExample/Prodution/LaucaProduction.jar)  and [LaucaTesting.jar](./LaucaExample/Testing/LaucaTesting.jar).
 
 ```shell
 
