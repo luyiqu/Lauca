@@ -1,6 +1,7 @@
 package accessdistribution;
 
 import java.math.BigDecimal;
+import java.util.ArrayList;
 import java.util.Arrays;
 
 /**
@@ -31,6 +32,15 @@ public class ContinuousParaDistribution <T extends Number> extends DataAccessDis
 		this.highFrequencyItems = highFrequencyItems;
 	}
 
+	public ContinuousParaDistribution(T minValue, T maxValue, T[] highFrequencyItems, double[] hFItemFrequencies,
+									  long[] intervalCardinalities, double[] intervalFrequencies,
+									  ArrayList<ArrayList<Double>> quantilePerInterval) {
+		super(hFItemFrequencies, intervalCardinalities, intervalFrequencies, quantilePerInterval);
+		this.minValue = minValue;
+		this.maxValue = maxValue;
+		this.highFrequencyItems = highFrequencyItems;
+	}
+
 	@Override
 	public T geneValue() {
 //		System.out.println(this.getClass());
@@ -52,10 +62,33 @@ public class ContinuousParaDistribution <T extends Number> extends DataAccessDis
 
 		// 可保证区间内生成参数的基数
 		// long intervalInnerIndex = intervalInnerIndexes[intervalIndex]++ % intervalCardinality;
-		long intervalInnerIndex = (long)(Math.random() * intervalCardinality);
+		double intervalInnerIndex = Math.random();
+
+		// 根据频数分位点先做一次映射，从均匀分布映射到基于频数的分段分布上
+		if (this.quantileNum > intervalIndex){
+			ArrayList<Double> quantile = this.quantilePerInterval.get(intervalIndex);
+			for(int i = 0;i < quantile.size() ; ++i){
+				double cdfNow = ((double) i / quantile.size());
+				if (intervalInnerIndex < cdfNow
+						+ 1e-7){// eps for float compare
+					// 概率上小于第i分位点的概率差
+					// 需要将该概率差映射到分段分布上，变成距离第i分位点的长度
+					double bias = cdfNow - intervalInnerIndex;
+					// 第i-1到i分位点在新分布上的区间长度
+					double intervalLength = (i == 0)? quantile.get(0) : quantile.get(i) - quantile.get(i-1);
+					// 偏差概率bias : 区间总概率(1/quantile.size) = 新区间上的长度biasLength : 区间长度
+					double biasLength = bias * quantile.size() * intervalLength;
+
+					// 映射后的位置应该是第i分位点向左偏移biasLength
+					intervalInnerIndex = quantile.get(i) - biasLength;
+					break;
+				}
+			}
+		}
+
 
 		double avgIntervalLength = (maxValue.doubleValue() - minValue.doubleValue()) / intervalNum;
-		double value = ((double)intervalInnerIndex / intervalCardinality + intervalIndex) * 
+		double value = (intervalInnerIndex + intervalIndex) *
 				avgIntervalLength + minValue.doubleValue();
 
 		// 将 double value 转化成目标数据类型的参数

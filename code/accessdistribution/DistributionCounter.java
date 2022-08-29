@@ -298,8 +298,11 @@ public class DistributionCounter {
 			long[] intervalCardinalities = (long[]) result[0];
 			double[] intervalFrequencies = (double[]) result[1];
 
+			ArrayList<ArrayList<Double>> quantilePerInterval = getQuantilePerInterval(valueNumEntryList, intervalCardinalities,
+					intervalFrequencies, maxValue, minValue, values.size());
+
 			return new ContinuousParaDistribution<Long>(minValue, maxValue, highFrequencyItems, hFItemFrequencies,
-					intervalCardinalities, intervalFrequencies);
+					intervalCardinalities, intervalFrequencies, quantilePerInterval);
 		} else if (dataType == 1) { // Double
 			List<Double> values = new ArrayList<>();
 			for (int i = 0; i < data.size(); i++) {
@@ -317,8 +320,11 @@ public class DistributionCounter {
 			long[] intervalCardinalities = (long[]) result[0];
 			double[] intervalFrequencies = (double[]) result[1];
 
+			ArrayList<ArrayList<Double>> quantilePerInterval = getQuantilePerInterval(valueNumEntryList, intervalCardinalities,
+					intervalFrequencies, maxValue, minValue, values.size());
+
 			return new ContinuousParaDistribution<Double>(minValue, maxValue, highFrequencyItems, hFItemFrequencies,
-					intervalCardinalities, intervalFrequencies);
+					intervalCardinalities, intervalFrequencies, quantilePerInterval);
 		} else if (dataType == 2) { // BigDecimal
 			List<BigDecimal> values = new ArrayList<>();
 			for (int i = 0; i < data.size(); i++) {
@@ -336,8 +342,11 @@ public class DistributionCounter {
 			long[] intervalCardinalities = (long[]) result[0];
 			double[] intervalFrequencies = (double[]) result[1];
 
+			ArrayList<ArrayList<Double>> quantilePerInterval = getQuantilePerInterval(valueNumEntryList, intervalCardinalities,
+					intervalFrequencies, maxValue, minValue, values.size());
+
 			return new ContinuousParaDistribution<BigDecimal>(minValue, maxValue, highFrequencyItems, hFItemFrequencies,
-					intervalCardinalities, intervalFrequencies);
+					intervalCardinalities, intervalFrequencies, quantilePerInterval);
 		} else {
 			System.out.println("针对ContinuousParaDistribution尚不支持的数据类型！ -- " + dataType);
 			return null;
@@ -544,6 +553,72 @@ public class DistributionCounter {
 		}
 
 		return hFItemFrequencies;
+	}
+
+	private static <T extends Number> ArrayList<ArrayList<Double>> getQuantilePerInterval(List<Entry<T, Integer>> valueNumEntryList,
+															long[] intervalCardinalities, double[]intervalFrequencies,
+																						  T maxValue, T minValue, int valuesSize) {
+		int intervalNum = Configurations.getIntervalNum();
+		double avgIntervalLength = (maxValue.doubleValue() - minValue.doubleValue() + 0.000000001) / intervalNum;
+
+		ArrayList<ArrayList<Double>> quantilePerInterval = new ArrayList<ArrayList<Double>>();
+		int binNum = 10;
+		// 单个区间内每段的容量
+		double[] intervalFreqLength = new double[intervalNum];
+		double[] cdfPerInterval = new double[intervalNum];
+		for (int i = 0;i < intervalNum; ++i){
+			intervalFreqLength[i] = (intervalFrequencies[i] / binNum);
+			cdfPerInterval[i] = 0;
+			quantilePerInterval.add(new ArrayList<Double>());
+			quantilePerInterval.get(i).add(0.0);
+		}
+		// 按键值升序排列
+		Collections.sort(valueNumEntryList, new Comparator<Entry<T, Integer>>() {
+			@Override
+			public int compare(Entry<T, Integer> o1, Entry<T, Integer> o2) {
+				return o1.getKey().intValue() - o2.getKey().intValue();
+			}
+		});
+
+
+		//
+
+		for (int i = 0; i < valueNumEntryList.size(); i++) {
+			int idx = (int) ((valueNumEntryList.get(i).getKey().doubleValue() - minValue.doubleValue())
+					/ avgIntervalLength);
+
+			// bug fix: 同下面函数中的 bug fix 说明
+			if (idx >= intervalCardinalities.length) {
+				idx = intervalCardinalities.length - 1;
+			}
+			// -------------------
+			// 在单个区间idx内，计算当前的分位点
+			cdfPerInterval[idx] += valueNumEntryList.get(i).getValue() / (double) valuesSize;
+			int freqInx = (int) (cdfPerInterval[idx] / intervalFreqLength[idx]);
+			// 如果这个数占据极大的频数，可能会直接跳过某个分位点，这种情况下进行补齐，即认为跳过的分位点和前一个是一样的位置
+			while (quantilePerInterval.get(idx).size() < freqInx - 1){
+				quantilePerInterval.get(idx).add(quantilePerInterval.get(idx).get(quantilePerInterval.get(idx).size() - 1));
+			}
+			if (quantilePerInterval.get(idx).size() == freqInx - 1){
+				double idxBase = ((valueNumEntryList.get(i).getKey().doubleValue() - minValue.doubleValue())
+						- idx * avgIntervalLength);
+				double posInInterval = idxBase / avgIntervalLength;
+				quantilePerInterval.get(idx).add(posInInterval);
+			}
+		}
+		// 补齐最后一个段，其值必然是1
+		for (int i = 0; i < intervalNum; i++){
+			int freqInx = binNum;
+			// 如果这个数占据极大的频数，可能会直接跳过某个分位点，这种情况下进行补齐，即认为跳过的分位点和前一个是一样的位置
+			while (quantilePerInterval.get(i).size() < freqInx){
+				quantilePerInterval.get(i).add(quantilePerInterval.get(i).get(quantilePerInterval.get(i).size() - 1));
+			}
+			if (quantilePerInterval.get(i).size() == freqInx){
+				quantilePerInterval.get(i).add(1.0);
+			}
+		}
+
+		return quantilePerInterval;
 	}
 
 	private static <T extends Number> Object[] getIntervalCardiFrequInfo(List<Entry<T, Integer>> valueNumEntryList,

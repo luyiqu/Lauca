@@ -1,4 +1,7 @@
 package accessdistribution;
+
+import java.util.ArrayList;
+
 /**
  * 当前工作中的数据访问分布由高频项和直方图共同表示
  */
@@ -19,6 +22,10 @@ public abstract class DataAccessDistribution implements Comparable<DataAccessDis
 	// 每个区间上数据访问的频率（在统计时会刨掉高频项），这里假设区间内每个元素出现的概率是相同的
 	protected double[] intervalFrequencies = null;
 
+	// 每个区间内频数统计的分段数，也即分位点数
+	protected int quantileNum;
+	// 每个区间频数统计的结果，这个二维数组的大小为intervalNum*quantileNum，每个区间的分段数都是一样的，记录了区间内各分位点的归一化位置
+	protected ArrayList<ArrayList<Double>> quantilePerInterval = null;
 
 	// 下面两个类成员不是数据分布的信息
 	// cumulativeFrequencies：累积频率，用来支持数据的随机生成
@@ -35,10 +42,24 @@ public abstract class DataAccessDistribution implements Comparable<DataAccessDis
 		init();
 	}
 
+	public DataAccessDistribution(double[] hFItemFrequencies, long[] intervalCardinalities,
+								  double[] intervalFrequencies,ArrayList<ArrayList<Double>> quantilePerInterval) {
+		super();
+		this.hFItemFrequencies = hFItemFrequencies;
+		this.intervalCardinalities = intervalCardinalities;
+		this.intervalFrequencies = intervalFrequencies;
+		this.quantilePerInterval = quantilePerInterval;
+		init();
+	}
+
 	// 利用构造函数传入的参数信息 初始化 其余类成员
 	private void init() {
 		highFrequencyItemNum = hFItemFrequencies.length;
 		intervalNum = intervalCardinalities.length;
+
+		quantileNum = (this.quantilePerInterval != null && this.quantilePerInterval.size() > 0)?
+				(this.quantilePerInterval.get(0).size()):
+				-1;
 
 		cumulativeFrequencies = new double[highFrequencyItemNum + intervalNum];
 		cumulativeFrequencies[0] = hFItemFrequencies[0]; // 默认是有高频项的

@@ -97,7 +97,8 @@ class DataGenerationThread implements Runnable {
 		
 		table.setThreadNum(threadNum);
 		table.setThreadId(threadId);
-		try (BufferedWriter bw = new BufferedWriter(new OutputStreamWriter(new FileOutputStream(outputFile), "utf-8"))) {
+		try  {
+			BufferedWriter bw = new BufferedWriter(new OutputStreamWriter(new FileOutputStream(outputFile), "utf-8"));
 			StringBuilder sb = new StringBuilder();
 			while (true) {
 				Object[] tuple = table.geneTuple(sdf);
@@ -109,7 +110,8 @@ class DataGenerationThread implements Runnable {
 				}
 				sb.append(tuple[tuple.length - 1]).append("\r\n");
 				//处理null值，导入mysql前，要将null换成\N
-				if (sb.toString().contains("null") && (Configurations.getDatabaseType().toLowerCase().equals("mysql")||Configurations.getDatabaseType().toLowerCase().equals("tidb"))}){
+				if (sb.toString().contains("null") &&
+						(Configurations.getDatabaseType().toLowerCase().equals("mysql")||Configurations.getDatabaseType().toLowerCase().equals("tidb"))){
 					bw.write(sb.toString().replace("null","\\N"));
 				}
 				else bw.write(sb.toString());
