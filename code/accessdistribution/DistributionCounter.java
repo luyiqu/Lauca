@@ -283,74 +283,31 @@ public class DistributionCounter {
 			for (int i = 0; i < data.size(); i++) {
 				values.add(Long.parseLong(data.get(i)));
 			}
-			Long minValue = Collections.min(values);
-			Long maxValue = Collections.max(values);
-
-			// Entry：<参数，参数出现的个数>；所有Entry按照出现个数升序排列
-			List<Entry<Long, Integer>> valueNumEntryList = getValueNumEntryList(values);
-
 			Long[] highFrequencyItems = new Long[Configurations.getHighFrequencyItemNum()];
-			// 因为一个函数无法有两个返回值，并且有些访问分布中不需要统计highFrequencyItems（此时传入一个null即可），故采用如下处理形式
-			double[] hFItemFrequencies = getHighFrequencyItemInfo(valueNumEntryList, values.size(), highFrequencyItems);
 
-			// Object[] result -> 为了可以有多个函数返回值~
-			Object[] result = getIntervalCardiFrequInfo(valueNumEntryList, maxValue, minValue, values.size());
-			long[] intervalCardinalities = (long[]) result[0];
-			double[] intervalFrequencies = (double[]) result[1];
-
-			ArrayList<ArrayList<Double>> quantilePerInterval = getQuantilePerInterval(valueNumEntryList, intervalCardinalities,
-					intervalFrequencies, maxValue, minValue, values.size());
-
-			return new ContinuousParaDistribution<Long>(minValue, maxValue, highFrequencyItems, hFItemFrequencies,
-					intervalCardinalities, intervalFrequencies, quantilePerInterval);
+			return getContinuousParaDistribution(values, highFrequencyItems);
 		} else if (dataType == 1) { // Double
 			List<Double> values = new ArrayList<>();
 			for (int i = 0; i < data.size(); i++) {
 				values.add(Double.parseDouble(data.get(i)));
 			}
-			Double minValue = Collections.min(values);
-			Double maxValue = Collections.max(values);
-
-			List<Entry<Double, Integer>> valueNumEntryList = getValueNumEntryList(values);
-
 			Double[] highFrequencyItems = new Double[Configurations.getHighFrequencyItemNum()];
-			double[] hFItemFrequencies = getHighFrequencyItemInfo(valueNumEntryList, values.size(), highFrequencyItems);
 
-			Object[] result = getIntervalCardiFrequInfo(valueNumEntryList, maxValue, minValue, values.size());
-			long[] intervalCardinalities = (long[]) result[0];
-			double[] intervalFrequencies = (double[]) result[1];
-
-			ArrayList<ArrayList<Double>> quantilePerInterval = getQuantilePerInterval(valueNumEntryList, intervalCardinalities,
-					intervalFrequencies, maxValue, minValue, values.size());
-
-			return new ContinuousParaDistribution<Double>(minValue, maxValue, highFrequencyItems, hFItemFrequencies,
-					intervalCardinalities, intervalFrequencies, quantilePerInterval);
+			return getContinuousParaDistribution(values, highFrequencyItems);
 		} else if (dataType == 2) { // BigDecimal
 			List<BigDecimal> values = new ArrayList<>();
 			for (int i = 0; i < data.size(); i++) {
 				values.add(new BigDecimal(data.get(i)));
 			}
-			BigDecimal minValue = Collections.min(values);
-			BigDecimal maxValue = Collections.max(values);
-
-			List<Entry<BigDecimal, Integer>> valueNumEntryList = getValueNumEntryList(values);
-
 			BigDecimal[] highFrequencyItems = new BigDecimal[Configurations.getHighFrequencyItemNum()];
-			double[] hFItemFrequencies = getHighFrequencyItemInfo(valueNumEntryList, values.size(), highFrequencyItems);
 
-			Object[] result = getIntervalCardiFrequInfo(valueNumEntryList, maxValue, minValue, values.size());
-			long[] intervalCardinalities = (long[]) result[0];
-			double[] intervalFrequencies = (double[]) result[1];
-
-			ArrayList<ArrayList<Double>> quantilePerInterval = getQuantilePerInterval(valueNumEntryList, intervalCardinalities,
-					intervalFrequencies, maxValue, minValue, values.size());
-
-			return new ContinuousParaDistribution<BigDecimal>(minValue, maxValue, highFrequencyItems, hFItemFrequencies,
-					intervalCardinalities, intervalFrequencies, quantilePerInterval);
+			return getContinuousParaDistribution(values, highFrequencyItems);
 		} else {
 			System.out.println("针对ContinuousParaDistribution尚不支持的数据类型！ -- " + dataType);
 			return null;
 		}
+
+
 	}
 
 	// 该函数中的代码与countContinuousParaDistribution函数中第一个分支的代码基本相同~
@@ -516,6 +473,27 @@ public class DistributionCounter {
 				intervalParaRepeatRatios, hFItemRepeatRatio);
 	}
 
+	private static <T extends Number> DataAccessDistribution getContinuousParaDistribution(List<T> values, T[] highFrequencyItems){
+		T minValue = Collections.min(values, Comparator.comparing(o -> new BigDecimal(o.doubleValue())));
+		T maxValue = Collections.max(values, Comparator.comparing(o -> new BigDecimal(o.doubleValue())));
+
+		// Entry：<参数，参数出现的个数>；所有Entry按照出现个数升序排列
+		List<Entry<T, Integer>> valueNumEntryList = getValueNumEntryList(values);
+
+		// 因为一个函数无法有两个返回值，并且有些访问分布中不需要统计highFrequencyItems（此时传入一个null即可），故采用如下处理形式
+		double[] hFItemFrequencies = getHighFrequencyItemInfo(valueNumEntryList, values.size(), highFrequencyItems);
+
+		// Object[] result -> 为了可以有多个函数返回值~
+		Object[] result = getIntervalCardiFrequInfo(valueNumEntryList, maxValue, minValue, values.size());
+		long[] intervalCardinalities = (long[]) result[0];
+		double[] intervalFrequencies = (double[]) result[1];
+
+		ArrayList<ArrayList<Double>> quantilePerInterval = getQuantilePerInterval(valueNumEntryList, intervalCardinalities,
+				intervalFrequencies, maxValue, minValue, values.size());
+		return new ContinuousParaDistribution<T>(minValue, maxValue, highFrequencyItems, hFItemFrequencies,
+				intervalCardinalities, intervalFrequencies, quantilePerInterval);
+	}
+
 	// 统计values中所有非重复值的出现个数，并按出现次数升序排列
 	private static <T> List<Entry<T, Integer>> getValueNumEntryList(List<T> values) {
 		Map<T, Integer> value2Num = new HashMap<>();
@@ -573,12 +551,7 @@ public class DistributionCounter {
 			quantilePerInterval.get(i).add(0.0);
 		}
 		// 按键值升序排列
-		Collections.sort(valueNumEntryList, new Comparator<Entry<T, Integer>>() {
-			@Override
-			public int compare(Entry<T, Integer> o1, Entry<T, Integer> o2) {
-				return o1.getKey().intValue() - o2.getKey().intValue();
-			}
-		});
+		Collections.sort(valueNumEntryList, (o1, o2) -> o1.getKey().intValue() - o2.getKey().intValue());
 
 
 		//
