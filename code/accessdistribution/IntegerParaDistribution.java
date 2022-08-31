@@ -1,9 +1,7 @@
 package accessdistribution;
 
-import java.util.Arrays;
-import java.util.HashSet;
-import java.util.Random;
-import java.util.Set;
+import java.util.*;
+
 import abstraction.Column;
 import config.Configurations;
 
@@ -40,6 +38,13 @@ public class IntegerParaDistribution extends DataAccessDistribution {
 	public IntegerParaDistribution(long windowMinValue, long windowMaxValue, double[] hFItemFrequencies, 
 			long[] intervalCardinalities, double[] intervalFrequencies) {
 		super(hFItemFrequencies, intervalCardinalities, intervalFrequencies);
+		this.windowMinValue = windowMinValue;
+		this.windowMaxValue = windowMaxValue;
+	}
+
+	public IntegerParaDistribution(long windowMinValue, long windowMaxValue, double[] hFItemFrequencies,
+								   long[] intervalCardinalities, double[] intervalFrequencies, ArrayList<ArrayList<Double>> quantilePerInterval) {
+		super(hFItemFrequencies, intervalCardinalities, intervalFrequencies, quantilePerInterval);
 		this.windowMinValue = windowMinValue;
 		this.windowMaxValue = windowMaxValue;
 	}

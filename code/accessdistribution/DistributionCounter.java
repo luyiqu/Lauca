@@ -150,7 +150,7 @@ public class DistributionCounter {
 			DataAccessDistribution distribution0 = countContinuousParaDistribution(distTypeInfo.dataType, data);
 			distribution0.setTime(windowTime);
 //			System.out.println("DistributionCounter "+"windowTime: "+windowTime);
-//			txName2ParaId2DistributionList.get(txName).get(paraIdentifier).add(distribution0);
+			txName2ParaId2DistributionList.get(txName).get(paraIdentifier).add(distribution0);
 			// System.out.println(txName + " " + paraIdentifier + "\n" + distribution0);
 			break;
 		case 1:
@@ -327,8 +327,11 @@ public class DistributionCounter {
 		long[] intervalCardinalities = (long[]) result[0];
 		double[] intervalFrequencies = (double[]) result[1];
 
+		ArrayList<ArrayList<Double>> quantilePerInterval = getQuantilePerInterval(valueNumEntryList, intervalCardinalities,
+				intervalFrequencies, windowMaxValue, windowMinValue, values.size());
+
 		return new IntegerParaDistribution(windowMinValue, windowMaxValue, hFItemFrequencies, intervalCardinalities,
-				intervalFrequencies);
+				intervalFrequencies, quantilePerInterval);
 	}
 
 	private static VarcharParaDistribution countVarcharParaDistribution(List<String> data) {
@@ -340,6 +343,8 @@ public class DistributionCounter {
 		Object[] result = getIntervalCardiFrequInfo(valueNumEntryList, data.size());
 		long[] intervalCardinalities = (long[]) result[0];
 		double[] intervalFrequencies = (double[]) result[1];
+
+		// TODO hash code 分段的情况下要怎么统计频数？
 
 		return new VarcharParaDistribution(hFItemFrequencies, intervalCardinalities, intervalFrequencies);
 	}
@@ -374,8 +379,11 @@ public class DistributionCounter {
 			}
 		}
 
+		ArrayList<ArrayList<Double>> quantilePerInterval = getQuantilePerInterval(valueNumEntryList, intervalCardinalities,
+				intervalFrequencies, maxValue, minValue, values.size());
+
 		return new SequentialCtnsParaDistribution(minValue.longValue(), maxValue.longValue(), highFrequencyItems2,
-				hFItemFrequencies, intervalCardinalities, intervalFrequencies, intervalParaRepeatRatios);
+				hFItemFrequencies, intervalCardinalities, intervalFrequencies, intervalParaRepeatRatios, quantilePerInterval);
 	}
 
 	private static SequentialIntParaDistribution countSequentialIntParaDistribution(List<String> data, String txName,
@@ -428,8 +436,11 @@ public class DistributionCounter {
 			hFItemRepeatRatio = (double) hFItemRepeatNum / currentHFItemNum;
 		}
 
+		ArrayList<ArrayList<Double>> quantilePerInterval = getQuantilePerInterval(valueNumEntryList, intervalCardinalities,
+				intervalFrequencies, windowMaxValue, windowMinValue, values.size());
+
 		return new SequentialIntParaDistribution(windowMinValue, windowMaxValue, hFItemFrequencies,
-				intervalCardinalities, intervalFrequencies, intervalParaRepeatRatios, hFItemRepeatRatio);
+				intervalCardinalities, intervalFrequencies, intervalParaRepeatRatios, hFItemRepeatRatio, quantilePerInterval);
 	}
 
 	private static SequentialVcharParaDistribution countSequentialVcharParaDistribution(List<String> data,

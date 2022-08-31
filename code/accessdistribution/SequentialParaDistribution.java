@@ -1,5 +1,7 @@
 package accessdistribution;
 
+import java.util.ArrayList;
+
 /**
  * 基于连续时间窗口的数据访问分布，体现了相邻时间窗口数据分布之间的连续性
  * 对于非等值过滤型参数，这种连续性是没有物理意义的，因此连续时间窗口数据访问分布一般仅考虑整型和字符型参数
@@ -13,6 +15,12 @@ public abstract class SequentialParaDistribution extends DataAccessDistribution 
 	public SequentialParaDistribution(double[] hFItemFrequencies, long[] intervalCardinalities,
 			double[] intervalFrequencies, double[] intervalParaRepeatRatios) {
 		super(hFItemFrequencies, intervalCardinalities, intervalFrequencies);
+		this.intervalParaRepeatRatios = intervalParaRepeatRatios;
+	}
+
+	public SequentialParaDistribution(double[] hFItemFrequencies, long[] intervalCardinalities,
+									  double[] intervalFrequencies, double[] intervalParaRepeatRatios, ArrayList<ArrayList<Double>> quantilePerInterval) {
+		super(hFItemFrequencies, intervalCardinalities, intervalFrequencies, quantilePerInterval);
 		this.intervalParaRepeatRatios = intervalParaRepeatRatios;
 	}
 }

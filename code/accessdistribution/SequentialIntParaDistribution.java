@@ -32,10 +32,19 @@ public class SequentialIntParaDistribution extends SequentialParaDistribution {
 	private long[] highFrequencyItems = null;
 	private long[][] currentParaCandidates = null;
 
+	public SequentialIntParaDistribution(long windowMinValue, long windowMaxValue,
+										 double[] hFItemFrequencies, long[] intervalCardinalities, double[] intervalFrequencies,
+										 double[] intervalParaRepeatRatios, double hFItemRepeatRatio) {
+		super(hFItemFrequencies, intervalCardinalities, intervalFrequencies, intervalParaRepeatRatios);
+		this.windowMinValue = windowMinValue;
+		this.windowMaxValue = windowMaxValue;
+		this.hFItemRepeatRatio = hFItemRepeatRatio;
+	}
+
 	public SequentialIntParaDistribution(long windowMinValue, long windowMaxValue, 
 			double[] hFItemFrequencies, long[] intervalCardinalities, double[] intervalFrequencies, 
-			double[] intervalParaRepeatRatios, double hFItemRepeatRatio) {
-		super(hFItemFrequencies, intervalCardinalities, intervalFrequencies, intervalParaRepeatRatios);
+			double[] intervalParaRepeatRatios, double hFItemRepeatRatio, ArrayList<ArrayList<Double>> quantilePerInterval) {
+		super(hFItemFrequencies, intervalCardinalities, intervalFrequencies, intervalParaRepeatRatios, quantilePerInterval);
 		this.windowMinValue = windowMinValue;
 		this.windowMaxValue = windowMaxValue;
 		this.hFItemRepeatRatio = hFItemRepeatRatio;

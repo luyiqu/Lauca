@@ -29,6 +29,15 @@ public class SequentialCtnsParaDistribution extends SequentialParaDistribution {
 		this.highFrequencyItems = highFrequencyItems;
 	}
 
+	public SequentialCtnsParaDistribution(long minValue, long maxValue, long[] highFrequencyItems,
+										  double[] hFItemFrequencies, long[] intervalCardinalities, double[] intervalFrequencies,
+										  double[] intervalParaRepeatRatios, ArrayList<ArrayList<Double>> quantilePerInterval) {
+		super(hFItemFrequencies, intervalCardinalities, intervalFrequencies, intervalParaRepeatRatios, quantilePerInterval);
+		this.minValue = minValue;
+		this.maxValue = maxValue;
+		this.highFrequencyItems = highFrequencyItems;
+	}
+
 	// long[][] priorParaCandidates：前一个时间窗口的候选参数集，这里的priorParaCandidates无需保存
 	// 通过priorParaCandidates生成满足要求（intervalParaRepeatRatios & intervalCardinalities）的currentParaCandidates
 	// 当intervalParaRepeatRatios & priorParaCandidates为Null时，即生成第一个（初始）时间窗口的currentParaCandidates

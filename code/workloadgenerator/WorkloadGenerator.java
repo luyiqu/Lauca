@@ -129,6 +129,9 @@ public class WorkloadGenerator {
 	// 启动当前节点上的所有测试客户端
 	public void startAllThreads(CountDownLatch countDownLatch) {
 		Thread[] threads = new Thread[localThreadNum];
+
+		// TODO 在这里更新txName2ParaId2FullLifeCycleDistribution
+
 		for (int i = 0; i < localThreadNum; i++) {
 			// 这里的Workload一定要深拷贝，以避免多测试线程共享Workload对象而发生错误
 			Workload workloadCopy = new Workload(workload);
