@@ -38,6 +38,30 @@ public class SequentialCtnsParaDistribution extends SequentialParaDistribution {
 		this.highFrequencyItems = highFrequencyItems;
 	}
 
+	public SequentialCtnsParaDistribution(SequentialCtnsParaDistribution sequentialCtnsParaDistribution){
+		super(sequentialCtnsParaDistribution);
+		this.minValue = sequentialCtnsParaDistribution.minValue;
+		this.maxValue = sequentialCtnsParaDistribution.maxValue;
+		this.highFrequencyItems = new long[sequentialCtnsParaDistribution.highFrequencyItems.length];
+
+		for (int i = 0 ;i< highFrequencyItems.length; ++i){
+			highFrequencyItems[i] = sequentialCtnsParaDistribution.highFrequencyItems[i];
+		}
+
+		if (sequentialCtnsParaDistribution.currentParaCandidates != null){
+			this.currentParaCandidates = new long[sequentialCtnsParaDistribution.currentParaCandidates.length][sequentialCtnsParaDistribution.currentParaCandidates[0].length];
+			for (int i = 0; i < sequentialCtnsParaDistribution.currentParaCandidates.length; i++) {
+				for (int j = 0; j < sequentialCtnsParaDistribution.currentParaCandidates[0].length; j++) {
+					this.currentParaCandidates[i][j] = sequentialCtnsParaDistribution.currentParaCandidates[i][j];
+				}
+			}
+		}
+	}
+
+	public SequentialCtnsParaDistribution copy(){
+		return new SequentialCtnsParaDistribution(this);
+	}
+
 	// long[][] priorParaCandidates：前一个时间窗口的候选参数集，这里的priorParaCandidates无需保存
 	// 通过priorParaCandidates生成满足要求（intervalParaRepeatRatios & intervalCardinalities）的currentParaCandidates
 	// 当intervalParaRepeatRatios & priorParaCandidates为Null时，即生成第一个（初始）时间窗口的currentParaCandidates

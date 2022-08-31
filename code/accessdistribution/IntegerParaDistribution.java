@@ -49,6 +49,24 @@ public class IntegerParaDistribution extends DataAccessDistribution {
 		this.windowMaxValue = windowMaxValue;
 	}
 
+	public IntegerParaDistribution(IntegerParaDistribution integerParaDistribution){
+		super(integerParaDistribution);
+		this.windowMaxValue = integerParaDistribution.windowMaxValue;
+		this.windowMinValue = integerParaDistribution.windowMinValue;
+		this.highFrequencyItems = new long[integerParaDistribution.highFrequencyItems.length];
+
+		for (int i = 0 ;i< highFrequencyItems.length; ++i){
+			highFrequencyItems[i] = integerParaDistribution.highFrequencyItems[i];
+		}
+
+		setColumnInfo(integerParaDistribution.columnMinValue, integerParaDistribution.columnMaxValue,
+				integerParaDistribution.columnCardinality, integerParaDistribution.coefficient);
+	}
+
+	public IntegerParaDistribution copy(){
+		return new IntegerParaDistribution(this);
+	}
+
 	public void setColumnInfo(long columnMinValue, long columnMaxValue, 
 			long columnCardinality, double coefficient) {
 		this.columnMinValue = columnMinValue;

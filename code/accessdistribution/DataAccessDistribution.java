@@ -52,6 +52,33 @@ public abstract class DataAccessDistribution implements Comparable<DataAccessDis
 		init();
 	}
 
+	public DataAccessDistribution(DataAccessDistribution dataAccessDistribution){
+		super();
+		this.time = dataAccessDistribution.time;
+		this.highFrequencyItemNum = dataAccessDistribution.highFrequencyItemNum;
+		this.intervalNum = dataAccessDistribution.intervalNum;
+		this.quantileNum = dataAccessDistribution.quantileNum;
+
+		this.hFItemFrequencies = new double[highFrequencyItemNum];
+		for (int i = 0;i < highFrequencyItemNum; ++i){
+			this.hFItemFrequencies[i] = dataAccessDistribution.hFItemFrequencies[i];
+		}
+
+		this.intervalCardinalities = new long[this.intervalNum];
+		this.intervalFrequencies = new double[this.intervalNum];
+		for (int  i = 0;i < this.intervalNum; ++i){
+			this.intervalFrequencies[i] = dataAccessDistribution.intervalFrequencies[i];
+			this.intervalCardinalities[i] = dataAccessDistribution.intervalCardinalities[i];
+		}
+
+		this.quantilePerInterval = new ArrayList<>();
+		for (ArrayList quantile: dataAccessDistribution.quantilePerInterval){
+			this.quantilePerInterval.add(new ArrayList<>(quantile));
+		}
+
+		init();
+	}
+
 	// 利用构造函数传入的参数信息 初始化 其余类成员
 	private void init() {
 		highFrequencyItemNum = hFItemFrequencies.length;
@@ -132,5 +159,12 @@ public abstract class DataAccessDistribution implements Comparable<DataAccessDis
 	
 	// bug fix：判断利用事务逻辑生成的参数是否在当前属性的阈值内
 	public abstract boolean inDomain(Object parameter);
-	
+
+	// 将另一个数据分布的内容按一定的比例合并到当前分布
+	public void merge(DataAccessDistribution dataAccessDistribution, double p){
+
+	}
+
+	public abstract DataAccessDistribution copy();
+
 }

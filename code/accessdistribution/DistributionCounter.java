@@ -902,6 +902,33 @@ public class DistributionCounter {
 	public static Map<String, Map<String, Vector<DataAccessDistribution>>> getTxName2ParaId2DistributionList() {
 		return txName2ParaId2DistributionList;
 	}
+
+	public static List<Map<String, Map<String, DataAccessDistribution>>> windowDistributionAverage(List<Map<String, Map<String, DataAccessDistribution>>> windowDistributionList) {
+		List<Map<String, Map<String, DataAccessDistribution>>> averageList = new ArrayList<>();
+		averageList.add(windowDistributionList.get(0));
+
+		for (int i = 1; i < windowDistributionList.size(); ++i){
+			averageList.add(mergeDistribution(averageList.get(i-1), windowDistributionList.get(i)));
+		}
+
+		return averageList;
+	}
+
+	private static Map<String, Map<String, DataAccessDistribution>> mergeDistribution(Map<String, Map<String, DataAccessDistribution>> oldDistribution, Map<String, Map<String, DataAccessDistribution>> newDistribution) {
+		Map<String, Map<String, DataAccessDistribution>> trueDistribution = new HashMap<>();
+		double p = 0.8;
+		for (String txId : oldDistribution.keySet()){
+			Map<String, DataAccessDistribution> txParaDistribution = new HashMap<>();
+			for (String paraId : oldDistribution.get(txId).keySet()){
+				DataAccessDistribution paraDistribution = oldDistribution.get(txId).get(paraId).copy(); // TODO 这里需要修改成深拷贝
+				paraDistribution.merge(newDistribution.get(txId).get(paraId), p);
+				txParaDistribution.put(paraId, paraDistribution);
+			}
+			trueDistribution.put(txId, txParaDistribution);
+		}
+		return trueDistribution;
+	}
+
 	public void setTxName2ParaId2DistributionList
 			(String txName, String paraIdentifier, long windowTime, IntegerParaDistribution distribution){
 		distribution.setTime(windowTime);

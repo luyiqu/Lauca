@@ -41,6 +41,22 @@ public class ContinuousParaDistribution <T extends Number> extends DataAccessDis
 		this.highFrequencyItems = highFrequencyItems;
 	}
 
+	public ContinuousParaDistribution(ContinuousParaDistribution<T> continuousParaDistribution){
+		super(continuousParaDistribution);
+		this.minValue = continuousParaDistribution.minValue;
+		this.maxValue = continuousParaDistribution.maxValue;
+		ArrayList<T> freqItem = new ArrayList<>();// 泛型数组不能直接初始化，需要用arraylist强转一下
+
+		for (int i = 0 ;i< highFrequencyItems.length; ++i){
+			freqItem.add(continuousParaDistribution.highFrequencyItems[i]);
+		}
+		this.highFrequencyItems = (T[]) freqItem.toArray();
+	}
+
+	public ContinuousParaDistribution copy(){
+		return new ContinuousParaDistribution(this);
+	}
+
 	@Override
 	public T geneValue() {
 //		System.out.println(this.getClass());

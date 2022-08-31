@@ -50,6 +50,36 @@ public class SequentialIntParaDistribution extends SequentialParaDistribution {
 		this.hFItemRepeatRatio = hFItemRepeatRatio;
 	}
 
+	public SequentialIntParaDistribution(SequentialIntParaDistribution sequentialIntParaDistribution){
+		super(sequentialIntParaDistribution);
+		this.windowMinValue = sequentialIntParaDistribution.windowMinValue;
+		this.windowMaxValue = sequentialIntParaDistribution.windowMaxValue;
+		this.highFrequencyItems = new long[sequentialIntParaDistribution.highFrequencyItems.length];
+
+		for (int i = 0 ;i< highFrequencyItems.length; ++i){
+			highFrequencyItems[i] = sequentialIntParaDistribution.highFrequencyItems[i];
+		}
+		if (sequentialIntParaDistribution.currentParaCandidates != null){
+			this.currentParaCandidates = new long[sequentialIntParaDistribution.currentParaCandidates.length][sequentialIntParaDistribution.currentParaCandidates[0].length];
+			for (int i = 0; i < sequentialIntParaDistribution.currentParaCandidates.length; i++) {
+				for (int j = 0; j < sequentialIntParaDistribution.currentParaCandidates[0].length; j++) {
+					this.currentParaCandidates[i][j] = sequentialIntParaDistribution.currentParaCandidates[i][j];
+				}
+			}
+		}
+
+		for (int i = 0 ;i< highFrequencyItems.length; ++i){
+			highFrequencyItems[i] = sequentialIntParaDistribution.highFrequencyItems[i];
+		}
+
+		setColumnInfo(sequentialIntParaDistribution.columnMinValue,sequentialIntParaDistribution.columnMaxValue,
+				sequentialIntParaDistribution.columnCardinality,sequentialIntParaDistribution.coefficient);
+	}
+
+	public SequentialIntParaDistribution copy(){
+		return new SequentialIntParaDistribution(this);
+	}
+
 	public void setColumnInfo(long columnMinValue, long columnMaxValue, 
 			long columnCardinality, double coefficient) {
 		this.columnMinValue = columnMinValue;

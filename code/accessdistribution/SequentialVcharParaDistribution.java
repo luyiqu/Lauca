@@ -25,11 +25,40 @@ public class SequentialVcharParaDistribution extends SequentialParaDistribution 
 		this.hFItemRepeatRatio = hFItemRepeatRatio;
 	}
 
+	public SequentialVcharParaDistribution(SequentialVcharParaDistribution sequentialVcharParaDistribution){
+		super(sequentialVcharParaDistribution);
+		this.hFItemRepeatRatio = sequentialVcharParaDistribution.hFItemRepeatRatio;
+		this.highFrequencyItems = new String[sequentialVcharParaDistribution.highFrequencyItems.length];
+
+		for (int i = 0 ;i< highFrequencyItems.length; ++i){
+			highFrequencyItems[i] = sequentialVcharParaDistribution.highFrequencyItems[i];
+		}
+		if (sequentialVcharParaDistribution.currentParaCandidates != null){
+			this.currentParaCandidates = new String[sequentialVcharParaDistribution.currentParaCandidates.length][sequentialVcharParaDistribution.currentParaCandidates[0].length];
+			for (int i = 0; i < sequentialVcharParaDistribution.currentParaCandidates.length; i++) {
+				for (int j = 0; j < sequentialVcharParaDistribution.currentParaCandidates[0].length; j++) {
+					this.currentParaCandidates[i][j] = sequentialVcharParaDistribution.currentParaCandidates[i][j];
+				}
+			}
+		}
+
+
+		setColumnInfo(sequentialVcharParaDistribution.columnCardinality,sequentialVcharParaDistribution.minLength,
+				sequentialVcharParaDistribution.maxLength,sequentialVcharParaDistribution.seedStrings);
+	}
+
+	public SequentialVcharParaDistribution copy(){
+		return new SequentialVcharParaDistribution(this);
+	}
+
 	public void setColumnInfo(long columnCardinality, int minLength, int maxLength, String[] seedStrings) {
 		this.columnCardinality = columnCardinality;
 		this.minLength = minLength;
 		this.maxLength = maxLength;
-		this.seedStrings = seedStrings;
+		this.seedStrings = new String[seedStrings.length];
+		for (int i = 0; i < seedStrings.length; i++) {
+			this.seedStrings[i] = seedStrings[i];
+		}
 	}
 
 	public void geneHighFrequencyItems(String[] priorHighFrequencyItems) {

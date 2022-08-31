@@ -23,4 +23,12 @@ public abstract class SequentialParaDistribution extends DataAccessDistribution 
 		super(hFItemFrequencies, intervalCardinalities, intervalFrequencies, quantilePerInterval);
 		this.intervalParaRepeatRatios = intervalParaRepeatRatios;
 	}
+
+	public SequentialParaDistribution(SequentialParaDistribution sequentialParaDistribution){
+		super(sequentialParaDistribution);
+		this.intervalParaRepeatRatios = new double[sequentialParaDistribution.intervalParaRepeatRatios.length];
+		for (int i = 0;i < intervalParaRepeatRatios.length; ++i){
+			intervalParaRepeatRatios[i] = sequentialParaDistribution.intervalParaRepeatRatios[i];
+		}
+	}
 }

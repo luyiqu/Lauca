@@ -131,6 +131,8 @@ public class WorkloadGenerator {
 		Thread[] threads = new Thread[localThreadNum];
 
 		// TODO 在这里更新txName2ParaId2FullLifeCycleDistribution
+		Map<String, Map<String, DataAccessDistribution>> fullLifeCycleDistribution = new HashMap<>();
+
 
 		for (int i = 0; i < localThreadNum; i++) {
 			// 这里的Workload一定要深拷贝，以避免多测试线程共享Workload对象而发生错误

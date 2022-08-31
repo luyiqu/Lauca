@@ -235,7 +235,9 @@ public class LaucaTestingEnv {
 		WorkloadGenerator workloadGenerator = new WorkloadGenerator(allThreadNum, localThreadNum, workload,
 				dbConnector);
 		workloadGenerator.constructWindowThroughputList(DistributionCounter.getTxName2ThroughputList());
-		workloadGenerator.setWindowDistributionList(DistributionCounter.getWindowDistributionList());
+		List<Map<String, Map<String, DataAccessDistribution>>> windowDistributionList = DistributionCounter.getWindowDistributionList();
+		windowDistributionList = DistributionCounter.windowDistributionAverage(windowDistributionList);
+		workloadGenerator.setWindowDistributionList(windowDistributionList);
 
 		CountDownLatch countDownLatch =new CountDownLatch(allThreadNum+1);
 		workloadGenerator
