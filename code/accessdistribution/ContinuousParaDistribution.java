@@ -1,8 +1,7 @@
 package accessdistribution;
 
 import java.math.BigDecimal;
-import java.util.ArrayList;
-import java.util.Arrays;
+import java.util.*;
 
 /**
  * 参数空间是连续的，此时参数的生成不需要考虑miss的情形（miss是指利用该参数值过滤无返回tuple，即没有记录满足谓词）
@@ -83,7 +82,7 @@ public class ContinuousParaDistribution <T extends Number> extends DataAccessDis
 		// 根据频数分位点先做一次映射，从均匀分布映射到基于频数的分段分布上
 		if (this.quantileNum > intervalIndex){
 			ArrayList<Double> quantile = this.quantilePerInterval.get(intervalIndex);
-			for(int i = 0;i < quantile.size() ; ++i){
+			for(int i = 1;i <= quantile.size() ; ++i){
 				double cdfNow = ((double) i / quantile.size());
 				if (intervalInnerIndex < cdfNow
 						+ 1e-7){// eps for float compare
@@ -119,7 +118,157 @@ public class ContinuousParaDistribution <T extends Number> extends DataAccessDis
 			return null; // 理论上不可能进入该分支
 		}
 	}
-	
+
+	// 将本分布与传入的分布按概率p,(1-p)的形式加权合并
+	// 在本函数中直接使用的位置，概率信息都是还原后的真实值
+	@Override
+	public void merge(DataAccessDistribution dataAccessDistribution, double p) throws Exception {
+		super.merge(dataAccessDistribution, p);
+		if (!(dataAccessDistribution instanceof ContinuousParaDistribution)){
+			throw new Exception("It's not same access distribution type");
+		}
+		ContinuousParaDistribution mergeDistribution = (ContinuousParaDistribution) dataAccessDistribution;
+		// 还原概率分布
+		List<Map.Entry<Double,Double>> baseQuantile = getQuantile();
+		List<Map.Entry<Double,Double>> mergeQuantile = mergeDistribution.getQuantile();
+		// 按分位点切割全区间
+		List<Double> allQuantilePos = new ArrayList<>();
+		List<Double> allQuantileProb = new ArrayList<>();
+		for (Map.Entry<Double, Double> quantile : baseQuantile) {
+			allQuantilePos.add(quantile.getKey());
+			allQuantileProb.add(0.0);
+		}
+		for (Map.Entry<Double, Double> quantile : mergeQuantile) {
+			allQuantilePos.add(quantile.getKey());
+			allQuantileProb.add(0.0);
+		}
+
+		allQuantilePos.sort(Comparator.comparing(BigDecimal::valueOf));
+		// 分别将两个分布的概率投射到分位点切割的每个子区间内
+		for (int i = 1;i < allQuantilePos.size(); ++i){
+			for (int j = 1;j < baseQuantile.size(); ++j){
+				double leftEndPoint =  allQuantilePos.get(i - 1) > baseQuantile.get(j - 1).getKey() ? allQuantilePos.get(i - 1) : baseQuantile.get(j - 1).getKey();
+				double rightEndPoint = allQuantilePos.get(i) < baseQuantile.get(j).getKey() ? allQuantilePos.get(i) : baseQuantile.get(j).getKey();
+
+				if (rightEndPoint < leftEndPoint){
+					continue;
+				}
+				double prob = baseQuantile.get(j).getValue()*(rightEndPoint - leftEndPoint)/(baseQuantile.get(j).getKey() - baseQuantile.get(j - 1).getKey());
+				allQuantileProb.set(i,allQuantileProb.get(i) + prob * p);
+			}
+
+			for (int j = 1;j < mergeQuantile.size(); ++j){
+				double leftEndPoint =  allQuantilePos.get(i - 1) > mergeQuantile.get(j - 1).getKey() ? allQuantilePos.get(i - 1) : mergeQuantile.get(j - 1).getKey();
+				double rightEndPoint = allQuantilePos.get(i) < mergeQuantile.get(j).getKey() ? allQuantilePos.get(i) : mergeQuantile.get(j).getKey();
+
+				if (rightEndPoint < leftEndPoint){
+					continue;
+				}
+				double prob = mergeQuantile.get(j).getValue()*(rightEndPoint - leftEndPoint)/(mergeQuantile.get(j).getKey() - mergeQuantile.get(j - 1).getKey());
+				allQuantileProb.set(i,allQuantileProb.get(i) + prob * (1 - p));
+			}
+		}
+
+		this.minValue = this.minValue.doubleValue() < mergeDistribution.minValue.doubleValue() ?
+				this.minValue : (T) mergeDistribution.minValue;
+		this.maxValue = this.maxValue.doubleValue() < mergeDistribution.maxValue.doubleValue() ?
+				this.maxValue : (T) mergeDistribution.maxValue;
+
+		double avgIntervalLength = (this.maxValue.doubleValue() - this.minValue.doubleValue())/ intervalNum;
+		// 重构概率分布
+		for (int i = 1;i < allQuantilePos.size();++i){
+			// 当前分位点所在区间
+			int idx = (int)((allQuantilePos.get(i) - this.minValue.doubleValue()) / avgIntervalLength);
+			// 前一个分位点所在区间
+			int lastIdx = (int)((allQuantilePos.get(i - 1) - this.minValue.doubleValue()) / avgIntervalLength);
+
+			// 当前分位点对应的区间长度
+			double length = allQuantilePos.get(i) - allQuantilePos.get(i - 1);
+
+			// 从前一个分位点的位置扫过去
+			while (lastIdx <= idx){
+				// 当前所在区间的左端点
+				double left = (lastIdx * avgIntervalLength + this.minValue.doubleValue());
+
+				double leftEndPoint =  allQuantilePos.get(i - 1) > left ? allQuantilePos.get(i - 1) : left;
+				double rightEndPoint = allQuantilePos.get(i) < (left + avgIntervalLength) ? allQuantilePos.get(i) : (left + avgIntervalLength);
+
+				// 分位点应该分给当前区间的概率，根据两个区间的重合长度加权得到
+				double prob = allQuantileProb.get(i)*(rightEndPoint - leftEndPoint)/length;
+				this.intervalFrequencies[lastIdx] += prob;
+				lastIdx ++;
+			}
+		}
+
+		// 重构分位点
+		this.quantilePerInterval = new ArrayList<>();
+		for (int i = 0;i < this.intervalNum ; ++i){
+			ArrayList<Double> quantiles = new ArrayList<>();
+			quantiles.add(0.0);
+			// 当前区间每个分位点实际占有的概率
+			double prob = this.intervalFrequencies[i] / this.quantileNum;
+			// 先获取当前区间
+			Map<Double,Double> quantilesUsedNowAsMap = new HashMap<>();
+			double left = i * avgIntervalLength + this.minValue.doubleValue();
+
+
+			for (int j = 1;j < allQuantilePos.size(); ++j){
+				double length = allQuantilePos.get(j) - allQuantilePos.get(j - 1);
+				double leftEndPoint =  allQuantilePos.get(j - 1) > left ? allQuantilePos.get(j - 1) : left;
+				double rightEndPoint = allQuantilePos.get(j) < (left + avgIntervalLength) ? allQuantilePos.get(j) : (left + avgIntervalLength);
+				if (leftEndPoint < rightEndPoint){
+					quantilesUsedNowAsMap.put(rightEndPoint, allQuantileProb.get(j) * (rightEndPoint - leftEndPoint) / length);
+				}
+			}
+			if (!quantilesUsedNowAsMap.containsKey(left)){
+				quantilesUsedNowAsMap.put(left,0.0);
+			}
+			ArrayList<Map.Entry<Double,Double>> quantilesUsedNow = new ArrayList<>(quantilesUsedNowAsMap.entrySet());
+			quantilesUsedNow.sort(Comparator.comparing(o->BigDecimal.valueOf(o.getKey())));
+
+			double sum = 0;
+			double base = quantilesUsedNow.get(0).getKey();
+			for (Map.Entry<Double,Double> quantile: quantilesUsedNow){
+				while (sum + quantile.getValue() > prob + 1e-7){
+					double delta = prob - sum;
+					double length = quantile.getKey() - base;
+					double pos = base + length * delta / quantile.getValue();
+					quantiles.add((pos - left)/avgIntervalLength); // 保存归一化的分位点位置
+
+					base = pos;
+					quantile.setValue(quantile.getValue() - delta);
+					sum = 0;
+				}
+
+				base = quantile.getKey();
+				sum = quantile.getValue();
+			}
+		}
+	}
+
+	public List<Map.Entry<Double,Double>> getQuantile(){
+		HashMap<Double,Double> quantiles = new HashMap<>();
+		double avgIntervalLength = (maxValue.doubleValue() - minValue.doubleValue()) / intervalNum;
+		for (int i = 0; i < intervalNum; i++) {
+			// 当前区间的起始偏移量
+			double bias = i * avgIntervalLength + minValue.doubleValue();
+			// 当前区间每个分位点实际占有的概率
+			double prob = this.intervalFrequencies[i] / this.quantileNum;
+			for (int j = 0; j < quantileNum; j++) {
+				// 当前分位点的实际位置
+				double pos = bias + avgIntervalLength * this.quantilePerInterval.get(i).get(j);
+				// 第一个分位点是左端点，不对应任何概率
+				if (j == 0){
+					quantiles.put(pos,0.0);
+				}
+				else {
+					quantiles.put(pos,prob);
+				}
+
+			}
+		}
+		return new ArrayList<>(quantiles.entrySet());
+	}
 
 	public T getMinValue() {
 		return minValue;

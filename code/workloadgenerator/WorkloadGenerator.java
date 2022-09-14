@@ -130,8 +130,6 @@ public class WorkloadGenerator {
 	public void startAllThreads(CountDownLatch countDownLatch) {
 		Thread[] threads = new Thread[localThreadNum];
 
-		// TODO 在这里更新txName2ParaId2FullLifeCycleDistribution
-		Map<String, Map<String, DataAccessDistribution>> fullLifeCycleDistribution = new HashMap<>();
 
 
 		for (int i = 0; i < localThreadNum; i++) {

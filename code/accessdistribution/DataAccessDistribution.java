@@ -24,7 +24,7 @@ public abstract class DataAccessDistribution implements Comparable<DataAccessDis
 
 	// 每个区间内频数统计的分段数，也即分位点数
 	protected int quantileNum;
-	// 每个区间频数统计的结果，这个二维数组的大小为intervalNum*quantileNum，每个区间的分段数都是一样的，记录了区间内各分位点的归一化位置
+	// 每个区间频数统计的结果，这个二维数组的大小为intervalNum*quantileNum，每个区间的分段数都是一样的(含左右端点)，记录了区间内各分位点的归一化位置
 	protected ArrayList<ArrayList<Double>> quantilePerInterval = null;
 
 	// 下面两个类成员不是数据分布的信息
@@ -161,8 +161,7 @@ public abstract class DataAccessDistribution implements Comparable<DataAccessDis
 	public abstract boolean inDomain(Object parameter);
 
 	// 将另一个数据分布的内容按一定的比例合并到当前分布
-	public void merge(DataAccessDistribution dataAccessDistribution, double p){
-
+	public void merge(DataAccessDistribution dataAccessDistribution, double p) throws Exception {
 	}
 
 	public abstract DataAccessDistribution copy();

@@ -485,8 +485,8 @@ public class DistributionCounter {
 	}
 
 	private static <T extends Number> DataAccessDistribution getContinuousParaDistribution(List<T> values, T[] highFrequencyItems){
-		T minValue = Collections.min(values, Comparator.comparing(o -> new BigDecimal(o.doubleValue())));
-		T maxValue = Collections.max(values, Comparator.comparing(o -> new BigDecimal(o.doubleValue())));
+		T minValue = Collections.min(values, Comparator.comparing(o -> BigDecimal.valueOf(o.doubleValue())));
+		T maxValue = Collections.max(values, Comparator.comparing(o -> BigDecimal.valueOf(o.doubleValue())));
 
 		// Entry：<参数，参数出现的个数>；所有Entry按照出现个数升序排列
 		List<Entry<T, Integer>> valueNumEntryList = getValueNumEntryList(values);
@@ -562,7 +562,7 @@ public class DistributionCounter {
 			quantilePerInterval.get(i).add(0.0);
 		}
 		// 按键值升序排列
-		Collections.sort(valueNumEntryList, (o1, o2) -> o1.getKey().intValue() - o2.getKey().intValue());
+		valueNumEntryList.sort(Comparator.comparingInt(o -> o.getKey().intValue()));
 
 
 		//
@@ -921,7 +921,11 @@ public class DistributionCounter {
 			Map<String, DataAccessDistribution> txParaDistribution = new HashMap<>();
 			for (String paraId : oldDistribution.get(txId).keySet()){
 				DataAccessDistribution paraDistribution = oldDistribution.get(txId).get(paraId).copy(); // TODO 这里需要修改成深拷贝
-				paraDistribution.merge(newDistribution.get(txId).get(paraId), p);
+				try {
+					paraDistribution.merge(newDistribution.get(txId).get(paraId), p);
+				} catch (Exception e) {
+					e.printStackTrace();
+				}
 				txParaDistribution.put(paraId, paraDistribution);
 			}
 			trueDistribution.put(txId, txParaDistribution);
