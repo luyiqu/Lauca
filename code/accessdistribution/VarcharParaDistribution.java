@@ -24,6 +24,21 @@ public class VarcharParaDistribution extends DataAccessDistribution {
 		super(hFItemFrequencies, intervalCardinalities, intervalFrequencies);
 	}
 
+	public VarcharParaDistribution(VarcharParaDistribution distribution){
+		super(distribution);
+
+		String[] seedStrings = new String[distribution.seedStrings.length];
+		for (int i = 0;i < seedStrings.length; ++i){
+			seedStrings[i] = distribution.seedStrings[i];
+		}
+
+		setColumnInfo(distribution.columnCardinality, distribution.minLength, distribution.maxLength, seedStrings);
+	}
+
+	public VarcharParaDistribution copy(){
+		return new VarcharParaDistribution(this);
+	}
+
 	public void setColumnInfo(long columnCardinality, int minLength, int maxLength, String[] seedStrings) {
 		this.columnCardinality = columnCardinality;
 		this.minLength = minLength;

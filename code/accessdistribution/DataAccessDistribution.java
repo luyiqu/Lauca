@@ -71,6 +71,9 @@ public abstract class DataAccessDistribution implements Comparable<DataAccessDis
 			this.intervalCardinalities[i] = dataAccessDistribution.intervalCardinalities[i];
 		}
 
+		if (dataAccessDistribution.quantilePerInterval == null){
+			return;
+		}
 		this.quantilePerInterval = new ArrayList<>();
 		for (ArrayList quantile: dataAccessDistribution.quantilePerInterval){
 			this.quantilePerInterval.add(new ArrayList<>(quantile));
@@ -80,7 +83,7 @@ public abstract class DataAccessDistribution implements Comparable<DataAccessDis
 	}
 
 	// 利用构造函数传入的参数信息 初始化 其余类成员
-	private void init() {
+	protected void init() {
 		highFrequencyItemNum = hFItemFrequencies.length;
 		intervalNum = intervalCardinalities.length;
 
