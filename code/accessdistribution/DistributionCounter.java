@@ -551,7 +551,7 @@ public class DistributionCounter {
 		double avgIntervalLength = (maxValue.doubleValue() - minValue.doubleValue() + 0.000000001) / intervalNum;
 
 		ArrayList<ArrayList<Double>> quantilePerInterval = new ArrayList<ArrayList<Double>>();
-		int binNum = 10;
+		int binNum = Configurations.getQuantileNum();
 		// 单个区间内每段的容量
 		double[] intervalFreqLength = new double[intervalNum];
 		double[] cdfPerInterval = new double[intervalNum];
@@ -916,16 +916,19 @@ public class DistributionCounter {
 
 	private static Map<String, Map<String, DataAccessDistribution>> mergeDistribution(Map<String, Map<String, DataAccessDistribution>> oldDistribution, Map<String, Map<String, DataAccessDistribution>> newDistribution) {
 		Map<String, Map<String, DataAccessDistribution>> trueDistribution = new HashMap<>();
-		double p = 0.8;
+		double p = Configurations.getMergeWeight();
 		for (String txId : oldDistribution.keySet()){
 			Map<String, DataAccessDistribution> txParaDistribution = new HashMap<>();
 			for (String paraId : oldDistribution.get(txId).keySet()){
-				DataAccessDistribution paraDistribution = oldDistribution.get(txId).get(paraId).copy(); // TODO 这里需要修改成深拷贝
-				try {
-					paraDistribution.merge(newDistribution.get(txId).get(paraId), p);
-				} catch (Exception e) {
-					e.printStackTrace();
+				DataAccessDistribution paraDistribution = oldDistribution.get(txId).get(paraId).copy();
+				if (newDistribution.containsKey(txId) && newDistribution.get(txId).containsKey(paraId)){
+					try {
+						paraDistribution.merge(newDistribution.get(txId).get(paraId), p);
+					} catch (Exception e) {
+						e.printStackTrace();
+					}
 				}
+
 				txParaDistribution.put(paraId, paraDistribution);
 			}
 			trueDistribution.put(txId, txParaDistribution);

@@ -13,6 +13,7 @@ import java.util.Map;
 
 import accessdistribution.DataAccessDistribution;
 import accessdistribution.DistributionTypeInfo;
+import com.mysql.jdbc.exceptions.MySQLSyntaxErrorException;
 import workloadgenerator.LaucaTestingEnv;
 
 public class ReadOperation extends SqlStatement {
@@ -96,13 +97,9 @@ public class ReadOperation extends SqlStatement {
 			saveResultSet(rs);
 			return 1;
 		} catch (Exception e) {
-//			e.printStackTrace();
-			if (e.getMessage().contains("Deadlock")) {
+			if (e.getClass() == SQLException.class) {
 				return -1;
 			}
-			System.out.println(e.getMessage());
-			System.out.println(sql);
-			System.err.println("ERROR!!!");
 //			System.out.println(this.getClass().getName());
 //			System.out.println(sql);
 //			System.out.println(e.getMessage());
@@ -157,16 +154,11 @@ public class ReadOperation extends SqlStatement {
 //			long endTime1 = System.currentTimeMillis();
 //			LaucaTestingEnv.updateTime += endTime1 - startTime1;
 			return 1;
-		} catch (SQLException e) {
-//			e.printStackTrace();
-			if (e.getMessage().contains("Deadlock")) {
+		} catch (Exception e) {
+			if ( e instanceof SQLException) {
 				return -1;
 			}
-			System.out.println(this.getClass().getName());
-			System.out.println(sql);
-			System.out.println(e.getMessage());
-//			System.exit(1);
-//			System.err.println("ERROR!!!");
+			e.printStackTrace();
 			return 0;
 		}
 	}

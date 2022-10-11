@@ -11,6 +11,7 @@ import java.util.concurrent.atomic.AtomicInteger;
 
 import accessdistribution.DataAccessDistribution;
 import accessdistribution.DistributionTypeInfo;
+import com.mysql.jdbc.exceptions.MySQLSyntaxErrorException;
 import com.sun.org.apache.bcel.internal.generic.LADD;
 import workloadgenerator.LaucaTestingEnv;
 
@@ -96,15 +97,16 @@ public class WriteOperation extends SqlStatement {
 			}
 			return 1;
 		} catch (Exception e) {
-//			e.printStackTrace();
-			if (e.getMessage().contains("Deadlock")) {
+//			return -1;
+			if ( e instanceof SQLException) {
 				return -1;
 			}
+			e.printStackTrace();
 //			System.err.println("ERROR!!!");
-			System.out.println("aaaaaaaa"+pstmt.toString());
-			System.out.println(this.getClass().getName());
-			System.out.println(sql);
-			System.out.println(e.getMessage());
+//			System.out.println("aaaaaaaa"+pstmt.toString());
+//			System.out.println(this.getClass().getName());
+//			System.out.println(sql);
+//			System.out.println(e.getMessage());
 ////			System.exit(1);
 			return 0;
 		}

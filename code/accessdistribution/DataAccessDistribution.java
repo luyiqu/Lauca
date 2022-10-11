@@ -1,5 +1,7 @@
 package accessdistribution;
 
+import config.Configurations;
+
 import java.util.ArrayList;
 
 /**
@@ -23,7 +25,7 @@ public abstract class DataAccessDistribution implements Comparable<DataAccessDis
 	protected double[] intervalFrequencies = null;
 
 	// 每个区间内频数统计的分段数，也即分位点数
-	protected int quantileNum;
+	protected int quantileNum = -1;
 	// 每个区间频数统计的结果，这个二维数组的大小为intervalNum*quantileNum，每个区间的分段数都是一样的(含左右端点)，记录了区间内各分位点的归一化位置
 	protected ArrayList<ArrayList<Double>> quantilePerInterval = null;
 
@@ -88,7 +90,7 @@ public abstract class DataAccessDistribution implements Comparable<DataAccessDis
 		intervalNum = intervalCardinalities.length;
 
 		quantileNum = (this.quantilePerInterval != null && this.quantilePerInterval.size() > 0)?
-				(this.quantilePerInterval.get(0).size()):
+				Configurations.getQuantileNum() :
 				-1;
 
 		cumulativeFrequencies = new double[highFrequencyItemNum + intervalNum];
@@ -100,6 +102,8 @@ public abstract class DataAccessDistribution implements Comparable<DataAccessDis
 				cumulativeFrequencies[i] = cumulativeFrequencies[i - 1] + intervalFrequencies[i - highFrequencyItemNum];
 			}
 		}
+		cumulativeFrequencies[cumulativeFrequencies.length - 1] = 1.0;
+
 
 		intervalInnerIndexes = new long[intervalNum];
 		for (int i = 0; i < intervalNum; i++) {

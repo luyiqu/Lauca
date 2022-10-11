@@ -277,7 +277,7 @@ public class WorkloadReader {
 								oracleLog.parameters = new ArrayList<String>();
 								// 去掉参数头尾引号
 								for (int j = 0; j < paraArray.length; ++j) {
-									if (paraArray[j].charAt(0) == '"') {
+									if (paraArray[j].length() > 0 && paraArray[j].charAt(0) == '"') {
 										paraArray[j] = paraArray[j].substring(1, paraArray[j].length() - 1);
 									}
 								}

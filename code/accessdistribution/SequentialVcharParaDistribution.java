@@ -34,9 +34,10 @@ public class SequentialVcharParaDistribution extends SequentialParaDistribution 
 			highFrequencyItems[i] = sequentialVcharParaDistribution.highFrequencyItems[i];
 		}
 		if (sequentialVcharParaDistribution.currentParaCandidates != null){
-			this.currentParaCandidates = new String[sequentialVcharParaDistribution.currentParaCandidates.length][sequentialVcharParaDistribution.currentParaCandidates[0].length];
+			this.currentParaCandidates = new String[sequentialVcharParaDistribution.currentParaCandidates.length][];
 			for (int i = 0; i < sequentialVcharParaDistribution.currentParaCandidates.length; i++) {
-				for (int j = 0; j < sequentialVcharParaDistribution.currentParaCandidates[0].length; j++) {
+				this.currentParaCandidates[i] = new String[sequentialVcharParaDistribution.currentParaCandidates[i].length];
+				for (int j = 0; j < sequentialVcharParaDistribution.currentParaCandidates[i].length; j++) {
 					this.currentParaCandidates[i][j] = sequentialVcharParaDistribution.currentParaCandidates[i][j];
 				}
 			}

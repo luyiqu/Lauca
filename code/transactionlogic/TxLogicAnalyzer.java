@@ -180,7 +180,7 @@ public class TxLogicAnalyzer {
 	}
 
 	/**
-	 * @param operationDataTemplates：事务信息模板，用于遍历所有操作的输入参数
+	 * @param operationDataTemplateIter：事务信息模板，用于遍历所有操作的输入参数
 	 * @return statParameters：需要统计数据访问分布的参数，其中依数据类型对参数进行了分类存储
 	 */
 	public List<List<String>> getStatParameters(Iterator<Entry<Integer, OperationData>> operationDataTemplateIter) {

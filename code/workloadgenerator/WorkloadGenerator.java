@@ -246,6 +246,7 @@ class WorkloadGeneratorThread implements Runnable {
 			while (true) {
 				long currentTime = System.currentTimeMillis();
 				if (currentTime >= threadEndTime) {
+					System.out.println("thread time end");
 					break;
 				}
 				int tmpIndex = (int) (currentTime - threadStartTime) / timeWindowMillis;

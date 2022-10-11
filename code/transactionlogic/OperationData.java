@@ -51,7 +51,6 @@ public class OperationData implements Comparable<OperationData> {
 	/**
 	 * 
 	 * @param oneTrace 一条操作的负载轨迹
-	 * @param index    处理轨迹中的第几组参数
 	 * @return 当前操作的一个具体数据对象
 	 * @author Shuyan Zhang
 	 */
@@ -206,6 +205,9 @@ public class OperationData implements Comparable<OperationData> {
 	}
 
 	public int[] getParaDataTypes() {
+		if (paraDataTypes == null){
+			return new int[0];
+		}
 		return paraDataTypes;
 	}
 

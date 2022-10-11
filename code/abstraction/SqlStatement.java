@@ -483,6 +483,9 @@ public abstract class SqlStatement extends TransactionBlock {
 	}
 
 	public DistributionTypeInfo[] getParaDistTypeInfos() {
+		if (paraDistTypeInfos == null){
+			return new DistributionTypeInfo[0];
+		}
 		return paraDistTypeInfos;
 	}
 	public void setParaDistribution(Map<String, DataAccessDistribution> paraId2Distribution, int type) {

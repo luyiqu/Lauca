@@ -136,6 +136,11 @@ public class Configurations {
 	//保存匿名化对应关系的中间状态文件
 	private static String anonymitySaveFile = "";
 
+	//平均化多段分布的权重
+	private static double mergeWeight = 0.8;
+
+	private static int quantileNum= 10;
+
 	//启用存储过程
 	private static boolean useStoredProcedure = true;
 
@@ -621,4 +626,8 @@ public class Configurations {
 	public static void setDataIncreaseRate(Double dataIncreaseRate){ Configurations.dataIncreaseRate = dataIncreaseRate;}
 
 	public static Double getDataIncreaseRate(){return dataIncreaseRate;}
+
+	public static Double getMergeWeight(){return mergeWeight;}
+
+	public static int getQuantileNum(){return quantileNum;}
 }

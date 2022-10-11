@@ -60,20 +60,12 @@ public class SequentialIntParaDistribution extends SequentialParaDistribution {
 			highFrequencyItems[i] = sequentialIntParaDistribution.highFrequencyItems[i];
 		}
 		if (sequentialIntParaDistribution.currentParaCandidates != null){
-			this.currentParaCandidates = new long[sequentialIntParaDistribution.currentParaCandidates.length][sequentialIntParaDistribution.currentParaCandidates[0].length];
-			for (int i = 0; i < sequentialIntParaDistribution.currentParaCandidates.length; i++) {
-				for (int j = 0; j < sequentialIntParaDistribution.currentParaCandidates[0].length; j++) {
-					this.currentParaCandidates[i][j] = sequentialIntParaDistribution.currentParaCandidates[i][j];
-				}
-			}
-		}
-
-		for (int i = 0 ;i< highFrequencyItems.length; ++i){
-			highFrequencyItems[i] = sequentialIntParaDistribution.highFrequencyItems[i];
+			geneCandidates(sequentialIntParaDistribution.currentParaCandidates);
 		}
 
 		setColumnInfo(sequentialIntParaDistribution.columnMinValue,sequentialIntParaDistribution.columnMaxValue,
 				sequentialIntParaDistribution.columnCardinality,sequentialIntParaDistribution.coefficient);
+		init();
 	}
 
 	public SequentialIntParaDistribution copy(){

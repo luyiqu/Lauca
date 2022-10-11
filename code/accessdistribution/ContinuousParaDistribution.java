@@ -1,10 +1,6 @@
 package accessdistribution;
 
-import java.io.File;
-import java.io.FileWriter;
-import java.io.IOException;
-import java.io.PrintWriter;
-import java.lang.reflect.Array;
+
 import java.math.BigDecimal;
 import java.util.*;
 
@@ -61,7 +57,14 @@ public class ContinuousParaDistribution <T extends Number> extends DataAccessDis
 	public T geneValue() {
 //		System.out.println(this.getClass());
 //		System.out.println("高频项："+highFrequencyItems[2]);
-		int randomIndex = binarySearch();
+		int randomIndex = 0;
+		try {
+			 randomIndex = binarySearch();
+		}
+		catch (Exception e){
+			e.printStackTrace();
+		}
+
 		if (randomIndex < highFrequencyItemNum) {
 //			System.out.println(highFrequencyItems);
 			return highFrequencyItems[randomIndex];
@@ -70,11 +73,9 @@ public class ContinuousParaDistribution <T extends Number> extends DataAccessDis
 		}
 	}
 
-	@SuppressWarnings("unchecked")
 	// 获取指定区间中的随机参数值
 	private T getIntervalInnerRandomValue(int randomIndex) {
 		int intervalIndex = randomIndex - highFrequencyItemNum;
-		long intervalCardinality = intervalCardinalities[intervalIndex];
 
 		// 可保证区间内生成参数的基数
 		// long intervalInnerIndex = intervalInnerIndexes[intervalIndex]++ % intervalCardinality;
@@ -108,15 +109,21 @@ public class ContinuousParaDistribution <T extends Number> extends DataAccessDis
 				avgIntervalLength + minValue.doubleValue();
 
 		// 将 double value 转化成目标数据类型的参数
+		return transferValue(value);
+	}
+
+	private T transferValue(double value) {
 		String dataType = maxValue.getClass().getSimpleName();
-		if (dataType.equals("Long")) {
-			return (T)(new Long((long)value));
-		} else if (dataType.equals("Double")) {
-			return (T)(new Double(value));
-		} else if (dataType.equals("BigDecimal")) {
-			return (T)(new BigDecimal(value));
-		} else {
-			return null; // 理论上不可能进入该分支
+		switch (dataType) {
+			case "Long":
+				return (T) (new Long((long) value));
+			case "Double":
+				return (T) (new Double(value));
+			case "BigDecimal":
+				return (T) (new BigDecimal(value));
+			default:
+				return null; // 理论上不可能进入该分支
+
 		}
 	}
 
@@ -143,7 +150,10 @@ public class ContinuousParaDistribution <T extends Number> extends DataAccessDis
 			allQuantilePosAsSet.add(quantile.getKey());
 		}
 
-		List<Double> allQuantilePos = new ArrayList<>(allQuantilePosAsSet);
+		List<Double> allQuantilePos = new ArrayList<>();
+		for (Number n : allQuantilePosAsSet){
+			allQuantilePos.add(n.doubleValue());
+		}
 		List<Double> allQuantileProb = new ArrayList<>();
 		for (int i = 0;i < allQuantilePos.size(); ++i){
 			allQuantileProb.add(0.0);
@@ -151,29 +161,39 @@ public class ContinuousParaDistribution <T extends Number> extends DataAccessDis
 
 
 		allQuantilePos.sort(Comparator.comparing(BigDecimal::valueOf));
+		if (baseQuantile.size() > 1){
+			baseQuantile.get(1).setValue( baseQuantile.get(1).getValue() + baseQuantile.get(0).getValue());
+		}
+		if (mergeQuantile.size() > 1){
+			mergeQuantile.get(1).setValue( mergeQuantile.get(1).getValue() + mergeQuantile.get(0).getValue());
+		}
+
 		// 分别将两个分布的概率投射到分位点切割的每个子区间内
 		for (int i = 1;i < allQuantilePos.size(); ++i){
-			for (int j = 1;j < baseQuantile.size(); ++j){
-				double leftEndPoint =  allQuantilePos.get(i - 1) > baseQuantile.get(j - 1).getKey() ? allQuantilePos.get(i - 1) : baseQuantile.get(j - 1).getKey();
-				double rightEndPoint = allQuantilePos.get(i) < baseQuantile.get(j).getKey() ? allQuantilePos.get(i) : baseQuantile.get(j).getKey();
+			double left = allQuantilePos.get(i - 1);
+			double right = allQuantilePos.get(i);
+			double prob = 0.0;
 
-				if (rightEndPoint < leftEndPoint){
+			for (int j = 1;j < baseQuantile.size(); ++j){
+				double leftEndPoint =  left > baseQuantile.get(j - 1).getKey() ? left : baseQuantile.get(j - 1).getKey();
+				double rightEndPoint = right < baseQuantile.get(j).getKey() ? right : baseQuantile.get(j).getKey();
+
+				if (rightEndPoint <= leftEndPoint){ // todo 没有完全消除浮点数精度的问题
 					continue;
 				}
-				double prob = baseQuantile.get(j).getValue()*(rightEndPoint - leftEndPoint)/(baseQuantile.get(j).getKey() - baseQuantile.get(j - 1).getKey());
-				allQuantileProb.set(i,allQuantileProb.get(i) + prob);
+				prob += baseQuantile.get(j).getValue()*(rightEndPoint - leftEndPoint)/(baseQuantile.get(j).getKey() - baseQuantile.get(j - 1).getKey());
 			}
 
 			for (int j = 1;j < mergeQuantile.size(); ++j){
-				double leftEndPoint =  allQuantilePos.get(i - 1) > mergeQuantile.get(j - 1).getKey() ? allQuantilePos.get(i - 1) : mergeQuantile.get(j - 1).getKey();
-				double rightEndPoint = allQuantilePos.get(i) < mergeQuantile.get(j).getKey() ? allQuantilePos.get(i) : mergeQuantile.get(j).getKey();
+				double leftEndPoint =  left > mergeQuantile.get(j - 1).getKey() ? left : mergeQuantile.get(j - 1).getKey();
+				double rightEndPoint = right < mergeQuantile.get(j).getKey() ? right : mergeQuantile.get(j).getKey();
 
-				if (rightEndPoint < leftEndPoint){
+				if (rightEndPoint <= leftEndPoint){
 					continue;
 				}
-				double prob = mergeQuantile.get(j).getValue()*(rightEndPoint - leftEndPoint)/(mergeQuantile.get(j).getKey() - mergeQuantile.get(j - 1).getKey());
-				allQuantileProb.set(i,allQuantileProb.get(i) + prob);
+				prob += mergeQuantile.get(j).getValue()*(rightEndPoint - leftEndPoint)/(mergeQuantile.get(j).getKey() - mergeQuantile.get(j - 1).getKey());
 			}
+			allQuantileProb.set(i,allQuantileProb.get(i) + prob);
 		}
 
 		this.minValue = this.minValue.doubleValue() < mergeDistribution.minValue.doubleValue() ?
@@ -189,6 +209,7 @@ public class ContinuousParaDistribution <T extends Number> extends DataAccessDis
 			intervalProbSum += this.intervalFrequencies[i];
             this.intervalFrequencies[i] = 0.0;
         }
+		double  tmp_value = 0.0;
 		for (int i = 1;i < allQuantilePos.size();++i){
 			// 当前分位点所在区间
 			int idx = (int)((allQuantilePos.get(i) - this.minValue.doubleValue()) / avgIntervalLength);
@@ -199,22 +220,44 @@ public class ContinuousParaDistribution <T extends Number> extends DataAccessDis
 			double length = allQuantilePos.get(i) - allQuantilePos.get(i - 1);
 
 			// 从前一个分位点的位置扫过去
-			while (lastIdx <= idx){
-				// 当前所在区间的左端点
-				double left = (lastIdx * avgIntervalLength + this.minValue.doubleValue());
+			if (idx >= this.intervalNum){
+				idx --;
+			}
+			tmp_value = 0.;
+			if (length < 1e-6){
+				lastIdx = idx;
+				this.intervalFrequencies[lastIdx] += allQuantileProb.get(i);
+			}
+			else {
+				while (lastIdx <= idx){
+					// 当前所在区间的左端点
+					double left = (lastIdx * avgIntervalLength + this.minValue.doubleValue());
 
-				double leftEndPoint =  allQuantilePos.get(i - 1) > left ? allQuantilePos.get(i - 1) : left;
-				double rightEndPoint = allQuantilePos.get(i) < (left + avgIntervalLength) ? allQuantilePos.get(i) : (left + avgIntervalLength);
+					double leftEndPoint =  allQuantilePos.get(i - 1) > left ? allQuantilePos.get(i - 1) : left;
+					double rightEndPoint = allQuantilePos.get(i) < (left + avgIntervalLength) ? allQuantilePos.get(i) : (left + avgIntervalLength);
 
-				if (leftEndPoint >= rightEndPoint){
-				    break;
-                }
-				// 分位点应该分给当前区间的概率，根据两个区间的重合长度加权得到
-				double prob = allQuantileProb.get(i)*(rightEndPoint - leftEndPoint)/length;
-				this.intervalFrequencies[lastIdx] += prob;
-				lastIdx ++;
+					if (leftEndPoint > rightEndPoint){
+						lastIdx ++;
+						if ( allQuantileProb.get(i) - tmp_value > 1e-6 && lastIdx > idx){
+							System.out.println("err");
+						}
+						continue;
+					}
+					// 分位点应该分给当前区间的概率，根据两个区间的重合长度加权得到
+					double prob = allQuantileProb.get(i)*(rightEndPoint - leftEndPoint)/length;
+					this.intervalFrequencies[lastIdx] += prob;
+					lastIdx ++;
+					tmp_value += prob;
+					if ( allQuantileProb.get(i) - tmp_value > 1e-6 && lastIdx > idx){
+						System.out.println("err");
+					}
+				}
 			}
 		}
+		this.intervalFrequencies[this.intervalNum - 1] += 1.0 - tmp_value;
+
+
+
 
 		// 重构分位点
 		if (this.quantileNum > 0){
@@ -234,7 +277,13 @@ public class ContinuousParaDistribution <T extends Number> extends DataAccessDis
 					double leftEndPoint =  allQuantilePos.get(j - 1) > left ? allQuantilePos.get(j - 1) : left;
 					double rightEndPoint = allQuantilePos.get(j) < (left + avgIntervalLength) ? allQuantilePos.get(j) : (left + avgIntervalLength);
 					if (leftEndPoint < rightEndPoint){
-						quantilesUsedNowAsMap.put(rightEndPoint, allQuantileProb.get(j) * (rightEndPoint - leftEndPoint) / length);
+						if (quantilesUsedNowAsMap.containsKey(rightEndPoint)){
+							quantilesUsedNowAsMap.put(rightEndPoint, quantilesUsedNowAsMap.get(rightEndPoint) + allQuantileProb.get(j) * (rightEndPoint - leftEndPoint) / length);
+						}
+						else{
+							quantilesUsedNowAsMap.put(rightEndPoint, allQuantileProb.get(j) * (rightEndPoint - leftEndPoint) / length);
+						}
+
 					}
 				}
 				if (!quantilesUsedNowAsMap.containsKey(left)){
@@ -246,19 +295,23 @@ public class ContinuousParaDistribution <T extends Number> extends DataAccessDis
 				double sum = 0;
 				double base = quantilesUsedNow.get(0).getKey();
 				for (Map.Entry<Double,Double> quantile: quantilesUsedNow){
-					while (sum + quantile.getValue() > prob - 1e-7){
+					double value = quantile.getValue();
+					while (sum + value > prob - 1e-7 && value > 1e-7){
 						double delta = prob - sum;
 						double length = quantile.getKey() - base;
-						double pos = base + length * delta / quantile.getValue();
+						double pos = base + length * delta / value;
 						quantiles.add((pos - left)/avgIntervalLength); // 保存归一化的分位点位置
 
 						base = pos;
-						quantile.setValue(quantile.getValue() - delta);
+						value -= delta;
 						sum = 0;
 					}
 
 					base = quantile.getKey();
-					sum = quantile.getValue();
+					sum += value;
+				}
+				while (quantiles.size() < this.quantileNum){
+					quantiles.add(1.0);
 				}
 				this.quantilePerInterval.add(quantiles);
 			}
@@ -289,11 +342,17 @@ public class ContinuousParaDistribution <T extends Number> extends DataAccessDis
 			if (quantileNum == -1){
 				quantiles.put(bias + avgIntervalLength, this.intervalFrequencies[i] / intervalProbSum * p);
 			}
-			for (int j = 1; j < quantileNum; j++) {
+			for (int j = 1; j < this.quantilePerInterval.get(i).size(); j++) {
 				// 当前分位点的实际位置
 				double pos = bias + avgIntervalLength * this.quantilePerInterval.get(i).get(j);
 				// 第一个分位点是左端点，不对应任何概率
-				quantiles.put(pos,prob / intervalProbSum * p);
+				if (quantiles.containsKey(pos)){
+					quantiles.put(pos,quantiles.get(pos) + prob / intervalProbSum * p);
+				}
+				else{
+					quantiles.put(pos, prob / intervalProbSum * p);
+				}
+
 			}
 		}
 		return new ArrayList<>(quantiles.entrySet());
@@ -364,9 +423,9 @@ public class ContinuousParaDistribution <T extends Number> extends DataAccessDis
             quantiles2.add(quantile);
         }
 
-		ContinuousParaDistribution<Long> distribution = new ContinuousParaDistribution<Long>(minValue, maxValue,
+		ContinuousParaDistribution<Long> distribution = new ContinuousParaDistribution<>(minValue, maxValue,
 				highFrequencyItems2, hFItemFrequencies, intervalCardinalities, intervalFrequencies);
-		ContinuousParaDistribution<Long> distribution1 = new ContinuousParaDistribution<Long>(minValue+10, maxValue/2,
+		ContinuousParaDistribution<Long> distribution1 = new ContinuousParaDistribution<>(minValue+10, maxValue/2,
 				highFrequencyItems2, hFItemFrequencies2, intervalCardinalities, intervalFrequencies2);
 
         ContinuousParaDistribution<Long> distribution2 = distribution.copy();
@@ -400,22 +459,21 @@ public class ContinuousParaDistribution <T extends Number> extends DataAccessDis
 	public boolean inDomain(Object parameter) {
 		String dataType = maxValue.getClass().getSimpleName();
 		double para = 0;
-		if (dataType.equals("Long")) {
-			para = (Long)parameter;
-		} else if (dataType.equals("Double")) {
-			para = (Double)parameter;
-		} else if (dataType.equals("BigDecimal")) {
-			para = new BigDecimal(parameter.toString()).doubleValue();
+		switch (dataType) {
+			case "Long":
+				para = (Long) parameter;
+				break;
+			case "Double":
+				para = (Double) parameter;
+				break;
+			case "BigDecimal":
+				para = new BigDecimal(parameter.toString()).doubleValue();
+				break;
 		}
-		if (para < minValue.doubleValue() || para > maxValue.doubleValue()) {
-			return false;
-		} else {
-			return true;
-		}
+		return !(para < minValue.doubleValue()) && !(para > maxValue.doubleValue());
 	}
 
 	// 为了做实验后续添加的，生成完全随机的（即均匀分布）的参数
-	@SuppressWarnings("unchecked")
 	@Override
 	public T geneUniformValue() {
 		double value = Math.random() * (maxValue.doubleValue() - minValue.doubleValue()) 
@@ -423,15 +481,6 @@ public class ContinuousParaDistribution <T extends Number> extends DataAccessDis
 		
 		// 下面这段代码 copy from 函数 "getIntervalInnerRandomValue"
 		// 将 double value 转化成目标数据类型的参数
-		String dataType = maxValue.getClass().getSimpleName();
-		if (dataType.equals("Long")) {
-			return (T)(new Long((long)value));
-		} else if (dataType.equals("Double")) {
-			return (T)(new Double(value));
-		} else if (dataType.equals("BigDecimal")) {
-			return (T)(new BigDecimal(value));
-		} else {
-			return null; // 理论上不可能进入该分支
-		}
+		return transferValue(value);
 	}
 }

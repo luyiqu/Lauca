@@ -418,7 +418,7 @@ public class AccessDistributionAnalyzer {
 				Entry<Integer, DistributionTypeInfo[]> entry2 = iter2.next();
 				int operationId = entry2.getKey();
 				DistributionTypeInfo[] paraDistTypeInfos = entry2.getValue();
-				for (int i = 0; i < paraDistTypeInfos.length; i++) {
+				for (int i = 0; paraDistTypeInfos != null && i < paraDistTypeInfos.length; i++) {
 					String paraIdentifier = operationId + "_" + i;
 					txName2ParaId2DistTypeInfo.get(entry.getKey()).put(paraIdentifier, paraDistTypeInfos[i]);
 				}
@@ -685,9 +685,9 @@ class LogSplitter implements Runnable {
 				// 过滤掉不需要统计数据访问分布的参数数据
 				//qly TODO: 目前没有根据概率过滤呢 TODO 20201222 在这里将值为 #@# 的删掉！
 				//todo: 20210127 这里删的太早了，之后还得统计呢
-//				if (paraId2DataList.containsKey(identifier) && !parameters[i].equals("#@#")) {
+				if (paraId2DataList.containsKey(identifier) ) { /* && !parameters[i].equals("#@#") */
 					paraId2DataList.get(identifier).add(parameters[i].trim());
-//				}
+				}
 			}
 		}
 
