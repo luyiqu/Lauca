@@ -132,6 +132,9 @@ public class ContinuousParaDistribution <T extends Number> extends DataAccessDis
 	@Override
 	public void merge(DataAccessDistribution dataAccessDistribution, double p) throws Exception {
 		super.merge(dataAccessDistribution, p);
+		if (p > 1 - 1e-7){
+			return ;
+		}
 		if (!(dataAccessDistribution instanceof ContinuousParaDistribution)){
 			throw new Exception("It's not same access distribution type");
 		}
@@ -267,6 +270,14 @@ public class ContinuousParaDistribution <T extends Number> extends DataAccessDis
 				quantiles.add(0.0);
 				// 当前区间每个分位点实际占有的概率
 				double prob = this.intervalFrequencies[i] / (this.quantileNum - 1);
+				if (prob < 1e-5){
+					for(int j = 0 ; j < this.quantileNum; ++j){
+						quantiles.add(1.0 * j / this.quantileNum);
+					}
+					quantiles.add(1.0);
+					this.quantilePerInterval.add(quantiles);
+					continue;
+				}
 				// 先获取当前区间
 				Map<Double,Double> quantilesUsedNowAsMap = new HashMap<>();
 				double left = i * avgIntervalLength + this.minValue.doubleValue();

@@ -100,10 +100,7 @@ public class ReadOperation extends SqlStatement {
 			if (e.getClass() == SQLException.class) {
 				return -1;
 			}
-//			System.out.println(this.getClass().getName());
-//			System.out.println(sql);
-//			System.out.println(e.getMessage());
-//			System.exit(1);
+			e.printStackTrace();
 			return 0;
 		}
 	}

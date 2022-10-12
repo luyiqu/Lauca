@@ -908,7 +908,7 @@ public class DistributionCounter {
 		averageList.add(windowDistributionList.get(0));
 
 		for (int i = 1; i < windowDistributionList.size(); ++i){
-			averageList.add(mergeDistribution(averageList.get(i-1), windowDistributionList.get(i)));
+			averageList.add(mergeDistribution(windowDistributionList.get(i), averageList.get(i-1)));
 		}
 
 		return averageList;

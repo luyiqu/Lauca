@@ -70,10 +70,11 @@ public abstract class DataAccessDistribution implements Comparable<DataAccessDis
 		this.intervalFrequencies = new double[this.intervalNum];
 		for (int  i = 0;i < this.intervalNum; ++i){
 			this.intervalFrequencies[i] = dataAccessDistribution.intervalFrequencies[i];
-			this.intervalCardinalities[i] = dataAccessDistribution.intervalCardinalities[i];
+			this.intervalCardinalities[i] = Math.max(1,dataAccessDistribution.intervalCardinalities[i]);
 		}
 
 		if (dataAccessDistribution.quantilePerInterval == null){
+			init();
 			return;
 		}
 		this.quantilePerInterval = new ArrayList<>();

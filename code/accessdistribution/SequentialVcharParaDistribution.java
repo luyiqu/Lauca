@@ -33,19 +33,14 @@ public class SequentialVcharParaDistribution extends SequentialParaDistribution 
 		for (int i = 0 ;i< highFrequencyItems.length; ++i){
 			highFrequencyItems[i] = sequentialVcharParaDistribution.highFrequencyItems[i];
 		}
-		if (sequentialVcharParaDistribution.currentParaCandidates != null){
-			this.currentParaCandidates = new String[sequentialVcharParaDistribution.currentParaCandidates.length][];
-			for (int i = 0; i < sequentialVcharParaDistribution.currentParaCandidates.length; i++) {
-				this.currentParaCandidates[i] = new String[sequentialVcharParaDistribution.currentParaCandidates[i].length];
-				for (int j = 0; j < sequentialVcharParaDistribution.currentParaCandidates[i].length; j++) {
-					this.currentParaCandidates[i][j] = sequentialVcharParaDistribution.currentParaCandidates[i][j];
-				}
-			}
-		}
 
 
 		setColumnInfo(sequentialVcharParaDistribution.columnCardinality,sequentialVcharParaDistribution.minLength,
 				sequentialVcharParaDistribution.maxLength,sequentialVcharParaDistribution.seedStrings);
+		geneHighFrequencyItems(sequentialVcharParaDistribution.highFrequencyItems);
+		if (sequentialVcharParaDistribution.currentParaCandidates != null){
+			geneCandidates(sequentialVcharParaDistribution.currentParaCandidates);
+		}
 	}
 
 	public SequentialVcharParaDistribution copy(){
