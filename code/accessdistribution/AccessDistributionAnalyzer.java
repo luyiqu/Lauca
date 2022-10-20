@@ -679,7 +679,12 @@ class LogSplitter implements Runnable {
 		for (String operationData : windowLog) {   // qly windowLog日志格式： 操作id; para1, para2, ...
 			String[] arr = operationData.split(";");
 			String operationId = arr[0].trim();
+			if (arr.length <= 1) {// 可能不存在参数
+				continue;
+			}
 			String[] parameters = arr[1].split(",");
+
+
 			for (int i = 0; i < parameters.length; i++) {
 				String identifier = operationId + "_" + i;
 				// 过滤掉不需要统计数据访问分布的参数数据

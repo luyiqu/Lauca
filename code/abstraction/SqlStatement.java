@@ -490,14 +490,14 @@ public abstract class SqlStatement extends TransactionBlock {
 	}
 	public void setParaDistribution(Map<String, DataAccessDistribution> paraId2Distribution, int type) {
 		if (type == 0) { // 全负载周期数据访问分布
-			for (int i = 0; i < paraDataTypes.length; i++) {
+			for (int i = 0; i < (paraDataTypes == null ? 0 : paraDataTypes.length); i++) {
 				String paraIdentifier = operationId + "_" + i;
 				if (paraId2Distribution != null) { // 等于null应该是不可能的
 					fullLifeCycleParaGenerators[i] = paraId2Distribution.get(paraIdentifier);
 				}
 			}
 		} else if (type == 1) { // 当前时间窗口的数据访问分布
-			for (int i = 0; i < paraDataTypes.length; i++) {
+			for (int i = 0; i < (paraDataTypes == null ? 0 : paraDataTypes.length); i++) {
 				String paraIdentifier = operationId + "_" + i;
 				// 更倾向于利用全负载周期的数据访问分布，而不是保留一个最近时间窗口的数据访问分布 TODO 是否合理呢？
 				if (paraId2Distribution == null) { // 有可能等于null，在当前时间窗口该事务没有执行过

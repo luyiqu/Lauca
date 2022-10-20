@@ -970,6 +970,15 @@ public class SqlParser {
 
 			String[] columnNames = sql.substring(index2 + 1, index3).replaceAll("[ \\t]+", "").split(",");
 
+			if (columnNames[0].contains("?")){
+				tableName = tableName.substring(0,tableName.length() -6).trim();
+				int i = 0;
+				for (String columns : allColumnNames(tableName)){
+					columnNames[i] = columns;
+					i++;
+				}
+			}
+
 			int[] paraDataTypes = new int[columnNames.length];
 
 			Arrays.fill(paraDataTypes, -1);
@@ -988,7 +997,6 @@ public class SqlParser {
 					paraDistTypeInfos[i] = getParaDistTypeInfo(tableName, columnNames[i]);
 
 				} else {
-
 					System.err.println("1Unrecognized column: " + columnNames[i]);
 
 				}

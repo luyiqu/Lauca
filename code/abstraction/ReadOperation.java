@@ -34,8 +34,8 @@ public class ReadOperation extends SqlStatement {
 		this.returnDataTypes = returnDataTypes;
 		this.filterPrimaryKey = filterPrimaryKey;
 		
-		windowParaGenerators = new DataAccessDistribution[paraDataTypes.length];
-		fullLifeCycleParaGenerators = new DataAccessDistribution[paraDataTypes.length];
+		windowParaGenerators = new DataAccessDistribution[paraDataTypes == null ? 0 : paraDataTypes.length];
+		fullLifeCycleParaGenerators = new DataAccessDistribution[paraDataTypes == null ? 0 : paraDataTypes.length];
 //		sdf = new SimpleDateFormat("yyyy-MM-dd HH:mm:ss");
 	}
 
@@ -71,8 +71,8 @@ public class ReadOperation extends SqlStatement {
 		this.returnDataTypes = readOperation.returnDataTypes;
 		this.filterPrimaryKey = readOperation.filterPrimaryKey;
 
-		windowParaGenerators = new DataAccessDistribution[paraDataTypes.length];
-		fullLifeCycleParaGenerators = new DataAccessDistribution[paraDataTypes.length];
+		windowParaGenerators = new DataAccessDistribution[paraDataTypes == null ? 0 : paraDataTypes.length];
+		fullLifeCycleParaGenerators = new DataAccessDistribution[paraDataTypes == null ? 0 : paraDataTypes.length];
 //		sdf = new SimpleDateFormat("yyyy-MM-dd HH:mm:ss");
 	}
 
