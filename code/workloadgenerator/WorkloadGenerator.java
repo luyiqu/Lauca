@@ -79,6 +79,7 @@ public class WorkloadGenerator {
 		}
 
 		for (int i = 0; i < maxWindowNum; i++) {
+			System.out.println(i);
 
 //			System.out.println("Time: "+maxWindowNum);
 			int throughput = 0;
@@ -102,6 +103,7 @@ public class WorkloadGenerator {
 			}
 			int throughputPerSec = Math.round(throughput / (float) Configurations.getTimeWindowSize());
 			windowThroughputList.add(new WindowThroughput(throughputPerSec, txName2Ratio)); //每秒的吞吐&该秒中事务所占的比例
+			System.out.printf("%d/%d,%s\n",throughput,Configurations.getTimeWindowSize(),windowThroughputList.get(i).toString());
 //			System.out.println("throughputPerSec: "+throughputPerSec);
 //			System.out.println("txName2Ratio: "+txName2Ratio);
 		}

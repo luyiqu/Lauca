@@ -579,14 +579,12 @@ public class DistributionCounter {
 			// 在单个区间idx内，计算当前的分位点
 			cdfPerInterval[idx] += valueNumEntryList.get(i).getValue() / (double) valuesSize;
 			int freqInx = (int) (cdfPerInterval[idx] / intervalFreqLength[idx]);
-			// 如果这个数占据极大的频数，可能会直接跳过某个分位点，这种情况下进行补齐，即认为跳过的分位点和前一个是一样的位置
-			while (quantilePerInterval.get(idx).size() < freqInx - 1){
-				quantilePerInterval.get(idx).add(quantilePerInterval.get(idx).get(quantilePerInterval.get(idx).size() - 1));
-			}
-			if (quantilePerInterval.get(idx).size() == freqInx - 1){
-				double idxBase = ((valueNumEntryList.get(i).getKey().doubleValue() - minValue.doubleValue())
-						- idx * avgIntervalLength);
-				double posInInterval = idxBase / avgIntervalLength;
+
+			double idxBase = ((valueNumEntryList.get(i).getKey().doubleValue() - minValue.doubleValue())
+					- idx * avgIntervalLength);
+			double posInInterval = idxBase / avgIntervalLength;
+			// 如果这个数占据极大的频数，可能会直接跳过某个分位点，这种情况下进行补齐，即认为跳过的分位点也是当前数值
+			while (quantilePerInterval.get(idx).size() <= freqInx ){
 				quantilePerInterval.get(idx).add(posInInterval);
 			}
 		}
@@ -600,6 +598,15 @@ public class DistributionCounter {
 			if (quantilePerInterval.get(i).size() == freqInx){
 				quantilePerInterval.get(i).add(1.0);
 			}
+		}
+
+		for (int i = 0; i < intervalNum; ++i){
+			System.out.printf("\n interval %d with bin num %d: ",i, binNum);
+
+			for (int j = 0; j < binNum; ++j) {
+				System.out.printf("%f, ",quantilePerInterval.get(i).get(j));
+			}
+
 		}
 
 		return quantilePerInterval;
@@ -908,22 +915,29 @@ public class DistributionCounter {
 		averageList.add(windowDistributionList.get(0));
 
 		for (int i = 1; i < windowDistributionList.size(); ++i){
-			averageList.add(mergeDistribution(windowDistributionList.get(i), averageList.get(i-1)));
+			averageList.add(mergeDistribution(windowDistributionList.get(i), averageList.get(i-1),averageList.get(i-1)));
 		}
 
 		return averageList;
 	}
 
-	private static Map<String, Map<String, DataAccessDistribution>> mergeDistribution(Map<String, Map<String, DataAccessDistribution>> oldDistribution, Map<String, Map<String, DataAccessDistribution>> newDistribution) {
+	private static Map<String, Map<String, DataAccessDistribution>> mergeDistribution(Map<String, Map<String, DataAccessDistribution>> baseDistribution,
+																					  Map<String, Map<String, DataAccessDistribution>> mergeDistribution,
+																					  Map<String, Map<String, DataAccessDistribution>> oldDistribution) {
 		Map<String, Map<String, DataAccessDistribution>> trueDistribution = new HashMap<>();
 		double p = Configurations.getMergeWeight();
-		for (String txId : oldDistribution.keySet()){
+		int sum = 0;
+		int mergeSum = 0;
+		for (String txId : baseDistribution.keySet()){
 			Map<String, DataAccessDistribution> txParaDistribution = new HashMap<>();
-			for (String paraId : oldDistribution.get(txId).keySet()){
-				DataAccessDistribution paraDistribution = oldDistribution.get(txId).get(paraId).copy();
-				if (newDistribution.containsKey(txId) && newDistribution.get(txId).containsKey(paraId)){
+			for (String paraId : baseDistribution.get(txId).keySet()){
+				DataAccessDistribution paraDistribution = baseDistribution.get(txId).get(paraId);
+				sum ++;
+				if (mergeDistribution.containsKey(txId) && mergeDistribution.get(txId).containsKey(paraId)){
 					try {
-						paraDistribution.merge(newDistribution.get(txId).get(paraId), p);
+						mergeSum++;
+						paraDistribution = baseDistribution.get(txId).get(paraId).copy();
+						paraDistribution.merge(mergeDistribution.get(txId).get(paraId), p);
 					} catch (Exception e) {
 						e.printStackTrace();
 					}
@@ -933,6 +947,20 @@ public class DistributionCounter {
 			}
 			trueDistribution.put(txId, txParaDistribution);
 		}
+		int diffSum = 0;
+		for (String txId : oldDistribution.keySet()){
+			if (trueDistribution.containsKey(txId)){
+				continue;
+			}
+			Map<String, DataAccessDistribution> txParaDistribution = new HashMap<>();
+			for (String paraId : oldDistribution.get(txId).keySet()){
+				diffSum ++;
+				DataAccessDistribution paraDistribution = oldDistribution.get(txId).get(paraId);
+				txParaDistribution.put(paraId, paraDistribution);
+			}
+			trueDistribution.put(txId, txParaDistribution);
+		}
+		System.out.printf("%d-%d/%d%n",diffSum,mergeSum,sum);
 		return trueDistribution;
 	}
 

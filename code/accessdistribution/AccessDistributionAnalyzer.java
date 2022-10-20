@@ -689,6 +689,7 @@ class LogSplitter implements Runnable {
 					paraId2DataList.get(identifier).add(parameters[i].trim());
 				}
 			}
+
 		}
 
 		Iterator<Entry<String, List<String>>> iter = paraId2DataList.entrySet().iterator();

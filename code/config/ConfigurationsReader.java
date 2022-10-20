@@ -204,6 +204,12 @@ public class ConfigurationsReader {
 				case "useSkywalking":
 					Configurations.setUseSkywalking(Boolean.parseBoolean(arr[1].trim()));
 					break;
+				case "mergeWeight":
+					Configurations.setMergeWeight(Double.parseDouble(arr[1].trim()));
+					break;
+				case "quantileNum":
+					Configurations.setQuantileNum(Integer.parseInt(arr[1].trim()));
+					break;
 
 				}
 			}

@@ -627,7 +627,11 @@ public class Configurations {
 
 	public static Double getDataIncreaseRate(){return dataIncreaseRate;}
 
+	public static void setMergeWeight(Double mergeWeight){Configurations.mergeWeight = mergeWeight;}
+
 	public static Double getMergeWeight(){return mergeWeight;}
+
+	public static void setQuantileNum(int quantileNum){Configurations.quantileNum = quantileNum;}
 
 	public static int getQuantileNum(){return quantileNum;}
 }

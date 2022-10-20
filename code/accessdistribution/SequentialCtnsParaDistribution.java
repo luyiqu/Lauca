@@ -286,49 +286,50 @@ public class SequentialCtnsParaDistribution extends SequentialParaDistribution {
 			}
 		}
 
-//		List<Map.Entry<Long,Double>> oldCandidates = new ArrayList<>(oldCandidatesAsMap.entrySet());
-//		oldCandidates.sort(Comparator.comparing(o->o.getKey()));
-//		int idx = 0;
-//		long[][] newParaCandidates = new long[this.intervalNum][];
-//		for (int i = 0;i < this.intervalNum ; ++i){
-//			// 先获取当前区间
-//			double left = i * avgIntervalLength + this.minValue;
-//			double right = left + avgIntervalLength;
-//
-//			double sum = 0;
-//			List<Long> candidates = new ArrayList<>();
-//			List<Double> cdf = new ArrayList<>();
-//			while (oldCandidates.size() > idx && oldCandidates.get(idx).getKey() <= right){
-//				candidates.add(oldCandidates.get(idx).getKey());
-//				sum += oldCandidates.get(idx).getValue();
-//				cdf.add(sum);
-//				idx ++;
-//			}
-//
-//			long cnt = this.intervalCardinalities[i];
-//			Set<Long> candidatesSet = new HashSet<>();
-//			while ((cnt--) > 0){
-//				double targetIdx = Math.random() * sum;
-//				for (int j = 0;j < candidates.size() ; ++j){
-//					if (targetIdx < cdf.get(j)){
-//						candidatesSet.add(candidates.get(j));
-//						break;
-//					}
-//				}
-//			}
-//			int j = 0;
-//			newParaCandidates[i] = new long[candidatesSet.size()];
-//			for (Long candidate : candidatesSet){
-//				newParaCandidates[i][j] = candidate;
-//				j ++;
-//			}
-//		}
+		List<Map.Entry<Long,Double>> oldCandidates = new ArrayList<>(oldCandidatesAsMap.entrySet());
+		oldCandidates.sort(Comparator.comparing(o->o.getKey()));
+		int idx = 0;
+		long[][] newParaCandidates = new long[this.intervalNum][];
+		for (int i = 0;i < this.intervalNum ; ++i){
+			// 先获取当前区间
+			double left = i * avgIntervalLength + this.minValue;
+			double right = left + avgIntervalLength;
+
+			double sum = 0;
+			List<Long> candidates = new ArrayList<>();
+			List<Double> cdf = new ArrayList<>();
+			while (oldCandidates.size() > idx && oldCandidates.get(idx).getKey() <= right){
+				candidates.add(oldCandidates.get(idx).getKey());
+				sum += oldCandidates.get(idx).getValue();
+				cdf.add(sum);
+				idx ++;
+			}
+
+			long cnt = this.intervalCardinalities[i];
+
+			Set<Long> candidatesSet = new HashSet<>(candidates);
+			while ((cnt--) > 0){
+				double targetIdx = Math.random() * sum;
+				for (int j = 0;j < candidates.size() ; ++j){
+					if (targetIdx < cdf.get(j)){
+						candidatesSet.add(candidates.get(j));
+						break;
+					}
+				}
+			}
+			int j = 0;
+			newParaCandidates[i] = new long[candidatesSet.size()];
+			for (Long candidate : candidatesSet){
+				newParaCandidates[i][j] = candidate;
+				j ++;
+			}
+		}
 
 		for( int i = 0; i < this.intervalNum ; ++i){
 			this.intervalFrequencies[i] *= intervalProbSum;
 		}
 		init();
-		geneCandidates(this.getCurrentParaCandidates());
+		geneCandidates(newParaCandidates);
 	}
 
 	// 提取每个分位点，得到分位点的<实际位置,实际概率 * 1/直方图全概率(按直方图部分的概率进行归一化) * 权重>
