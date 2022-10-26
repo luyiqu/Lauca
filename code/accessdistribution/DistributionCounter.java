@@ -600,14 +600,14 @@ public class DistributionCounter {
 			}
 		}
 
-		for (int i = 0; i < intervalNum; ++i){
-			System.out.printf("\n interval %d with bin num %d: ",i, binNum);
-
-			for (int j = 0; j < binNum; ++j) {
-				System.out.printf("%f, ",quantilePerInterval.get(i).get(j));
-			}
-
-		}
+//		for (int i = 0; i < intervalNum; ++i){
+//			System.out.printf("\n interval %d with bin num %d: ",i, binNum);
+//
+//			for (int j = 0; j < binNum; ++j) {
+//				System.out.printf("%f, ",quantilePerInterval.get(i).get(j));
+//			}
+//
+//		}
 
 		return quantilePerInterval;
 	}
@@ -917,7 +917,7 @@ public class DistributionCounter {
 		for (int i = 1; i < windowDistributionList.size(); ++i){
 			averageList.add(mergeDistribution(windowDistributionList.get(i), averageList.get(i-1),averageList.get(i-1)));
 		}
-
+		System.out.println("merge and");
 		return averageList;
 	}
 
@@ -947,20 +947,7 @@ public class DistributionCounter {
 			}
 			trueDistribution.put(txId, txParaDistribution);
 		}
-		int diffSum = 0;
-		for (String txId : oldDistribution.keySet()){
-			if (trueDistribution.containsKey(txId)){
-				continue;
-			}
-			Map<String, DataAccessDistribution> txParaDistribution = new HashMap<>();
-			for (String paraId : oldDistribution.get(txId).keySet()){
-				diffSum ++;
-				DataAccessDistribution paraDistribution = oldDistribution.get(txId).get(paraId);
-				txParaDistribution.put(paraId, paraDistribution);
-			}
-			trueDistribution.put(txId, txParaDistribution);
-		}
-		System.out.printf("%d-%d/%d%n",diffSum,mergeSum,sum);
+		System.out.printf("%d/%d%n",mergeSum,sum);
 		return trueDistribution;
 	}
 

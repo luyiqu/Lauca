@@ -539,7 +539,6 @@ public class WorkloadReader {
 							loopSqls.add((SqlStatement) txnBlocks.get(k));
 							try {
 
-
 								txnTrace.get(i + k - j).operationID = ((SqlStatement) txnBlocks.get(k)).operationId;
 
 							}catch (Exception e){
