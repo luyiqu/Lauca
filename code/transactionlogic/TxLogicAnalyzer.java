@@ -28,6 +28,8 @@ public class TxLogicAnalyzer {
 	// 操作ID -> 平均执行次数，用于表示：if/else分支执行比例，multiple内操作平均执行次数（也算事务逻辑的一部分）
 	private Map<Integer, Double> operationId2AvgRunTimes = null;
 
+	private Map<String, Integer> cardinality4paraInSchema = null;
+
 	// 线性依赖关系分析时的配置参数，见LinearRelationAnalyzer
 	private int minTxDataSize = 1;
 	private int randomPairs = 10000;
@@ -40,7 +42,7 @@ public class TxLogicAnalyzer {
 		this.randomPairs = randomPairs;
 	}
 
-	public void obtainTxLogic(List<TransactionData> txDataList) {
+	public void obtainTxLogic(List<TransactionData> txDataList, Map<Integer, List<String>> opId2paraSchema) {
 		Map<Integer, Integer> operationId2ExecutionNum = countOperationExecutionNum(txDataList);
 		parameterNodeMap = new HashMap<>();
 		operationId2AvgRunTimes = new HashMap<>();
@@ -93,6 +95,9 @@ public class TxLogicAnalyzer {
 			multipleLogicMap = new HashMap<>();
 		}
 
+		// 统计基数约束
+		cardinality4paraInSchema = obtainCardinality(txDataList, opId2paraSchema);
+
 		// between and 逻辑
 		// TODO
 
@@ -102,6 +107,70 @@ public class TxLogicAnalyzer {
 
 
 
+	}
+
+	private Map<String, Integer> obtainCardinality(List<TransactionData> txDataList, Map<Integer, List<String>> opId2paraSchema) {
+		Map<String, Integer> cardinality4paraInSchema = new HashMap<>();
+
+		// 所有可能被用到的列
+		Set<String> paraSchemaInfo = new HashSet<>();
+		for (List<String> para : opId2paraSchema.values()){
+			paraSchemaInfo.addAll(para);
+		}
+		for (String para : paraSchemaInfo){
+			cardinality4paraInSchema.put(para,0);
+		}
+
+
+		for (TransactionData txData : txDataList){
+			int[] operationTypes = txData.getOperationTypes();
+			Object[] operationDatas = txData.getOperationDatas();
+
+
+			Map<String, Set<Object>> para4paraInSchema = new HashMap<>();
+			for (String para : paraSchemaInfo){
+				para4paraInSchema.put(para, new HashSet<>());
+			}
+
+			for (int i = 0; i < operationDatas.length; i++) {
+				if (operationTypes[i] == 1) {// 是循环中的操作并执行了多次
+					for (OperationData operationData : ((ArrayList<OperationData>) operationDatas[i])){
+						int operationId = operationData.getOperationId();
+						if (opId2paraSchema.containsKey(operationId)){
+							addParaCardinality(operationData, opId2paraSchema.get(operationId), para4paraInSchema);
+						}
+					}
+				} else if (operationTypes[i] == 0) {// 不是循环中的操作或者只执行了一次
+					OperationData operationData = (OperationData) operationDatas[i];
+					int operationId = operationData.getOperationId();
+					if (opId2paraSchema.containsKey(operationId)){
+						addParaCardinality(operationData, opId2paraSchema.get(operationId), para4paraInSchema);
+					}
+				}
+			}
+
+			for (String para : paraSchemaInfo){
+				cardinality4paraInSchema.put(para, cardinality4paraInSchema.get(para) +  para4paraInSchema.get(para).size());
+			}
+		}
+
+		// 获得平均的基数
+		for (String para : paraSchemaInfo){
+			cardinality4paraInSchema.put(para, cardinality4paraInSchema.get(para) / txDataList.size());
+		}
+
+		return cardinality4paraInSchema;
+	}
+
+	private void addParaCardinality(OperationData operationData, List<String> strings,
+									Map<String, Set<Object>> para4paraInSchema) {
+		int[] paraDataTypes = operationData.getParaDataTypes();
+
+		assert (paraDataTypes.length != strings.size());
+
+		for (int i = 0; i < paraDataTypes.length; i++){
+			para4paraInSchema.get(strings.get(i)).add(operationData.getParameters()[i]);
+		}
 	}
 
 	// 统计每个操作的总执行次数，算比例用的，所以循环中的只算一次
@@ -268,6 +337,10 @@ public class TxLogicAnalyzer {
 		return operationId2AvgRunTimes;
 	}
 
+	public Map<String, Integer> getCardinality4paraInSchema() {
+		return cardinality4paraInSchema;
+	}
+
 	public static void main(String[] args) {
 
 		// 实验数据需要 - 20190615
@@ -284,6 +357,8 @@ public class TxLogicAnalyzer {
 		preprocessor.constructOperationTemplateAndDistInfo(transactions);
 		Map<String, Map<Integer, OperationData>> txName2OperationId2Template = preprocessor
 				.getTxName2OperationId2Template();
+		Map<String, Map<Integer, List<String>>> txName2OpId2paraSchema = preprocessor.getTxName2OperationId2paraSchema();
+
 
 		RunningLogReader runningLogReader = new RunningLogReader(txName2OperationId2Template);
 		runningLogReader.read(new File(".//testdata//log4txlogic"));
@@ -297,7 +372,7 @@ public class TxLogicAnalyzer {
 			System.out.println("###########################");
 			System.out.println(entry.getKey() + ": " + entry.getValue().size());
 			System.out.println("###########################");
-			txLogicAnalyzer.obtainTxLogic(entry.getValue());
+			txLogicAnalyzer.obtainTxLogic(entry.getValue(), txName2OpId2paraSchema.get(entry.getKey()));
 			System.out.println("---------------------------");
 
 			Map<Integer, OperationData> operationDataTemplates = txName2OperationId2Template.get(entry.getKey());

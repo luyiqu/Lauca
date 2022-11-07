@@ -2,9 +2,7 @@ package input;
 
 import java.io.File;
 import java.sql.Timestamp;
-import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.List;
+import java.util.*;
 
 import abstraction.Column;
 import abstraction.StoredProcedure;
@@ -346,11 +344,15 @@ public class SqlParser {
 			Arrays.fill(paraDataTypes, -1);
 			DistributionTypeInfo[] paraDistTypeInfos = new DistributionTypeInfo[columnNames.length];
 
+			// add by wsy
+			List<String> paraSchemaInfos = new ArrayList<>();
+
 			for (int i = 0; i < columnNames.length; i++) {
 				Column column = searchColumn(tableName, columnNames[i]);
 				if (column != null) {
 					paraDataTypes[i] = column.getDataType();
 					paraDistTypeInfos[i] = getParaDistTypeInfo(tableName, columnNames[i]);
+					paraSchemaInfos.add(tableName + "_" + columnNames[i]);
 				} else {
 					System.err.println("Unrecognized column: " + columnNames[i]);
 				}
@@ -387,7 +389,7 @@ public class SqlParser {
 					parameters.set(i, "" + ts.valueOf(parameters.get(i)).getTime());
 				}
 			}
-			return new WriteOperation(operationId, originalSql, paraDataTypes, paraDistTypeInfos, batchExecute);
+			return new WriteOperation(operationId, originalSql, paraDataTypes, paraDistTypeInfos, paraSchemaInfos, batchExecute);
 		} else if (sql.startsWith("update")) {
 			int index1 = sql.indexOf("update ");
 			int index2 = sql.indexOf(" set ");
@@ -432,6 +434,9 @@ public class SqlParser {
 			List<Integer> paraDataTypes = new ArrayList<Integer>();
 			// sql参数的数据分布类型信息
 			List<DistributionTypeInfo> paraDistTypeInfos = new ArrayList<DistributionTypeInfo>();
+
+			// add by wsy
+			List<String> paraSchemaInfos = new ArrayList<>();
 
 			// added by zsy
 			// 判断是sql模板还是带参的sql语句
@@ -497,6 +502,7 @@ public class SqlParser {
 				if (column != null) {
 					paraDataTypes.add(column.getDataType());
 					paraDistTypeInfos.add(getParaDistTypeInfo(tableName, columnName));
+					paraSchemaInfos.add(tableName + "_" + columnName);
 				} else {
 					System.err.println("Unrecognized column: " + columnName);
 				}
@@ -580,6 +586,7 @@ public class SqlParser {
 				if (column != null) {
 					paraDataTypes.add(column.getDataType());
 					paraDistTypeInfos.add(getParaDistTypeInfo(tableName, columnName));
+					paraSchemaInfos.add(tableName + "_" + columnName);
 				} else {
 					System.err.println("Unrecognized column: " + columnName);
 				}
@@ -629,7 +636,7 @@ public class SqlParser {
 //			System.out.println(paraDataTypes);
 
 			return new WriteOperation(operationId, originalSql, tmp,
-					paraDistTypeInfos.toArray(new DistributionTypeInfo[paraDistTypeInfos.size()]), batchExecute);
+					paraDistTypeInfos.toArray(new DistributionTypeInfo[paraDistTypeInfos.size()]), paraSchemaInfos, batchExecute);
 		} else if (sql.startsWith("delete")) {
 			int index1 = sql.indexOf(" from ");
 			int index2 = sql.indexOf(" where ");
@@ -656,6 +663,8 @@ public class SqlParser {
 			List<Integer> paraDataTypes = new ArrayList<Integer>();
 			// sql参数的数据分布类型信息
 			List<DistributionTypeInfo> paraDistTypeInfos = new ArrayList<DistributionTypeInfo>();
+			// add by wsy
+			List<String> paraSchemaInfos = new ArrayList<>();
 
 			// added by zsy
 			// 判断是sql模板还是带参的sql语句
@@ -695,6 +704,7 @@ public class SqlParser {
 				if (column != null) {
 					paraDataTypes.add(column.getDataType());
 					paraDistTypeInfos.add(getParaDistTypeInfo(tableName, columnName));
+					paraSchemaInfos.add(tableName + "_" + columnName);
 				} else {
 					System.out.println(sql);
 					System.err.println("Unrecognized column: " + columnName);
@@ -736,7 +746,7 @@ public class SqlParser {
 				tmp[i] = paraDataTypes.get(i);
 			}
 			return new WriteOperation(operationId, originalSql, tmp,
-					paraDistTypeInfos.toArray(new DistributionTypeInfo[paraDistTypeInfos.size()]), batchExecute);
+					paraDistTypeInfos.toArray(new DistributionTypeInfo[paraDistTypeInfos.size()]),paraSchemaInfos, batchExecute);
 		} else {
 			System.err.println("Unrecognized write operation: " + originalSql);
 			return null;
@@ -984,6 +994,8 @@ public class SqlParser {
 			Arrays.fill(paraDataTypes, -1);
 
 			DistributionTypeInfo[] paraDistTypeInfos = new DistributionTypeInfo[columnNames.length];
+			// add by wsy
+			List<String> paraSchemaInfos = new ArrayList<>();
 
 			for (int i = 0; i < columnNames.length; i++) {
 
@@ -995,6 +1007,7 @@ public class SqlParser {
 					paraDataTypes[i] = column.getDataType();
 
 					paraDistTypeInfos[i] = getParaDistTypeInfo(tableName, columnNames[i]);
+					paraSchemaInfos.add(tableName + "_" + columnNames[i]);
 
 				} else {
 					System.err.println("1Unrecognized column: " + columnNames[i]);
@@ -1010,7 +1023,7 @@ public class SqlParser {
 					parameters.set(i, "" + ts.valueOf(parameters.get(i)).getTime());
 				}
 			}
-			return new WriteOperation(operationId, originalSql, paraDataTypes, paraDistTypeInfos, batchExecute);
+			return new WriteOperation(operationId, originalSql, paraDataTypes, paraDistTypeInfos, paraSchemaInfos, batchExecute);
 
 		} else if (sql.startsWith("update")) {
 
@@ -1071,6 +1084,8 @@ public class SqlParser {
 			Arrays.fill(paraDataTypes, -1);
 
 			DistributionTypeInfo[] paraDistTypeInfos = new DistributionTypeInfo[paraDataTypes.length];
+			// add by wsy
+			List<String> paraSchemaInfos = new ArrayList<>();
 
 			for (int i = 0; i < setStatements.length; i++) {
 
@@ -1083,7 +1098,7 @@ public class SqlParser {
 					paraDataTypes[i] = column.getDataType();
 
 					paraDistTypeInfos[i] = getParaDistTypeInfo(tableName, columnName);
-
+					paraSchemaInfos.add(tableName + "_" + columnName);
 				} else {
 
 					System.err.println("2Unrecognized column: " + columnName);
@@ -1103,6 +1118,7 @@ public class SqlParser {
 					paraDataTypes[setStatements.length + i] = column.getDataType();
 
 					paraDistTypeInfos[setStatements.length + i] = getParaDistTypeInfo(tableName, columnName);
+					paraSchemaInfos.add(tableName + "_" + columnName);
 
 				} else {
 
@@ -1118,7 +1134,7 @@ public class SqlParser {
 					parameters.set(i, "" + ts.valueOf(parameters.get(i)).getTime());
 				}
 			}
-			return new WriteOperation(operationId, originalSql, paraDataTypes, paraDistTypeInfos, batchExecute);
+			return new WriteOperation(operationId, originalSql, paraDataTypes, paraDistTypeInfos, paraSchemaInfos, batchExecute);
 
 		} else if (sql.startsWith("delete")) {
 
@@ -1153,6 +1169,8 @@ public class SqlParser {
 			Arrays.fill(paraDataTypes, -1);
 
 			DistributionTypeInfo[] paraDistTypeInfos = new DistributionTypeInfo[paraDataTypes.length];
+			// add by wsy
+			List<String> paraSchemaInfos = new ArrayList<>();
 
 			for (int i = 0; i < predicates.length; i++) {
 
@@ -1165,6 +1183,7 @@ public class SqlParser {
 					paraDataTypes[i] = column.getDataType();
 
 					paraDistTypeInfos[i] = getParaDistTypeInfo(tableName, columnName);
+					paraSchemaInfos.add(tableName + "_" + columnName);
 
 				} else {
 
@@ -1181,7 +1200,7 @@ public class SqlParser {
 				}
 			}
 
-			return new WriteOperation(operationId, originalSql, paraDataTypes, paraDistTypeInfos, batchExecute);
+			return new WriteOperation(operationId, originalSql, paraDataTypes, paraDistTypeInfos, paraSchemaInfos, batchExecute);
 
 		}else if(sql.startsWith("call")){
 			int index1 = sql.indexOf("(");
@@ -1193,9 +1212,12 @@ public class SqlParser {
 			Table[] tables4StoredProcedure = storedProcedure.getTable();
 			int[] paraDataTypes = new int[columns.length];
 			DistributionTypeInfo[] paraDistTypeInfos = new DistributionTypeInfo[columns.length];
+			// add by wsy
+			List<String> paraSchemaInfos = new ArrayList<>();
 			for (int i = 0; i < columns.length; i++) {
 					paraDataTypes[i] =columns[i].getDataType();
 					paraDistTypeInfos[i] = getParaDistTypeInfo(tables4StoredProcedure[i],columns[i]);
+					paraSchemaInfos.add(tables4StoredProcedure[i] + "_" + columns[i]);
 			}
 
 			for (int i = 0; i < columns.length; ++i) {
@@ -1205,7 +1227,7 @@ public class SqlParser {
 					parameters.set(i, "" + ts.valueOf(parameters.get(i)).getTime());
 				}
 			}
-			return new WriteOperation(operationId, originalSql, paraDataTypes, paraDistTypeInfos, batchExecute);
+			return new WriteOperation(operationId, originalSql, paraDataTypes, paraDistTypeInfos,paraSchemaInfos, batchExecute);
 		} 
 		
 		else {

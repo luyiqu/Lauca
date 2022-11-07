@@ -60,6 +60,8 @@ public class AccessDistributionAnalyzer {
 				.getTxName2OperationId2paraDistTypeInfos();
 		Map<String, Map<String, DistributionTypeInfo>> txName2ParaId2DistTypeInfo = getParaDistributionTypeInfo(
 				txName2OperationId2paraDistTypeInfos);
+		Map<String, Map<Integer, List<String>>> txName2OpId2paraSchema = preprocessor.getTxName2OperationId2paraSchema();
+
 
 		RunningLogReader runningLogReader = new RunningLogReader(txName2OperationId2Template);
 		runningLogReader.read(new File(".//testdata//log4txlogic"));
@@ -83,7 +85,7 @@ public class AccessDistributionAnalyzer {
 //			System.out.println(entry.getKey());
 
 			TxLogicAnalyzer txLogicAnalyzer = new TxLogicAnalyzer();
-			txLogicAnalyzer.obtainTxLogic(entry.getValue());
+			txLogicAnalyzer.obtainTxLogic(entry.getValue(), txName2OpId2paraSchema.get(entry.getKey()));
 
 			Map<Integer, OperationData> operationDataTemplates = txName2OperationId2Template.get(entry.getKey());
 			Map<Integer, OperationData> sortedOperationDataTemplates = new TreeMap<>();
@@ -107,7 +109,7 @@ public class AccessDistributionAnalyzer {
 			for (int i = 0; i < transactions.size(); i++) {
 				if (transactions.get(i).getName().equals(entry.getKey())) {
 					transactions.get(i).setTransactionLogicInfo(txLogicAnalyzer.getParameterNodeMap(),
-							txLogicAnalyzer.getMultipleLogicMap(), txLogicAnalyzer.getOperationId2AvgRunTimes());
+							txLogicAnalyzer.getMultipleLogicMap(), txLogicAnalyzer.getOperationId2AvgRunTimes(), txLogicAnalyzer.getCardinality4paraInSchema());
 					break;
 				}
 			}
@@ -233,6 +235,7 @@ public class AccessDistributionAnalyzer {
 				.getTxName2OperationId2paraDistTypeInfos();
 		Map<String, Map<String, DistributionTypeInfo>> txName2ParaId2DistTypeInfo = getParaDistributionTypeInfo(
 				txName2OperationId2paraDistTypeInfos);
+		Map<String, Map<Integer, List<String>>> txName2OpId2paraSchema = preprocessor.getTxName2OperationId2paraSchema();
 
 		RunningLogReader runningLogReader = new RunningLogReader(txName2OperationId2Template);
 		if (Configurations.isUseSkywalking()) {
@@ -268,7 +271,7 @@ public class AccessDistributionAnalyzer {
 //			System.out.println(entry.getKey());
 
 			TxLogicAnalyzer txLogicAnalyzer = new TxLogicAnalyzer();
-			txLogicAnalyzer.obtainTxLogic(entry.getValue());
+			txLogicAnalyzer.obtainTxLogic(entry.getValue(), txName2OpId2paraSchema.get(entry.getKey()));
 
 
 			Map<Integer, OperationData> operationDataTemplates = txName2OperationId2Template.get(entry.getKey());
@@ -293,7 +296,7 @@ public class AccessDistributionAnalyzer {
 			for (int i = 0; i < transactions.size(); i++) {
 				if (transactions.get(i).getName().equals(entry.getKey())) {
 					transactions.get(i).setTransactionLogicInfo(txLogicAnalyzer.getParameterNodeMap(),
-							txLogicAnalyzer.getMultipleLogicMap(), txLogicAnalyzer.getOperationId2AvgRunTimes());
+							txLogicAnalyzer.getMultipleLogicMap(), txLogicAnalyzer.getOperationId2AvgRunTimes(), txLogicAnalyzer.getCardinality4paraInSchema());
 					break;
 				} //qly:在这里才把事务逻辑，每个操作平均执行的次数和Multiple逻辑关系加入transaction中
 			}

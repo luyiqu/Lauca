@@ -3,10 +3,7 @@ package abstraction;
 import java.sql.SQLException;
 import java.sql.Statement;
 import java.text.SimpleDateFormat;
-import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.Date;
-import java.util.Map;
+import java.util.*;
 import java.util.concurrent.atomic.AtomicInteger;
 
 import accessdistribution.DataAccessDistribution;
@@ -21,16 +18,17 @@ public class WriteOperation extends SqlStatement {
 
 	private boolean batchExecute;
 
-
+	private List<String> paraSchemaInfos;
 
 	public WriteOperation(int operationId, String sql, int[] paraDataTypes, 
-			DistributionTypeInfo[] paraDistTypeInfos, boolean batchExecute) {
+			DistributionTypeInfo[] paraDistTypeInfos,List<String> paraSchemaInfos , boolean batchExecute) {
 		super();
 		this.operationId = operationId;
 		this.sql = sql;
 		this.paraDataTypes = paraDataTypes;
 		this.paraDistTypeInfos = paraDistTypeInfos;
-		
+
+		this.paraSchemaInfos = paraSchemaInfos;
 		this.batchExecute = batchExecute;
 		
 		windowParaGenerators = new DataAccessDistribution[paraDataTypes.length];
@@ -45,6 +43,8 @@ public class WriteOperation extends SqlStatement {
 		this.sql = writeOperation.sql;
 		this.paraDataTypes = writeOperation.paraDataTypes;
 		this.paraDistTypeInfos = writeOperation.paraDistTypeInfos;
+
+		this.paraSchemaInfos = new ArrayList<>(writeOperation.paraSchemaInfos);
 		this.batchExecute = writeOperation.batchExecute;
 		windowParaGenerators = new DataAccessDistribution[paraDataTypes.length];
 		fullLifeCycleParaGenerators = new DataAccessDistribution[paraDataTypes.length];
@@ -110,6 +110,11 @@ public class WriteOperation extends SqlStatement {
 ////			System.exit(1);
 			return 0;
 		}
+	}
+
+	// add by wsy
+	public List<String> getParaSchemaInfos(){
+		return paraSchemaInfos;
 	}
 
 	@Override

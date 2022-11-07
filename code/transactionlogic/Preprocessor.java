@@ -17,14 +17,18 @@ public class Preprocessor {
 	private Map<String, Map<Integer, OperationData>> txName2OperationId2Template = null;
 	private Map<String, Map<Integer, DistributionTypeInfo[]>> txName2OperationId2paraDistTypeInfos = null;
 
+	private Map<String, Map<Integer, List<String>>> txName2OperationId2paraSchema = null;
+
 	public void constructOperationTemplateAndDistInfo(List<Transaction> transactions) {
 		txName2OperationId2Template = new HashMap<>();
 		txName2OperationId2paraDistTypeInfos = new HashMap<>();
+		txName2OperationId2paraSchema = new HashMap<>();
 
 		for (int i = 0; i < transactions.size(); i++) {
 			Transaction tx = transactions.get(i);
 			txName2OperationId2Template.put(tx.getName(), new HashMap<>());
 			txName2OperationId2paraDistTypeInfos.put(tx.getName(), new HashMap<>());
+			txName2OperationId2paraSchema.put(tx.getName(), new HashMap<>());
 
 			int operationId = 1; // 后期我们在SqlStatement中维护了operationId~
 			for (int j = 0; j < tx.getTransactionBlocks().size(); j++) {
@@ -42,6 +46,7 @@ public class Preprocessor {
 					txName2OperationId2Template.get(tx.getName()).put(operationId, new OperationData(operationId, 
 							null, false, op.getParaDataTypes()));
 					txName2OperationId2paraDistTypeInfos.get(tx.getName()).put(operationId, op.getParaDistTypeInfos());
+					txName2OperationId2paraSchema.get(tx.getName()).put(operationId, op.getParaSchemaInfos());
 					operationId++;
 
 				} else if (className.equals("abstraction.Multiple")) {
@@ -61,6 +66,7 @@ public class Preprocessor {
 							txName2OperationId2Template.get(tx.getName()).put(operationId, new OperationData(operationId, 
 									null, false, op.getParaDataTypes()));
 							txName2OperationId2paraDistTypeInfos.get(tx.getName()).put(operationId, op.getParaDistTypeInfos());
+							txName2OperationId2paraSchema.get(tx.getName()).put(operationId, op.getParaSchemaInfos());
 							operationId++;
 						}
 					}
@@ -83,6 +89,7 @@ public class Preprocessor {
 								txName2OperationId2Template.get(tx.getName()).put(operationId, new OperationData(operationId, 
 										null, false, op.getParaDataTypes()));
 								txName2OperationId2paraDistTypeInfos.get(tx.getName()).put(operationId, op.getParaDistTypeInfos());
+								txName2OperationId2paraSchema.get(tx.getName()).put(operationId, op.getParaSchemaInfos());
 								operationId++;
 							}
 						}
@@ -98,5 +105,9 @@ public class Preprocessor {
 
 	public Map<String, Map<Integer, DistributionTypeInfo[]>> getTxName2OperationId2paraDistTypeInfos() {
 		return txName2OperationId2paraDistTypeInfos;
+	}
+
+	public Map<String, Map<Integer, List<String>>> getTxName2OperationId2paraSchema() {
+		return txName2OperationId2paraSchema;
 	}
 }

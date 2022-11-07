@@ -940,7 +940,7 @@ public class DistributionCounter {
 
 
 						double sim = baseDistribution.get(txId).get(paraId).getSimilarity(mergeDistribution.get(txId).get(paraId));
-						if (sim >= 0){
+						if (sim > 0){
 							similarity.add( sim );
 						}
 					} catch (Exception e) {
