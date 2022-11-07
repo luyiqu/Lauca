@@ -150,7 +150,7 @@ public class DistributionCounter {
 			DataAccessDistribution distribution0 = countContinuousParaDistribution(distTypeInfo.dataType, data);
 			distribution0.setTime(windowTime);
 //			System.out.println("DistributionCounter "+"windowTime: "+windowTime);
-			txName2ParaId2DistributionList.get(txName).get(paraIdentifier).add(distribution0);
+//			txName2ParaId2DistributionList.get(txName).get(paraIdentifier).add(distribution0);
 			// System.out.println(txName + " " + paraIdentifier + "\n" + distribution0);
 			break;
 		case 1:
@@ -544,6 +544,7 @@ public class DistributionCounter {
 		return hFItemFrequencies;
 	}
 
+	// todo 检查实现
 	private static <T extends Number> ArrayList<ArrayList<Double>> getQuantilePerInterval(List<Entry<T, Integer>> valueNumEntryList,
 															long[] intervalCardinalities, double[]intervalFrequencies,
 																						  T maxValue, T minValue, int valuesSize) {
@@ -590,14 +591,10 @@ public class DistributionCounter {
 		}
 		// 补齐最后一个段，其值必然是1
 		for (int i = 0; i < intervalNum; i++){
-			int freqInx = binNum;
-			// 如果这个数占据极大的频数，可能会直接跳过某个分位点，这种情况下进行补齐，即认为跳过的分位点和前一个是一样的位置
-			while (quantilePerInterval.get(i).size() < freqInx){
-				quantilePerInterval.get(i).add(quantilePerInterval.get(i).get(quantilePerInterval.get(i).size() - 1));
-			}
-			if (quantilePerInterval.get(i).size() == freqInx){
+			while (quantilePerInterval.get(i).size() <= binNum){
 				quantilePerInterval.get(i).add(1.0);
 			}
+			quantilePerInterval.get(i).set(binNum, 1.0);
 		}
 
 //		for (int i = 0; i < intervalNum; ++i){
@@ -928,6 +925,8 @@ public class DistributionCounter {
 		double p = Configurations.getMergeWeight();
 		int sum = 0;
 		int mergeSum = 0;
+
+		List<Double> similarity = new ArrayList<>();
 		for (String txId : baseDistribution.keySet()){
 			Map<String, DataAccessDistribution> txParaDistribution = new HashMap<>();
 			for (String paraId : baseDistribution.get(txId).keySet()){
@@ -938,6 +937,12 @@ public class DistributionCounter {
 						mergeSum++;
 						paraDistribution = baseDistribution.get(txId).get(paraId).copy();
 						paraDistribution.merge(mergeDistribution.get(txId).get(paraId), p);
+
+
+						double sim = baseDistribution.get(txId).get(paraId).getSimilarity(mergeDistribution.get(txId).get(paraId));
+						if (sim >= 0){
+							similarity.add( sim );
+						}
 					} catch (Exception e) {
 						e.printStackTrace();
 					}
@@ -947,7 +952,12 @@ public class DistributionCounter {
 			}
 			trueDistribution.put(txId, txParaDistribution);
 		}
-		System.out.printf("%d/%d%n",mergeSum,sum);
+
+		double sim = 0.0;
+		for (Double s : similarity){
+			sim += s;
+		}
+		System.out.printf("%f/%d%n",sim,similarity.size());
 		return trueDistribution;
 	}
 

@@ -43,8 +43,9 @@ public class SequentialVcharParaDistribution extends SequentialParaDistribution 
 		}
 	}
 
+	// not realize now, return itself
 	public SequentialVcharParaDistribution copy(){
-		return new SequentialVcharParaDistribution(this);
+		return this;
 	}
 
 	public void setColumnInfo(long columnCardinality, int minLength, int maxLength, String[] seedStrings) {

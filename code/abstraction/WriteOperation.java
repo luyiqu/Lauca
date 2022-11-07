@@ -98,14 +98,14 @@ public class WriteOperation extends SqlStatement {
 			return 1;
 		} catch (Exception e) {
 //			return -1;
-			if ( e instanceof SQLException) {
+			if (e.getMessage().contains("Deadlock")) {
 				return -1;
 			}
-			e.printStackTrace();
+//			e.printStackTrace();
 //			System.err.println("ERROR!!!");
-//			System.out.println("aaaaaaaa"+pstmt.toString());
-//			System.out.println(this.getClass().getName());
-//			System.out.println(sql);
+			System.out.println("aaaaaaaa"+pstmt.toString());
+			System.out.println(this.getClass().getName());
+			System.out.println(sql);
 //			System.out.println(e.getMessage());
 ////			System.exit(1);
 			return 0;

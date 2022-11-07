@@ -3,6 +3,8 @@ package accessdistribution;
 import config.Configurations;
 
 import java.util.ArrayList;
+import java.util.List;
+import java.util.Map;
 
 /**
  * 当前工作中的数据访问分布由高频项和直方图共同表示
@@ -146,6 +148,63 @@ public abstract class DataAccessDistribution implements Comparable<DataAccessDis
 		return -1; // 理论上不可能返回-1
 	}
 
+	protected int getStart(List<Map.Entry<Double,Double>> lst, double pos){
+		int low=1,high=lst.size() - 1;
+		while (low < high){
+			int mid = (low + high) / 2;
+			if (lst.get(mid).getKey() < pos){
+				low = mid + 1;
+			}else{
+				high = mid;
+			}
+		}
+		return low;
+	}
+
+	// 二分加速寻找起点
+	protected int getStart(ArrayList<Double> lst, double pos){
+		int low=1,high=lst.size() - 1;
+		while (low < high){
+			int mid = (low + high) / 2;
+			if (lst.get(mid) < pos){
+				low = mid + 1;
+			}else{
+				high = mid;
+			}
+		}
+		return low;
+	}
+
+	protected double getOverlapProb(List<Map.Entry<Double,Double>> lst,double left, double right){
+		int i = getStart(lst, left);
+		double prob = 0.0;
+		for (;i < lst.size(); ++i){
+			Double value = lst.get(i).getValue();
+			Double key0 = lst.get(i - 1).getKey();
+			Double key1 = lst.get(i).getKey();
+			if (value < 1e-4 || value.isNaN()){
+				continue;
+			}
+
+			if (key1 - key0 < 1e-4){
+				prob += value;
+				continue;
+			}
+
+			double leftEndPoint =  Math.max(key0 , left);
+			double rightEndPoint = Math.min(key1 , right);
+
+			if (right <= key0){
+				break;
+			}
+			if (leftEndPoint >= rightEndPoint){
+				continue;
+			}
+			prob += value*(rightEndPoint - leftEndPoint)/(key1 - key0);
+		}
+		return prob;
+	}
+
 	public void setTime(long time) {
 		this.time = time;
 	}
@@ -174,4 +233,7 @@ public abstract class DataAccessDistribution implements Comparable<DataAccessDis
 
 	public abstract DataAccessDistribution copy();
 
+	public double getSimilarity(DataAccessDistribution dataAccessDistribution){
+		return -1.0;
+	};
 }
