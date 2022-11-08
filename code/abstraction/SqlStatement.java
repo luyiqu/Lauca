@@ -10,6 +10,7 @@ import java.text.SimpleDateFormat;
 import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 
 import accessdistribution.DataAccessDistribution;
 import accessdistribution.DistributionTypeInfo;
@@ -470,9 +471,15 @@ public abstract class SqlStatement extends TransactionBlock {
 	}
 
 	// 服务于Multiple块内操作的执行（非第一次执行）
-	public abstract int execute(Map<String, Double> multipleLogicMap, int round);
+//	public abstract int execute(Map<String, Double> multipleLogicMap, int round);
 
-	public abstract int execute(Statement stmt, Map<String, Double> multipleLogicMap, int round);
+	public abstract int execute(Map<String, Integer> cardinality4paraInSchema, Map<String, Set<Object>> paraUsed,
+								Map<String, Double> multipleLogicMap, int round);
+
+	public abstract int execute(Map<String, Integer> cardinality4paraInSchema, Map<String, Set<Object>> paraUsed,
+								Statement stmt, Map<String, Double> multipleLogicMap, int round);
+
+//	public abstract int execute(Statement stmt, Map<String, Double> multipleLogicMap, int round);
 
 	public int getOperationId() {
 		return operationId;

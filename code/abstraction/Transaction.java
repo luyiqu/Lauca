@@ -4,11 +4,7 @@ import java.math.BigDecimal;
 import java.sql.Connection;
 import java.sql.SQLException;
 import java.sql.Statement;
-import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
+import java.util.*;
 
 import accessdistribution.DataAccessDistribution;
 import transactionlogic.ParameterNode;
@@ -169,6 +165,11 @@ public class Transaction{
 		long startTime = System.nanoTime();
 		int flag = 1;
 
+		Map<String, Set<Object>> paraUsed = new HashMap<>();
+		for (String para : cardinality4paraInSchema.keySet()){
+			paraUsed.put(para, new HashSet<>());
+		}
+
 
 //		if(transactionBlocks.size()!=1){
 //			System.out.println(transactionBlocks.size());
@@ -179,14 +180,14 @@ public class Transaction{
 //		}
 		for (int i = 0; i < transactionBlocks.size(); i++) {
 			if (prepared) {
-				flag = transactionBlocks.get(i).execute();
+				flag = transactionBlocks.get(i).execute(cardinality4paraInSchema, paraUsed);
 				if (flag != 1) {
 //					System.out.println("prepared"+this.name+" "+i);
 					break;
 				}
 			} else {
 
-				flag = transactionBlocks.get(i).execute(stmt);
+				flag = transactionBlocks.get(i).execute(cardinality4paraInSchema, paraUsed, stmt);
 //				System.out.println("NoPrepared: "+transactionBlocks.get(i));
 				if (flag != 1) {
 					break;

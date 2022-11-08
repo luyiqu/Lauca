@@ -4,15 +4,9 @@ import java.sql.SQLException;
 import java.sql.Statement;
 import java.text.SimpleDateFormat;
 import java.util.*;
-import java.util.concurrent.atomic.AtomicInteger;
 
 import accessdistribution.DataAccessDistribution;
 import accessdistribution.DistributionTypeInfo;
-import com.mysql.jdbc.exceptions.MySQLSyntaxErrorException;
-import com.sun.org.apache.bcel.internal.generic.LADD;
-import workloadgenerator.LaucaTestingEnv;
-
-import javax.swing.plaf.synth.SynthOptionPaneUI;
 
 public class WriteOperation extends SqlStatement {
 
@@ -56,7 +50,7 @@ public class WriteOperation extends SqlStatement {
 	}
 
 	@Override
-	public int execute() {
+	public int execute(Map<String, Integer> cardinality4paraInSchema, Map<String, Set<Object>> paraUsed) {
 //		long startTime = System.currentTimeMillis();
 //		long para = -1; //lyqu: 照理说不应该为long类型，而是int主键类型
 //		LaucaTestingEnv.writeOperationTimes.getAndIncrement();
@@ -67,7 +61,15 @@ public class WriteOperation extends SqlStatement {
 //				if(i == paraDataTypes.length-1){
 //					para = (long)parameter;
 //				}
-				setParameter(i + 1, paraDataTypes[i], geneParameter(i));
+
+				Object parameter = checkParaOutOfCardinality(
+						geneParameter(i),
+						this.paraSchemaInfos.get(i),
+						cardinality4paraInSchema,
+						paraUsed
+				);
+
+				setParameter(i + 1, paraDataTypes[i], parameter);
 
 			}
 //			long endTime = System.currentTimeMillis();
@@ -118,14 +120,21 @@ public class WriteOperation extends SqlStatement {
 	}
 
 	@Override
-	public int execute(Statement stmt) {
+	public int execute(Map<String, Integer> cardinality4paraInSchema, Map<String, Set<Object>> paraUsed, Statement stmt) {
 		
 		String tmp = sql; // 方便程序调试
 		
 		try {
 			// String tmp = sql;
 			for (int i = 0; i < paraDataTypes.length; i++) {
-				Object parameter = geneParameter(i);
+
+				Object parameter = checkParaOutOfCardinality(
+						geneParameter(i),
+						this.paraSchemaInfos.get(i),
+						cardinality4paraInSchema,
+						paraUsed
+				);
+
 				if (paraDataTypes[i] == 3) {
 					tmp = tmp.replaceFirst("\\?", " '" + sdf.format(new Date((Long)parameter)) + "' ");
 				} else if (paraDataTypes[i] == 4) {
@@ -152,10 +161,17 @@ public class WriteOperation extends SqlStatement {
 	}
 
 	@Override
-	public int execute(Map<String, Double> multipleLogicMap, int round) {
+	public int execute(Map<String, Integer> cardinality4paraInSchema, Map<String, Set<Object>> paraUsed,
+					   Map<String, Double> multipleLogicMap, int round) {
 		try {
 			for (int i = 0; i < paraDataTypes.length; i++) {
-				Object parameter = geneParameterByMultipleLogic(i, multipleLogicMap, round);
+				Object parameter = checkParaOutOfCardinality(
+						geneParameterByMultipleLogic(i, multipleLogicMap, round),
+						this.paraSchemaInfos.get(i),
+						cardinality4paraInSchema,
+						paraUsed
+				);
+
 				setParameter(i + 1, paraDataTypes[i], parameter);
 			}
 			if (batchExecute) {
@@ -181,11 +197,17 @@ public class WriteOperation extends SqlStatement {
 	}
 
 	@Override
-	public int execute(Statement stmt, Map<String, Double> multipleLogicMap, int round) {
+	public int execute(Map<String, Integer> cardinality4paraInSchema, Map<String, Set<Object>> paraUsed,
+					   Statement stmt, Map<String, Double> multipleLogicMap, int round) {
 		try {
 			String tmp = sql;
 			for (int i = 0; i < paraDataTypes.length; i++) {
-				Object parameter = geneParameterByMultipleLogic(i, multipleLogicMap, round);
+				Object parameter = checkParaOutOfCardinality(
+						geneParameterByMultipleLogic(i, multipleLogicMap, round),
+						this.paraSchemaInfos.get(i),
+						cardinality4paraInSchema,
+						paraUsed
+				);
 				if (paraDataTypes[i] == 3) {
 					tmp = tmp.replaceFirst("\\?", " '" + sdf.format(new Date((Long)parameter)) + "' ");
 				} else if (paraDataTypes[i] == 4) {

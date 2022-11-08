@@ -10,6 +10,7 @@ import java.sql.Statement;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 
 public class Multiple extends TransactionBlock {
 
@@ -68,7 +69,7 @@ public class Multiple extends TransactionBlock {
 	}
 
 	@Override
-	public int execute(){
+	public int execute(Map<String, Integer> cardinality4paraInSchema, Map<String, Set<Object>> paraUsed){
 		//modified by lyqu for debug
 		double decimalPart = avgRunTimes % 1;
 		int runTimes = (int) avgRunTimes;
@@ -82,14 +83,14 @@ public class Multiple extends TransactionBlock {
 		for (int i = 0; i < runTimes; i++) {
 			if (i == 0) { // multiple块内操作的第一次执行，无需考虑multiple逻辑
 				for (int j = 0; j < sqls.size(); j++) {
-					int flag = sqls.get(j).execute();
+					int flag = sqls.get(j).execute(cardinality4paraInSchema, paraUsed);
 					if (flag != 1) {
 						return flag;
 					}
 				}
 			} else { // 非第一次执行，此时块内操作的执行需考虑multiple逻辑
 				for (int j = 0; j < sqls.size(); j++) {
-					int flag = sqls.get(j).execute(multipleLogicMap, i);
+					int flag = sqls.get(j).execute(cardinality4paraInSchema, paraUsed, multipleLogicMap, i);
 					if (flag != 1) {
 						return flag;
 					}
@@ -133,7 +134,7 @@ public class Multiple extends TransactionBlock {
 	}
 
 	@Override
-	public int execute(Statement stmt) {
+	public int execute(Map<String, Integer> cardinality4paraInSchema, Map<String, Set<Object>> paraUsed, Statement stmt) {
 		double decimalPart = avgRunTimes % 1;
 		//modified by lyqu
 //		System.out.println("2222");
@@ -148,14 +149,14 @@ public class Multiple extends TransactionBlock {
 		for (int i = 0; i < runTimes; i++) {
 			if (i == 0) {
 				for (int j = 0; j < sqls.size(); j++) {
-					int flag = sqls.get(j).execute(stmt);
+					int flag = sqls.get(j).execute(cardinality4paraInSchema, paraUsed, stmt);
 					if (flag != 1) {
 						return flag;
 					}
 				}
 			} else {
 				for (int j = 0; j < sqls.size(); j++) {
-					int flag = sqls.get(j).execute(stmt, multipleLogicMap, i);
+					int flag = sqls.get(j).execute(cardinality4paraInSchema, paraUsed, stmt, multipleLogicMap, i);
 					if (flag != 1) {
 						return flag;
 					}

@@ -5,11 +5,7 @@ import java.sql.SQLException;
 import java.sql.Statement;
 import java.sql.Timestamp;
 import java.text.SimpleDateFormat;
-import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.Date;
-import java.util.List;
-import java.util.Map;
+import java.util.*;
 
 import accessdistribution.DataAccessDistribution;
 import accessdistribution.DistributionTypeInfo;
@@ -77,7 +73,7 @@ public class ReadOperation extends SqlStatement {
 	}
 
 	@Override
-	public int execute() {
+	public int execute(Map<String, Integer> cardinality4paraInSchema, Map<String, Set<Object>> paraUsed) {
 //		long startTime = System.currentTimeMillis();
 		try {
 			for (int i = 0; i < paraDataTypes.length; i++) {
@@ -109,7 +105,7 @@ public class ReadOperation extends SqlStatement {
 	}
 
 	@Override
-	public int execute(Statement stmt) {
+	public int execute(Map<String, Integer> cardinality4paraInSchema, Map<String, Set<Object>> paraUsed, Statement stmt) {
 		try {
 			String tmp = sql;
 			for (int i = 0; i < paraDataTypes.length; i++) {
@@ -136,7 +132,8 @@ public class ReadOperation extends SqlStatement {
 	}
 
 	@Override
-	public int execute(Map<String, Double> multipleLogicMap, int round) {
+	public int execute(Map<String, Integer> cardinality4paraInSchema, Map<String, Set<Object>> paraUsed,
+					   Map<String, Double> multipleLogicMap, int round) {
 //		long startTime = System.currentTimeMillis();
 //		System.out.println("照例说Read操作肯定会走这里，但这里是指multiple的事务逻辑");
 		try {
@@ -164,7 +161,8 @@ public class ReadOperation extends SqlStatement {
 	}
 
 	@Override
-	public int execute(Statement stmt, Map<String, Double> multipleLogicMap, int round) {
+	public int execute(Map<String, Integer> cardinality4paraInSchema, Map<String, Set<Object>> paraUsed,
+					   Statement stmt, Map<String, Double> multipleLogicMap, int round) {
 		try {
 			String tmp = sql;
 			for (int i = 0; i < paraDataTypes.length; i++) {
