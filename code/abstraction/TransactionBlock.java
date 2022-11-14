@@ -39,16 +39,16 @@ public abstract class TransactionBlock {
 	protected Object checkParaOutOfCardinality(Object para, String paraSchemaInfo,
 											   Map<String, Integer> cardinality4paraInSchema, Map<String, Set<Object>> paraUsed){
 		Object parameter = para;
-		if (cardinality4paraInSchema.containsKey(paraSchemaInfo)){
-			// 如果已经填满基数，不再重新构造，直接从已知的参数里找一个
-			if (cardinality4paraInSchema.get(paraSchemaInfo) == paraUsed.get(paraSchemaInfo).size()){
-				parameter = new ArrayList<>(paraUsed.get(paraSchemaInfo)).get(
-						new Random().nextInt(cardinality4paraInSchema.get(paraSchemaInfo)));
-			}
-			else{
-				paraUsed.get(paraSchemaInfo).add(parameter);
-			}
-		}
+//		if (cardinality4paraInSchema.containsKey(paraSchemaInfo)){
+//			// 如果已经填满基数，不再重新构造，直接从已知的参数里找一个
+//			if (cardinality4paraInSchema.get(paraSchemaInfo) == paraUsed.get(paraSchemaInfo).size()){
+//				parameter = new ArrayList<>(paraUsed.get(paraSchemaInfo)).get(
+//						new Random().nextInt(cardinality4paraInSchema.get(paraSchemaInfo)));
+//			}
+//			else{
+//				paraUsed.get(paraSchemaInfo).add(parameter);
+//			}
+//		}
 		return parameter;
 	}
 }

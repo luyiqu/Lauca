@@ -908,13 +908,15 @@ public class DistributionCounter {
 	}
 
 	public static List<Map<String, Map<String, DataAccessDistribution>>> windowDistributionAverage(List<Map<String, Map<String, DataAccessDistribution>>> windowDistributionList) {
+
+		long startTime = System.currentTimeMillis();
 		List<Map<String, Map<String, DataAccessDistribution>>> averageList = new ArrayList<>();
 		averageList.add(windowDistributionList.get(0));
 
 		for (int i = 1; i < windowDistributionList.size(); ++i){
 			averageList.add(mergeDistribution(windowDistributionList.get(i), averageList.get(i-1),averageList.get(i-1)));
 		}
-		System.out.println("merge and");
+		System.out.println("merge and with time(ms):" + (System.currentTimeMillis() - startTime));
 		return averageList;
 	}
 
@@ -957,7 +959,7 @@ public class DistributionCounter {
 		for (Double s : similarity){
 			sim += s;
 		}
-		System.out.printf("%f/%d%n",sim,similarity.size());
+		System.out.printf("%s/%d%n", similarity,similarity.size());
 		return trueDistribution;
 	}
 

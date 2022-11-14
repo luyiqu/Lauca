@@ -34,7 +34,7 @@ public class Transaction{
 	// Multiple块内SQL操作的逻辑（目前仅考虑SQL输入参数是否保持不变或者单调改变）
 	private Map<String, Double> multipleLogicMap = null;
 	// 以访问的列为单位统计的基数
-	private Map<String, Integer> cardinality4paraInSchema = null;
+	private Map<String, Integer> cardinality4paraInSchema = new HashMap<>();
 	// 操作ID -> 平均执行次数，用来确定：if/else分支执行比例，multiple内操作平均执行次数
 	private Map<Integer, Double> operationId2AvgRunTimes = null;
 
@@ -72,6 +72,9 @@ public class Transaction{
 		this.ratio = transaction.ratio;
 		this.prepared = transaction.prepared;
 		this.transactionBlocks = new ArrayList<>();
+
+		if (transaction.cardinality4paraInSchema != null)
+			this.cardinality4paraInSchema = new HashMap<>(transaction.cardinality4paraInSchema);
 
 		for (TransactionBlock txBlock : transaction.transactionBlocks) {
 			if (txBlock.getClass().getSimpleName().equals("Multiple")) {

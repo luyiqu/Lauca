@@ -12,7 +12,7 @@ public class WriteOperation extends SqlStatement {
 
 	private boolean batchExecute;
 
-	private List<String> paraSchemaInfos;
+	private List<String> paraSchemaInfos = new ArrayList<>();
 
 	public WriteOperation(int operationId, String sql, int[] paraDataTypes, 
 			DistributionTypeInfo[] paraDistTypeInfos,List<String> paraSchemaInfos , boolean batchExecute) {
@@ -38,7 +38,8 @@ public class WriteOperation extends SqlStatement {
 		this.paraDataTypes = writeOperation.paraDataTypes;
 		this.paraDistTypeInfos = writeOperation.paraDistTypeInfos;
 
-		this.paraSchemaInfos = new ArrayList<>(writeOperation.paraSchemaInfos);
+		if (writeOperation.paraSchemaInfos != null)
+			this.paraSchemaInfos = new ArrayList<>(writeOperation.paraSchemaInfos);
 		this.batchExecute = writeOperation.batchExecute;
 		windowParaGenerators = new DataAccessDistribution[paraDataTypes.length];
 		fullLifeCycleParaGenerators = new DataAccessDistribution[paraDataTypes.length];
