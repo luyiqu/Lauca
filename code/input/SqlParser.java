@@ -10,7 +10,6 @@ import abstraction.ReadOperation;
 import abstraction.Table;
 import abstraction.WriteOperation;
 import accessdistribution.DistributionTypeInfo;
-import com.sun.javaws.IconUtil;
 import config.Configurations;
 
 public class SqlParser {

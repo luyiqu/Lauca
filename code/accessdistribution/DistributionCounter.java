@@ -777,7 +777,7 @@ public class DistributionCounter {
 				allParaDistributionInfo.add(entry2.getValue());
 			}
 		}
-		
+
 
 		// 待返回数据，list中的每一项就是某一个时间窗口的所有数据分布信息
 		List<Map<String, Map<String, DataAccessDistribution>>> windowDistributionList = new ArrayList<>();
@@ -938,8 +938,7 @@ public class DistributionCounter {
 					try {
 						mergeSum++;
 						paraDistribution = baseDistribution.get(txId).get(paraId).copy();
-						paraDistribution.merge(mergeDistribution.get(txId).get(paraId), p);
-
+						// todo 在这里计算候选集的合并
 
 						double sim = baseDistribution.get(txId).get(paraId).getSimilarity(mergeDistribution.get(txId).get(paraId));
 						if (sim > 0){

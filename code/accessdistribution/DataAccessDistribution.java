@@ -227,10 +227,6 @@ public abstract class DataAccessDistribution implements Comparable<DataAccessDis
 	// bug fix：判断利用事务逻辑生成的参数是否在当前属性的阈值内
 	public abstract boolean inDomain(Object parameter);
 
-	// 将另一个数据分布的内容按一定的比例合并到当前分布
-	public void merge(DataAccessDistribution dataAccessDistribution, double p) throws Exception {
-	}
-
 	public abstract DataAccessDistribution copy();
 
 	public double getSimilarity(DataAccessDistribution dataAccessDistribution){

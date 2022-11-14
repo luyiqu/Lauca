@@ -172,98 +172,6 @@ public class ContinuousParaDistribution <T extends Number> extends DataAccessDis
 
 		return sim;
 	}
-	// 将本分布与传入的分布按概率p,(1-p)的形式加权合并
-	// 在本函数中直接使用的位置，概率信息都是还原后的真实值
-	@Override
-	public void merge(DataAccessDistribution dataAccessDistribution, double p) throws Exception {
-		super.merge(dataAccessDistribution, p);
-		if (p > 1 - 1e-7){
-			return ;
-		}
-		if (!(dataAccessDistribution instanceof ContinuousParaDistribution)){
-			throw new Exception("It's not same access distribution type");
-		}
-		ContinuousParaDistribution mergeDistribution = (ContinuousParaDistribution) dataAccessDistribution;
-		// 还原概率分布
-		List<Map.Entry<Double,Double>> baseQuantile = getQuantile(p);
-		baseQuantile.addAll(mergeDistribution.getQuantile(1-p));
-		baseQuantile.sort(Map.Entry.comparingByKey());
-		// 按分位点切割全区间
-		ArrayList<Double> allQuantilePos = new ArrayList<>();
-		for (Map.Entry<Double,Double> quantile: baseQuantile){
-			allQuantilePos.add(quantile.getKey());
-		}
-
-
-		List<Double> allQuantileProb = new ArrayList<>();
-		for (int i = 0;i < allQuantilePos.size(); ++i){
-			allQuantileProb.add(0.0);
-		}
-
-		// 分别将两个分布的概率投射到分位点切割的每个子区间内
-		for (int i = 1;i < allQuantilePos.size(); ++i){
-			double left = allQuantilePos.get(i - 1);
-			double right = allQuantilePos.get(i);
-			double prob = getOverlapProb(baseQuantile, left, right);
-			allQuantileProb.set(i,allQuantileProb.get(i) + prob);
-		}
-
-		this.minValue = this.minValue.doubleValue() < mergeDistribution.minValue.doubleValue() ?
-				this.minValue : (T) mergeDistribution.minValue;
-		this.maxValue = this.maxValue.doubleValue() > mergeDistribution.maxValue.doubleValue() ?
-				this.maxValue : (T) mergeDistribution.maxValue;
-
-		double avgIntervalLength = (this.maxValue.doubleValue() - this.minValue.doubleValue())/ intervalNum;
-		// 重构概率分布
-		// 记录原始的直方图占有的概率,后续等比例还原
-		double intervalProbSum = 0;
-        for (int i = 0;i < this.intervalNum; ++i){
-			intervalProbSum += this.intervalFrequencies[i];
-            this.intervalFrequencies[i] = 0.0;
-        }
-		double  tmp_value = 0.0;
-		for (int j = 0,i = 1 ;j < this.intervalNum ; ++j){
-			double left = minValue.doubleValue() + j * avgIntervalLength;
-			double right = left + avgIntervalLength;
-			double prob = 0.0;
-
-			for (;i < allQuantilePos.size();++i){
-				double leftEndPoint =  Math.max(allQuantilePos.get(i - 1) , left);
-				double rightEndPoint = Math.min(allQuantilePos.get(i) , right);
-
-				if (right < allQuantilePos.get(i - 1)){
-					break;
-				}
-				if (leftEndPoint >= rightEndPoint){
-					continue;
-				}
-
-				prob += allQuantileProb.get(i)*(rightEndPoint - leftEndPoint)/(allQuantilePos.get(i) - allQuantilePos.get(i - 1));
-			}
-			this.intervalFrequencies[j] += prob;
-		}
-		tmp_value = 0;
-		for (int i = 0 ; i < this.intervalNum ; ++i){
-			tmp_value += this.intervalFrequencies[i];
-		}
-		if (tmp_value < 1e-7) tmp_value = 1;
-		for (int i = 0; i < this.intervalNum ; ++i){
-			this.intervalFrequencies[i] /= tmp_value;
-		}
-
-
-
-
-		// 重构分位点
-		if (this.quantileNum > 0){
-			constructQuantile(allQuantilePos,allQuantileProb,avgIntervalLength);
-		}
-
-		for( int i = 0; i < this.intervalNum ; ++i){
-			this.intervalFrequencies[i] *= intervalProbSum;
-		}
-		init();
-	}
 
 	private void constructQuantile(ArrayList<Double>allQuantilePos, List<Double>allQuantileProb, double avgIntervalLength){
 		this.quantilePerInterval = new ArrayList<>();
@@ -436,13 +344,7 @@ public class ContinuousParaDistribution <T extends Number> extends DataAccessDis
 		ContinuousParaDistribution<Long> distribution1 = new ContinuousParaDistribution<>(minValue+10, maxValue/2,
 				highFrequencyItems2, hFItemFrequencies2, intervalCardinalities, intervalFrequencies2);
 
-        ContinuousParaDistribution<Long> distribution2 = distribution.copy();
-		try {
-			distribution2.merge(distribution1,0.8);
-		}
-		catch (Exception e){
-			e.printStackTrace();
-		}
+
 
 //		File file = new File("output.txt");
 //		try {
