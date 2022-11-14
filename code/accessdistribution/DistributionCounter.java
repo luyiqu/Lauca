@@ -544,7 +544,6 @@ public class DistributionCounter {
 		return hFItemFrequencies;
 	}
 
-	// todo 检查实现
 	private static <T extends Number> ArrayList<ArrayList<Double>> getQuantilePerInterval(List<Entry<T, Integer>> valueNumEntryList,
 															long[] intervalCardinalities, double[]intervalFrequencies,
 																						  T maxValue, T minValue, int valuesSize) {
@@ -914,51 +913,67 @@ public class DistributionCounter {
 		averageList.add(windowDistributionList.get(0));
 
 		for (int i = 1; i < windowDistributionList.size(); ++i){
-			averageList.add(mergeDistribution(windowDistributionList.get(i), averageList.get(i-1),averageList.get(i-1)));
+			averageList.add(mergeDistribution(i, windowDistributionList));
 		}
 		System.out.println("merge and with time(ms):" + (System.currentTimeMillis() - startTime));
 		return averageList;
 	}
 
-	private static Map<String, Map<String, DataAccessDistribution>> mergeDistribution(Map<String, Map<String, DataAccessDistribution>> baseDistribution,
-																					  Map<String, Map<String, DataAccessDistribution>> mergeDistribution,
-																					  Map<String, Map<String, DataAccessDistribution>> oldDistribution) {
+	private static Map<String, Map<String, DataAccessDistribution>> mergeDistribution(int baseDistributionPos,
+																					  List<Map<String, Map<String, DataAccessDistribution>>> mergeDistributionList
+																					  ) {
 		Map<String, Map<String, DataAccessDistribution>> trueDistribution = new HashMap<>();
-		double p = Configurations.getMergeWeight();
-		int sum = 0;
-		int mergeSum = 0;
+		int k = Configurations.getMergeWeight().intValue();
+		// 当前的分布集合
+		Map<String, Map<String, DataAccessDistribution>> baseDistribution = mergeDistributionList.get(baseDistributionPos);
 
-		List<Double> similarity = new ArrayList<>();
+
 		for (String txId : baseDistribution.keySet()){
 			Map<String, DataAccessDistribution> txParaDistribution = new HashMap<>();
-			for (String paraId : baseDistribution.get(txId).keySet()){
-				DataAccessDistribution paraDistribution = baseDistribution.get(txId).get(paraId);
-				sum ++;
-				if (mergeDistribution.containsKey(txId) && mergeDistribution.get(txId).containsKey(paraId)){
-					try {
-						mergeSum++;
-						paraDistribution = baseDistribution.get(txId).get(paraId).copy();
-						// todo 在这里计算候选集的合并
+			for (String paraId : baseDistribution.get(txId).keySet()){ // 遍历每个参数的访问分布
+				if (!(baseDistribution.get(txId).get(paraId) instanceof SequentialCtnsParaDistribution)){ // 只合并ctn的候选参数
+					txParaDistribution.put(paraId, baseDistribution.get(txId).get(paraId));
+					continue;
+				}
+				SequentialCtnsParaDistribution paraDistribution = (SequentialCtnsParaDistribution)baseDistribution.get(txId).get(paraId);
 
-						double sim = baseDistribution.get(txId).get(paraId).getSimilarity(mergeDistribution.get(txId).get(paraId));
-						if (sim > 0){
-							similarity.add( sim );
-						}
-					} catch (Exception e) {
-						e.printStackTrace();
+				// 初始化存储列表
+				ArrayList<ArrayList<Long>> candidates = new ArrayList<>();
+				for (int i = 0; i < paraDistribution.intervalNum; ++i){
+					candidates.add(new ArrayList<>());
+				}
+
+				// 计算前k个区间
+				for (int i = 0;i < k ;i ++){
+					int mergeDistPos = baseDistributionPos - i;
+					if (mergeDistPos < 0){
+						continue;
+					}
+
+					Map<String, Map<String, DataAccessDistribution>> mergeDistribution = mergeDistributionList.get(mergeDistPos);
+					if (mergeDistribution.containsKey(txId) && mergeDistribution.get(txId).containsKey(paraId)){
+						SequentialCtnsParaDistribution mergeParaDistribution = (SequentialCtnsParaDistribution)mergeDistribution.get(txId).get(paraId);
+						// 合并前面区间的候选参数
+						candidates = paraDistribution.mergeCandidate(mergeParaDistribution.getCurrentParaCandidates(), candidates);
 					}
 				}
 
+				// 转为数组
+				long[][] newParaCandidates = new long[paraDistribution.intervalNum][];
+				for (int i = 0; i < paraDistribution.intervalNum; ++i){
+					newParaCandidates[i] = new long[candidates.get(i).size()];
+					for (int j = 0; j < candidates.get(i).size(); ++j) {
+						newParaCandidates[i][j] = candidates.get(i).get(j);
+					}
+				}
+
+				// 更新结果
+				paraDistribution.geneCandidates(newParaCandidates);
 				txParaDistribution.put(paraId, paraDistribution);
 			}
 			trueDistribution.put(txId, txParaDistribution);
 		}
 
-		double sim = 0.0;
-		for (Double s : similarity){
-			sim += s;
-		}
-		System.out.printf("%s/%d%n", similarity,similarity.size());
 		return trueDistribution;
 	}
 

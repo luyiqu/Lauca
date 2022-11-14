@@ -54,6 +54,48 @@ public class SequentialCtnsParaDistribution extends SequentialParaDistribution {
 		return new SequentialCtnsParaDistribution(this);
 	}
 
+	/**
+	 * 按照当前分布的范围，把前一个区间的候选参数加进统计里
+	 * 这个过程是去重的
+	 * @param priorParaCandidates 前一个区间的候选参数
+	 * @param base 已经存储好的候选参数
+	 * @return 合并后的结果
+	 */
+	public ArrayList<ArrayList<Long>> mergeCandidate(long[][] priorParaCandidates,ArrayList<ArrayList<Long>> base ){
+		List<Long> priorParaCandidateList = new ArrayList<>();
+		if (priorParaCandidates != null) {
+			for (long[] tmpArr : priorParaCandidates) {
+				for (long tmpItem : tmpArr) {
+					priorParaCandidateList.add(tmpItem);
+				}
+			}
+			Collections.shuffle(priorParaCandidateList);
+		}
+
+		int[] repeatedParaNums = new int[intervalNum];
+		for (int i = 0; i < intervalNum; i++) {
+			// 对于区间内参数基数超过int最大值的情形暂不考虑~
+			if (intervalParaRepeatRatios == null) {
+				repeatedParaNums[i] = 0;
+			} else {
+				repeatedParaNums[i] = (int)(intervalCardinalities[i] * intervalParaRepeatRatios[i]);
+			}
+		}
+
+		double avgIntervalLength = (maxValue - minValue) / (double)intervalNum;
+		int[] repeatedParaNumsCopy = Arrays.copyOf(repeatedParaNums, repeatedParaNums.length);
+		for (long para : priorParaCandidateList) {
+			int intervalIndex = (int)((para - minValue) / avgIntervalLength);
+			if (intervalIndex >= 0 && intervalIndex < intervalNum &&
+					repeatedParaNumsCopy[intervalIndex] > base.get(intervalIndex).size() &&
+					!base.get(intervalIndex).contains(para)) { // 去重
+				base.get(intervalIndex).add(para);
+			}
+		}
+
+		return base;
+	}
+
 	// long[][] priorParaCandidates：前一个时间窗口的候选参数集，这里的priorParaCandidates无需保存
 	// 通过priorParaCandidates生成满足要求（intervalParaRepeatRatios & intervalCardinalities）的currentParaCandidates
 	// 当intervalParaRepeatRatios & priorParaCandidates为Null时，即生成第一个（初始）时间窗口的currentParaCandidates
