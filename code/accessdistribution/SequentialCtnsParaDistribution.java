@@ -15,24 +15,41 @@ public class SequentialCtnsParaDistribution extends SequentialParaDistribution {
 	// 当前时间窗口的候选输入参数集，第一层数组是针对区间的，第二层数组是针对区间内候选参数的
 	private long[][] currentParaCandidates = null;
 
+
 	public SequentialCtnsParaDistribution(long minValue, long maxValue, long[] highFrequencyItems, 
-			double[] hFItemFrequencies, long[] intervalCardinalities, double[] intervalFrequencies, 
-			double[] intervalParaRepeatRatios) {
+			double[] hFItemFrequencies, long[] intervalCardinalities, double[] intervalFrequencies,
+										  ArrayList<double[]> intervalParaRepeatRatios) {
 		super(hFItemFrequencies, intervalCardinalities, intervalFrequencies, intervalParaRepeatRatios);
 		this.minValue = minValue;
 		this.maxValue = maxValue;
 		this.highFrequencyItems = highFrequencyItems;
 
 	}
+	public SequentialCtnsParaDistribution(long minValue, long maxValue, long[] highFrequencyItems,
+										  double[] hFItemFrequencies, long[] intervalCardinalities, double[] intervalFrequencies,
+										  double[] intervalParaRepeatRatios) {
+		this(minValue, maxValue, highFrequencyItems, hFItemFrequencies, intervalCardinalities,
+				intervalFrequencies, new ArrayList<>());
+		this.intervalParaRepeatRatios.add(intervalParaRepeatRatios);
+	}
+
+
 
 	public SequentialCtnsParaDistribution(long minValue, long maxValue, long[] highFrequencyItems,
 										  double[] hFItemFrequencies, long[] intervalCardinalities, double[] intervalFrequencies,
-										  double[] intervalParaRepeatRatios, ArrayList<ArrayList<Double>> quantilePerInterval) {
+										  ArrayList<double[]> intervalParaRepeatRatios, ArrayList<ArrayList<Double>> quantilePerInterval) {
 		super(hFItemFrequencies, intervalCardinalities, intervalFrequencies, intervalParaRepeatRatios, quantilePerInterval);
 		this.minValue = minValue;
 		this.maxValue = maxValue;
 		this.highFrequencyItems = highFrequencyItems;
+	}
 
+	public SequentialCtnsParaDistribution(long minValue, long maxValue, long[] highFrequencyItems,
+										  double[] hFItemFrequencies, long[] intervalCardinalities, double[] intervalFrequencies,
+										  double[] intervalParaRepeatRatios, ArrayList<ArrayList<Double>> quantilePerInterval) {
+		this(minValue, maxValue, highFrequencyItems, hFItemFrequencies, intervalCardinalities,
+				intervalFrequencies, new ArrayList<>(), quantilePerInterval);
+		this.intervalParaRepeatRatios.add(intervalParaRepeatRatios);
 	}
 
 	public SequentialCtnsParaDistribution(SequentialCtnsParaDistribution sequentialCtnsParaDistribution){
@@ -61,7 +78,7 @@ public class SequentialCtnsParaDistribution extends SequentialParaDistribution {
 	 * @param base 已经存储好的候选参数
 	 * @return 合并后的结果
 	 */
-	public ArrayList<ArrayList<Long>> mergeCandidate(long[][] priorParaCandidates,ArrayList<ArrayList<Long>> base ){
+	public ArrayList<ArrayList<Long>> mergeCandidate(long[][] priorParaCandidates,ArrayList<ArrayList<Long>> base, int k ){
 		List<Long> priorParaCandidateList = new ArrayList<>();
 		if (priorParaCandidates != null) {
 			for (long[] tmpArr : priorParaCandidates) {
@@ -78,7 +95,7 @@ public class SequentialCtnsParaDistribution extends SequentialParaDistribution {
 			if (intervalParaRepeatRatios == null) {
 				repeatedParaNums[i] = 0;
 			} else {
-				repeatedParaNums[i] = (int)(intervalCardinalities[i] * intervalParaRepeatRatios[i]);
+				repeatedParaNums[i] = (int)(intervalCardinalities[i] * intervalParaRepeatRatios.get(k)[i]);
 			}
 		}
 
@@ -87,9 +104,10 @@ public class SequentialCtnsParaDistribution extends SequentialParaDistribution {
 		for (long para : priorParaCandidateList) {
 			int intervalIndex = (int)((para - minValue) / avgIntervalLength);
 			if (intervalIndex >= 0 && intervalIndex < intervalNum &&
-					repeatedParaNumsCopy[intervalIndex] > base.get(intervalIndex).size() &&
-					!base.get(intervalIndex).contains(para)) { // 去重
+					repeatedParaNumsCopy[intervalIndex] > 0 ) {
+				if (!base.get(intervalIndex).contains(para)) continue; // 去重
 				base.get(intervalIndex).add(para);
+				repeatedParaNumsCopy[intervalIndex] --;
 			}
 		}
 
@@ -118,7 +136,7 @@ public class SequentialCtnsParaDistribution extends SequentialParaDistribution {
 			if (intervalParaRepeatRatios == null) {
 				repeatedParaNums[i] = 0;
 			} else {
-				repeatedParaNums[i] = (int)(intervalCardinalities[i] * intervalParaRepeatRatios[i]);
+				repeatedParaNums[i] = (int)(intervalCardinalities[i] * intervalParaRepeatRatios.get(intervalParaRepeatRatios.size() - 1)[i]);
 			}
 		}
 
@@ -150,14 +168,14 @@ public class SequentialCtnsParaDistribution extends SequentialParaDistribution {
 			}
 
 			while (idx < currentParaCandidates[i].length) {
-				long randomParameter = (long)((Math.random() + i) * avgIntervalLength) + minValue;// getIntervalInnerRandomValue(i)  ;//
+				long randomParameter = (long)getIntervalInnerRandomValue(i)  ;//((Math.random() + i) * avgIntervalLength) + minValue;//
 				int retryCount = 1;
 				while (priorParameterSet.contains(randomParameter) || 
 						existedParameterSet.contains(randomParameter)) {
 					if (retryCount++ > 5) {
 						break;
 					}
-					randomParameter = (long)((Math.random() + i) * avgIntervalLength) + minValue;// getIntervalInnerRandomValue(i) ;//
+					randomParameter = (long)getIntervalInnerRandomValue(i) ;//((Math.random() + i) * avgIntervalLength) + minValue;//
 				}
 				// 这里有个假设：当前时间窗口中的参数基数是远小于参数阈值的，故这样处理引入的误差较小
 				currentParaCandidates[i][idx] = randomParameter;
@@ -273,7 +291,7 @@ public class SequentialCtnsParaDistribution extends SequentialParaDistribution {
 		return -1L;
 
 	}
-	
+
 	public void setCurrentParaCandidates(long[][] currentParaCandidates) {
 		this.currentParaCandidates = currentParaCandidates;
 	}
@@ -287,7 +305,7 @@ public class SequentialCtnsParaDistribution extends SequentialParaDistribution {
 		return "SequentialCtnsParaDistribution [minValue=" + minValue + ", maxValue=" + maxValue
 				+ ", highFrequencyItems=" + Arrays.toString(highFrequencyItems) + ", size of currentParaCandidates="
 				+ currentParaCandidates.length + ", intervalParaRepeatRatios="
-				+ Arrays.toString(intervalParaRepeatRatios) + ", time=" + time + ", highFrequencyItemNum="
+				+ Arrays.toString(intervalParaRepeatRatios.get(intervalParaRepeatRatios.size())) + ", time=" + time + ", highFrequencyItemNum="
 				+ highFrequencyItemNum + ", hFItemFrequencies=" + Arrays.toString(hFItemFrequencies) + ", intervalNum="
 				+ intervalNum + ", intervalCardinalities=" + Arrays.toString(intervalCardinalities)
 				+ ", intervalFrequencies=" + Arrays.toString(intervalFrequencies) + ", cumulativeFrequencies="

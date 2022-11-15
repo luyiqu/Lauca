@@ -34,16 +34,23 @@ public class SequentialIntParaDistribution extends SequentialParaDistribution {
 
 	public SequentialIntParaDistribution(long windowMinValue, long windowMaxValue,
 										 double[] hFItemFrequencies, long[] intervalCardinalities, double[] intervalFrequencies,
-										 double[] intervalParaRepeatRatios, double hFItemRepeatRatio) {
+										 ArrayList<double[]> intervalParaRepeatRatios, double hFItemRepeatRatio) {
 		super(hFItemFrequencies, intervalCardinalities, intervalFrequencies, intervalParaRepeatRatios);
 		this.windowMinValue = windowMinValue;
 		this.windowMaxValue = windowMaxValue;
 		this.hFItemRepeatRatio = hFItemRepeatRatio;
 	}
 
+	public SequentialIntParaDistribution(long windowMinValue, long windowMaxValue,
+										 double[] hFItemFrequencies, long[] intervalCardinalities, double[] intervalFrequencies,
+										 double[] intervalParaRepeatRatios, double hFItemRepeatRatio) {
+		this(windowMinValue, windowMaxValue, hFItemFrequencies, intervalCardinalities, intervalFrequencies, new ArrayList<>(), hFItemRepeatRatio);
+		this.intervalParaRepeatRatios.add(intervalParaRepeatRatios);
+	}
+
 	public SequentialIntParaDistribution(long windowMinValue, long windowMaxValue, 
-			double[] hFItemFrequencies, long[] intervalCardinalities, double[] intervalFrequencies, 
-			double[] intervalParaRepeatRatios, double hFItemRepeatRatio, ArrayList<ArrayList<Double>> quantilePerInterval) {
+			double[] hFItemFrequencies, long[] intervalCardinalities, double[] intervalFrequencies,
+										 ArrayList<double[]> intervalParaRepeatRatios, double hFItemRepeatRatio, ArrayList<ArrayList<Double>> quantilePerInterval) {
 		super(hFItemFrequencies, intervalCardinalities, intervalFrequencies, intervalParaRepeatRatios, quantilePerInterval);
 		this.windowMinValue = windowMinValue;
 		this.windowMaxValue = windowMaxValue;
@@ -168,7 +175,7 @@ public class SequentialIntParaDistribution extends SequentialParaDistribution {
 			if (intervalParaRepeatRatios == null) {
 				repeatedParaNums[i] = 0;
 			} else {
-				repeatedParaNums[i] = (int)(intervalCardinalities[i] * intervalParaRepeatRatios[i]);
+				repeatedParaNums[i] = (int)(intervalCardinalities[i] * intervalParaRepeatRatios.get(intervalParaRepeatRatios.size() - 1)[i]);
 			}
 		}
 
@@ -281,7 +288,7 @@ public class SequentialIntParaDistribution extends SequentialParaDistribution {
 				+ coefficient + ", minParaIndex=" + minParaIndex + ", maxParaIndex=" + maxParaIndex
 				+ ", highFrequencyItems=" + Arrays.toString(highFrequencyItems) + ", size of currentParaCandidates="
 				+ currentParaCandidates.length + ", intervalParaRepeatRatios="
-				+ Arrays.toString(intervalParaRepeatRatios) + ", time=" + time + ", highFrequencyItemNum="
+				+ Arrays.toString(intervalParaRepeatRatios.get(intervalParaRepeatRatios.size() - 1)) + ", time=" + time + ", highFrequencyItemNum="
 				+ highFrequencyItemNum + ", hFItemFrequencies=" + Arrays.toString(hFItemFrequencies) + ", intervalNum="
 				+ intervalNum + ", intervalCardinalities=" + Arrays.toString(intervalCardinalities)
 				+ ", intervalFrequencies=" + Arrays.toString(intervalFrequencies) + ", cumulativeFrequencies="

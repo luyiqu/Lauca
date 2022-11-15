@@ -32,7 +32,7 @@ public class DistributionCounter {
 	// 下面四个数据结构服务于基于连续时间窗口数据访问分布的统计，下面这四个不用序列化
 	// 保存最近一个时间窗口的原始数据， 事务名称 -> 参数标示符 -> 数据（强转好的数据），用于统计intervalParaRepeatRatios
 	private static Map<String, Map<String, Object>> txName2ParaId2Data = null;
-	// 保存最近一个时间窗口的候选参数集，事务名称 -> 参数标示符 -> 候选参数集
+	// 保存最近一段时间窗口的候选参数集，事务名称 -> 参数标示符 -> 候选参数集
 	private static Map<String, Map<String, Object>> txName2ParaId2ParaCandidates = null;
 
 	// 保存日志中最近一个时间窗口的高频项，用于统计hFItemRepeatRatio。事务名称 -> 参数标示符 -> 高频项集
@@ -363,13 +363,22 @@ public class DistributionCounter {
 		Long[] highFrequencyItems = new Long[Configurations.getHighFrequencyItemNum()];
 		double[] hFItemFrequencies = getHighFrequencyItemInfo(valueNumEntryList, values.size(), highFrequencyItems);
 
-		// priorData是前一个时间窗口的参数数据，用来统计intervalParaRepeatRatios
-		Object priorData = txName2ParaId2Data.get(txName).get(paraIdentifier);
-		txName2ParaId2Data.get(txName).put(paraIdentifier, values);
+		// priorData是之前一段时间窗口的参数数据，用来统计intervalParaRepeatRatios
+		ArrayList<Object> priorData = (ArrayList<Object>)txName2ParaId2Data.get(txName).get(paraIdentifier);
+		int k = Configurations.getMergeWeight().intValue();
+		if (priorData == null) priorData = new ArrayList<>();
+
 		Object[] result = getIntervalCardiFrequInfo(valueNumEntryList, maxValue, minValue, values.size(), priorData);
+
+		priorData.add(values);
+		if (priorData.size() > k){
+			priorData.subList(1,priorData.size());
+		}
+		txName2ParaId2Data.get(txName).put(paraIdentifier, priorData);
+
 		long[] intervalCardinalities = (long[]) result[0];
 		double[] intervalFrequencies = (double[]) result[1];
-		double[] intervalParaRepeatRatios = (double[]) result[2];
+		ArrayList<double[]> intervalParaRepeatRatios = (ArrayList<double[]>) result[2];
 
 		// 仅仅是转化数据类型：Long[] -> long[]
 		long[] highFrequencyItems2 = new long[highFrequencyItems.length];
@@ -401,16 +410,21 @@ public class DistributionCounter {
 		Long[] highFrequencyItems = new Long[Configurations.getHighFrequencyItemNum()];
 		double[] hFItemFrequencies = getHighFrequencyItemInfo(valueNumEntryList, values.size(), highFrequencyItems);
 //
-//		System.out.println("打印出C_PAYMENT_CNT统计时的高频项");
-//		System.out.println(highFrequencyItems);
-//		System.out.println("****end*******");
-		Object priorData = txName2ParaId2Data.get(txName).get(paraIdentifier);
-		txName2ParaId2Data.get(txName).put(paraIdentifier, values);
-		Object[] result = getIntervalCardiFrequInfo(valueNumEntryList, windowMaxValue, windowMinValue, values.size(),
-				priorData);
+		// priorData是之前一段时间窗口的参数数据，用来统计intervalParaRepeatRatios
+		ArrayList<Object> priorData = (ArrayList<Object>)txName2ParaId2Data.get(txName).get(paraIdentifier);
+		int k = Configurations.getMergeWeight().intValue();
+		if (priorData == null) priorData = new ArrayList<>();
+
+		Object[] result = getIntervalCardiFrequInfo(valueNumEntryList, windowMaxValue, windowMinValue, values.size(), priorData);
+
+		priorData.add(values);
+		if (priorData.size() > k){
+			priorData.subList(1,priorData.size());
+		}
+		txName2ParaId2Data.get(txName).put(paraIdentifier, priorData);
 		long[] intervalCardinalities = (long[]) result[0];
 		double[] intervalFrequencies = (double[]) result[1];
-		double[] intervalParaRepeatRatios = (double[]) result[2];
+		ArrayList<double[]> intervalParaRepeatRatios = (ArrayList<double[]>) result[2];
 
 		// 上一个时间窗口 从日志中统计得到的高频项
 		Long[] priorHighFrequencyItems = (Long[]) txName2ParaId2LogHFItems.get(txName).get(paraIdentifier);
@@ -567,8 +581,8 @@ public class DistributionCounter {
 
 		//
 
-		for (int i = 0; i < valueNumEntryList.size(); i++) {
-			int idx = (int) ((valueNumEntryList.get(i).getKey().doubleValue() - minValue.doubleValue())
+		for (Entry<T, Integer> tIntegerEntry : valueNumEntryList) {
+			int idx = (int) ((tIntegerEntry.getKey().doubleValue() - minValue.doubleValue())
 					/ avgIntervalLength);
 
 			// bug fix: 同下面函数中的 bug fix 说明
@@ -577,14 +591,14 @@ public class DistributionCounter {
 			}
 			// -------------------
 			// 在单个区间idx内，计算当前的分位点
-			cdfPerInterval[idx] += valueNumEntryList.get(i).getValue() / (double) valuesSize;
+			cdfPerInterval[idx] += tIntegerEntry.getValue() / (double) valuesSize;
 			int freqInx = (int) (cdfPerInterval[idx] / intervalFreqLength[idx]);
 
-			double idxBase = ((valueNumEntryList.get(i).getKey().doubleValue() - minValue.doubleValue())
+			double idxBase = ((tIntegerEntry.getKey().doubleValue() - minValue.doubleValue())
 					- idx * avgIntervalLength);
 			double posInInterval = idxBase / avgIntervalLength;
 			// 如果这个数占据极大的频数，可能会直接跳过某个分位点，这种情况下进行补齐，即认为跳过的分位点也是当前数值
-			while (quantilePerInterval.get(idx).size() <= freqInx ){
+			while (quantilePerInterval.get(idx).size() <= freqInx) {
 				quantilePerInterval.get(idx).add(posInInterval);
 			}
 		}
@@ -639,18 +653,60 @@ public class DistributionCounter {
 	@SuppressWarnings("unchecked")
 	private static <T extends Number> Object[] getIntervalCardiFrequInfo(List<Entry<T, Integer>> valueNumEntryList,
 			T maxValue, T minValue, int valueSize, Object priorData) {
-		// priorData是前一个时间窗口的参数数据，用来统计intervalParaRepeatRatios
-		Set<T> priorDataSet = new HashSet<T>();
-		if (priorData != null) {
-			priorDataSet.addAll((List<T>) priorData);
-		}
 
 		int intervalNum = Configurations.getIntervalNum();
+		double avgIntervalLength = (maxValue.doubleValue() - minValue.doubleValue() + 0.000000001) / intervalNum;
+		int k = Configurations.getMergeWeight().intValue();
+		ArrayList<double[]> intervalParaRepeatRatios = new ArrayList<>();
+
+		ArrayList<Object> priorDataList = (ArrayList<Object>) priorData;
+		// 统计已经重复的值，从而实现差分的统计
+		Set<T> priorDataSet = new HashSet<T>();
+		for (int i=priorDataList.size() - 1; i >= 0; i--){
+
+			double[] intervalSum = new double[intervalNum];
+
+			Object pData = priorDataList.get(i);
+			// pData是前面某个时间窗口的参数数据，用来统计intervalParaRepeatRatios
+			double[] repeatRatio = new double[intervalNum];
+			Set<T> frontDataSet = new HashSet<T>((List<T>) pData);
+
+			for (Entry<T, Integer> tIntegerEntry : valueNumEntryList) {
+				T keyValue = tIntegerEntry.getKey() ;
+				int idx = (int) ((keyValue.doubleValue() - minValue.doubleValue())
+						/ avgIntervalLength);
+
+				if (idx >= intervalNum) { // 处理越界
+					idx = intervalNum - 1;
+				}
+
+				// cond1 如果当前统计的周期的数据和之前的时间窗口的数据重了，cond2 而且是新发现的重合值
+				if (frontDataSet.contains(keyValue) && !priorDataSet.contains(keyValue)) {
+					repeatRatio[idx] += tIntegerEntry.getValue();
+				}
+
+				intervalSum[idx] += valueNumEntryList.get(i).getValue();
+			}
+			priorDataSet.addAll((List<T>) pData);
+
+			// 除以总数，变成重复率
+			for (int j = 0; j < intervalNum; j++) {
+				if (intervalSum[j] == 0) {
+					continue;
+				}
+				repeatRatio[j] /= intervalSum[j];
+			}
+
+			intervalParaRepeatRatios.add(repeatRatio);
+		}
+
+
+
+
 		long[] intervalCardinalities = new long[intervalNum];
 		double[] intervalFrequencies = new double[intervalNum];
-		double[] intervalParaRepeatRatios = new double[intervalNum];
 
-		double avgIntervalLength = (maxValue.doubleValue() - minValue.doubleValue() + 0.000000001) / intervalNum;
+
 		for (int i = 0; i < valueNumEntryList.size(); i++) {
 			int idx = (int) ((valueNumEntryList.get(i).getKey().doubleValue() - minValue.doubleValue())
 					/ avgIntervalLength);
@@ -664,18 +720,9 @@ public class DistributionCounter {
 
 			intervalCardinalities[idx]++;
 			intervalFrequencies[idx] += valueNumEntryList.get(i).getValue() / (double) valueSize;
-
-			if (priorDataSet.contains(valueNumEntryList.get(i).getKey())) {
-				intervalParaRepeatRatios[idx] += valueNumEntryList.get(i).getValue() / (double) valueSize;
-			}
 		}
 
-		for (int i = 0; i < intervalParaRepeatRatios.length; i++) {
-			if (intervalFrequencies[i] == 0) {
-				continue;
-			}
-			intervalParaRepeatRatios[i] /= intervalFrequencies[i];
-		}
+
 
 		Object[] result = new Object[3];
 		result[0] = intervalCardinalities;
@@ -954,7 +1001,7 @@ public class DistributionCounter {
 					if (mergeDistribution.containsKey(txId) && mergeDistribution.get(txId).containsKey(paraId)){
 						SequentialCtnsParaDistribution mergeParaDistribution = (SequentialCtnsParaDistribution)mergeDistribution.get(txId).get(paraId);
 						// 合并前面区间的候选参数
-						candidates = paraDistribution.mergeCandidate(mergeParaDistribution.getCurrentParaCandidates(), candidates);
+						candidates = paraDistribution.mergeCandidate(mergeParaDistribution.getCurrentParaCandidates(), candidates, i);
 					}
 				}
 

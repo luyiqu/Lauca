@@ -20,9 +20,15 @@ public class SequentialVcharParaDistribution extends SequentialParaDistribution 
 	private String[][] currentParaCandidates = null;
 
 	public SequentialVcharParaDistribution(double[] hFItemFrequencies, long[] intervalCardinalities,
-			double[] intervalFrequencies, double[] intervalParaRepeatRatios, double hFItemRepeatRatio) {
+			double[] intervalFrequencies, ArrayList<double[]> intervalParaRepeatRatios, double hFItemRepeatRatio) {
 		super(hFItemFrequencies, intervalCardinalities, intervalFrequencies, intervalParaRepeatRatios);
 		this.hFItemRepeatRatio = hFItemRepeatRatio;
+	}
+
+	public SequentialVcharParaDistribution(double[] hFItemFrequencies, long[] intervalCardinalities,
+										   double[] intervalFrequencies, double[] intervalParaRepeatRatios, double hFItemRepeatRatio) {
+		this(hFItemFrequencies, intervalCardinalities, intervalFrequencies, new ArrayList<double[]>() , hFItemRepeatRatio);
+		this.intervalParaRepeatRatios.add(intervalParaRepeatRatios);
 	}
 
 	public SequentialVcharParaDistribution(SequentialVcharParaDistribution sequentialVcharParaDistribution){
@@ -117,7 +123,7 @@ public class SequentialVcharParaDistribution extends SequentialParaDistribution 
 			if (intervalParaRepeatRatios == null) {
 				repeatedParaNums[i] = 0;
 			} else {
-				repeatedParaNums[i] = (int)(intervalCardinalities[i] * intervalParaRepeatRatios[i]);
+				repeatedParaNums[i] = (int)(intervalCardinalities[i] * intervalParaRepeatRatios.get(intervalParaRepeatRatios.size() - 1)[i]);
 			}
 		}
 
@@ -212,7 +218,7 @@ public class SequentialVcharParaDistribution extends SequentialParaDistribution 
 				+ columnCardinality + ", minLength=" + minLength + ", maxLength=" + maxLength + ", size of seedStrings="
 				+ seedStrings.length + ", highFrequencyItems=" + Arrays.toString(highFrequencyItems)
 				+ ", size of currentParaCandidates=" + currentParaCandidates.length + ", intervalParaRepeatRatios="
-				+ Arrays.toString(intervalParaRepeatRatios) + ", time=" + time + ", highFrequencyItemNum="
+				+ Arrays.toString(intervalParaRepeatRatios.get(intervalParaRepeatRatios.size() - 1)) + ", time=" + time + ", highFrequencyItemNum="
 				+ highFrequencyItemNum + ", hFItemFrequencies=" + Arrays.toString(hFItemFrequencies) + ", intervalNum="
 				+ intervalNum + ", intervalCardinalities=" + Arrays.toString(intervalCardinalities)
 				+ ", intervalFrequencies=" + Arrays.toString(intervalFrequencies) + ", cumulativeFrequencies="

@@ -10,25 +10,30 @@ public abstract class SequentialParaDistribution extends DataAccessDistribution 
 
 	// 当前时间窗口中各分区的输入参数与前一个时间窗口输入参数重复的比例（对cache，buffer性能影响显著）
 	// 在负载的生成过程中控制这个比例可能使得负载生成器成为性能测试瓶颈，因此可以离线生成好候选输入参数集
-	protected double[] intervalParaRepeatRatios = null;
+	protected ArrayList<double[]> intervalParaRepeatRatios = null;
 
 	public SequentialParaDistribution(double[] hFItemFrequencies, long[] intervalCardinalities,
-			double[] intervalFrequencies, double[] intervalParaRepeatRatios) {
+			double[] intervalFrequencies, ArrayList<double[]> intervalParaRepeatRatios) {
 		super(hFItemFrequencies, intervalCardinalities, intervalFrequencies);
 		this.intervalParaRepeatRatios = intervalParaRepeatRatios;
 	}
 
 	public SequentialParaDistribution(double[] hFItemFrequencies, long[] intervalCardinalities,
-									  double[] intervalFrequencies, double[] intervalParaRepeatRatios, ArrayList<ArrayList<Double>> quantilePerInterval) {
+									  double[] intervalFrequencies, ArrayList<double[]> intervalParaRepeatRatios, ArrayList<ArrayList<Double>> quantilePerInterval) {
 		super(hFItemFrequencies, intervalCardinalities, intervalFrequencies, quantilePerInterval);
 		this.intervalParaRepeatRatios = intervalParaRepeatRatios;
 	}
 
 	public SequentialParaDistribution(SequentialParaDistribution sequentialParaDistribution){
 		super(sequentialParaDistribution);
-		this.intervalParaRepeatRatios = new double[sequentialParaDistribution.intervalParaRepeatRatios.length];
-		for (int i = 0;i < intervalParaRepeatRatios.length; ++i){
-			intervalParaRepeatRatios[i] = sequentialParaDistribution.intervalParaRepeatRatios[i];
+		this.intervalParaRepeatRatios = new ArrayList<>();
+		for (double[] repeatRadio :	sequentialParaDistribution.intervalParaRepeatRatios ) {
+			double[] tmp = new double[repeatRadio.length];
+			for (int i = 0;i < repeatRadio.length; ++i){
+				tmp[i] = repeatRadio[i];
+			}
+			this.intervalParaRepeatRatios.add(tmp);
 		}
+
 	}
 }
