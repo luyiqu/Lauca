@@ -20,15 +20,16 @@ public class SequentialVcharParaDistribution extends SequentialParaDistribution 
 	private String[][] currentParaCandidates = null;
 
 	public SequentialVcharParaDistribution(double[] hFItemFrequencies, long[] intervalCardinalities,
-			double[] intervalFrequencies, ArrayList<double[]> intervalParaRepeatRatios, double hFItemRepeatRatio) {
+			double[] intervalFrequencies, double[][] intervalParaRepeatRatios, double hFItemRepeatRatio) {
 		super(hFItemFrequencies, intervalCardinalities, intervalFrequencies, intervalParaRepeatRatios);
 		this.hFItemRepeatRatio = hFItemRepeatRatio;
 	}
 
 	public SequentialVcharParaDistribution(double[] hFItemFrequencies, long[] intervalCardinalities,
 										   double[] intervalFrequencies, double[] intervalParaRepeatRatios, double hFItemRepeatRatio) {
-		this(hFItemFrequencies, intervalCardinalities, intervalFrequencies, new ArrayList<double[]>() , hFItemRepeatRatio);
-		this.intervalParaRepeatRatios.add(intervalParaRepeatRatios);
+		this(hFItemFrequencies, intervalCardinalities, intervalFrequencies, new double[1][] , hFItemRepeatRatio);
+		this.intervalParaRepeatRatios[0] = new double[intervalParaRepeatRatios.length];
+		System.arraycopy(intervalParaRepeatRatios, 0, this.intervalParaRepeatRatios[0], 0, intervalParaRepeatRatios.length);
 	}
 
 	public SequentialVcharParaDistribution(SequentialVcharParaDistribution sequentialVcharParaDistribution){
@@ -36,9 +37,7 @@ public class SequentialVcharParaDistribution extends SequentialParaDistribution 
 		this.hFItemRepeatRatio = sequentialVcharParaDistribution.hFItemRepeatRatio;
 		this.highFrequencyItems = new String[sequentialVcharParaDistribution.highFrequencyItems.length];
 
-		for (int i = 0 ;i< highFrequencyItems.length; ++i){
-			highFrequencyItems[i] = sequentialVcharParaDistribution.highFrequencyItems[i];
-		}
+		System.arraycopy(sequentialVcharParaDistribution.highFrequencyItems, 0, highFrequencyItems, 0, highFrequencyItems.length);
 
 
 		setColumnInfo(sequentialVcharParaDistribution.columnCardinality,sequentialVcharParaDistribution.minLength,
@@ -120,10 +119,10 @@ public class SequentialVcharParaDistribution extends SequentialParaDistribution 
 		for (int i = 0; i < intervalNum; i++) {
 			// 对于区间内参数基数超过int最大值的情形暂不考虑~
 			currentParaCandidates[i] = new String[(int)intervalCardinalities[i]];
-			if (intervalParaRepeatRatios == null) {
+			if (intervalParaRepeatRatios == null || intervalParaRepeatRatios.length == 0) {
 				repeatedParaNums[i] = 0;
 			} else {
-				repeatedParaNums[i] = (int)(intervalCardinalities[i] * intervalParaRepeatRatios.get(intervalParaRepeatRatios.size() - 1)[i]);
+				repeatedParaNums[i] = (int)(intervalCardinalities[i] * intervalParaRepeatRatios[intervalParaRepeatRatios.length - 1][i]);
 			}
 		}
 
@@ -218,7 +217,7 @@ public class SequentialVcharParaDistribution extends SequentialParaDistribution 
 				+ columnCardinality + ", minLength=" + minLength + ", maxLength=" + maxLength + ", size of seedStrings="
 				+ seedStrings.length + ", highFrequencyItems=" + Arrays.toString(highFrequencyItems)
 				+ ", size of currentParaCandidates=" + currentParaCandidates.length + ", intervalParaRepeatRatios="
-				+ Arrays.toString(intervalParaRepeatRatios.get(intervalParaRepeatRatios.size() - 1)) + ", time=" + time + ", highFrequencyItemNum="
+				+ Arrays.toString(intervalParaRepeatRatios) + ", time=" + time + ", highFrequencyItemNum="
 				+ highFrequencyItemNum + ", hFItemFrequencies=" + Arrays.toString(hFItemFrequencies) + ", intervalNum="
 				+ intervalNum + ", intervalCardinalities=" + Arrays.toString(intervalCardinalities)
 				+ ", intervalFrequencies=" + Arrays.toString(intervalFrequencies) + ", cumulativeFrequencies="

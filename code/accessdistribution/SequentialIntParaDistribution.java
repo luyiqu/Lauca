@@ -34,7 +34,7 @@ public class SequentialIntParaDistribution extends SequentialParaDistribution {
 
 	public SequentialIntParaDistribution(long windowMinValue, long windowMaxValue,
 										 double[] hFItemFrequencies, long[] intervalCardinalities, double[] intervalFrequencies,
-										 ArrayList<double[]> intervalParaRepeatRatios, double hFItemRepeatRatio) {
+										 double[][] intervalParaRepeatRatios, double hFItemRepeatRatio) {
 		super(hFItemFrequencies, intervalCardinalities, intervalFrequencies, intervalParaRepeatRatios);
 		this.windowMinValue = windowMinValue;
 		this.windowMaxValue = windowMaxValue;
@@ -44,13 +44,14 @@ public class SequentialIntParaDistribution extends SequentialParaDistribution {
 	public SequentialIntParaDistribution(long windowMinValue, long windowMaxValue,
 										 double[] hFItemFrequencies, long[] intervalCardinalities, double[] intervalFrequencies,
 										 double[] intervalParaRepeatRatios, double hFItemRepeatRatio) {
-		this(windowMinValue, windowMaxValue, hFItemFrequencies, intervalCardinalities, intervalFrequencies, new ArrayList<>(), hFItemRepeatRatio);
-		this.intervalParaRepeatRatios.add(intervalParaRepeatRatios);
+		this(windowMinValue, windowMaxValue, hFItemFrequencies, intervalCardinalities, intervalFrequencies, new double[1][0], hFItemRepeatRatio);
+		this.intervalParaRepeatRatios[0] = new double[intervalParaRepeatRatios.length];
+		System.arraycopy(intervalParaRepeatRatios, 0, this.intervalParaRepeatRatios[0], 0, intervalParaRepeatRatios.length);
 	}
 
 	public SequentialIntParaDistribution(long windowMinValue, long windowMaxValue, 
 			double[] hFItemFrequencies, long[] intervalCardinalities, double[] intervalFrequencies,
-										 ArrayList<double[]> intervalParaRepeatRatios, double hFItemRepeatRatio, ArrayList<ArrayList<Double>> quantilePerInterval) {
+										 double[][] intervalParaRepeatRatios, double hFItemRepeatRatio, ArrayList<ArrayList<Double>> quantilePerInterval) {
 		super(hFItemFrequencies, intervalCardinalities, intervalFrequencies, intervalParaRepeatRatios, quantilePerInterval);
 		this.windowMinValue = windowMinValue;
 		this.windowMaxValue = windowMaxValue;
@@ -63,9 +64,7 @@ public class SequentialIntParaDistribution extends SequentialParaDistribution {
 		this.windowMaxValue = sequentialIntParaDistribution.windowMaxValue;
 		this.highFrequencyItems = new long[sequentialIntParaDistribution.highFrequencyItems.length];
 
-		for (int i = 0 ;i< highFrequencyItems.length; ++i){
-			highFrequencyItems[i] = sequentialIntParaDistribution.highFrequencyItems[i];
-		}
+		System.arraycopy(sequentialIntParaDistribution.highFrequencyItems, 0, highFrequencyItems, 0, highFrequencyItems.length);
 		if (sequentialIntParaDistribution.currentParaCandidates != null){
 			geneCandidates(sequentialIntParaDistribution.currentParaCandidates);
 		}
@@ -172,10 +171,10 @@ public class SequentialIntParaDistribution extends SequentialParaDistribution {
 		for (int i = 0; i < intervalNum; i++) {
 			// 对于区间内参数基数超过int最大值的情形暂不考虑~
 			currentParaCandidates[i] = new long[(int)intervalCardinalities[i]];
-			if (intervalParaRepeatRatios == null) {
+			if (intervalParaRepeatRatios == null || intervalParaRepeatRatios.length == 0) {
 				repeatedParaNums[i] = 0;
 			} else {
-				repeatedParaNums[i] = (int)(intervalCardinalities[i] * intervalParaRepeatRatios.get(intervalParaRepeatRatios.size() - 1)[i]);
+				repeatedParaNums[i] = (int)(intervalCardinalities[i] * intervalParaRepeatRatios[intervalParaRepeatRatios.length - 1][i]);
 			}
 		}
 
@@ -288,7 +287,7 @@ public class SequentialIntParaDistribution extends SequentialParaDistribution {
 				+ coefficient + ", minParaIndex=" + minParaIndex + ", maxParaIndex=" + maxParaIndex
 				+ ", highFrequencyItems=" + Arrays.toString(highFrequencyItems) + ", size of currentParaCandidates="
 				+ currentParaCandidates.length + ", intervalParaRepeatRatios="
-				+ Arrays.toString(intervalParaRepeatRatios.get(intervalParaRepeatRatios.size() - 1)) + ", time=" + time + ", highFrequencyItemNum="
+				+ Arrays.toString(intervalParaRepeatRatios) + ", time=" + time + ", highFrequencyItemNum="
 				+ highFrequencyItemNum + ", hFItemFrequencies=" + Arrays.toString(hFItemFrequencies) + ", intervalNum="
 				+ intervalNum + ", intervalCardinalities=" + Arrays.toString(intervalCardinalities)
 				+ ", intervalFrequencies=" + Arrays.toString(intervalFrequencies) + ", cumulativeFrequencies="

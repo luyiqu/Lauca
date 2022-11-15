@@ -18,7 +18,7 @@ public class SequentialCtnsParaDistribution extends SequentialParaDistribution {
 
 	public SequentialCtnsParaDistribution(long minValue, long maxValue, long[] highFrequencyItems, 
 			double[] hFItemFrequencies, long[] intervalCardinalities, double[] intervalFrequencies,
-										  ArrayList<double[]> intervalParaRepeatRatios) {
+										  double[][] intervalParaRepeatRatios) {
 		super(hFItemFrequencies, intervalCardinalities, intervalFrequencies, intervalParaRepeatRatios);
 		this.minValue = minValue;
 		this.maxValue = maxValue;
@@ -29,15 +29,16 @@ public class SequentialCtnsParaDistribution extends SequentialParaDistribution {
 										  double[] hFItemFrequencies, long[] intervalCardinalities, double[] intervalFrequencies,
 										  double[] intervalParaRepeatRatios) {
 		this(minValue, maxValue, highFrequencyItems, hFItemFrequencies, intervalCardinalities,
-				intervalFrequencies, new ArrayList<>());
-		this.intervalParaRepeatRatios.add(intervalParaRepeatRatios);
+				intervalFrequencies, new double[1][0]);
+		this.intervalParaRepeatRatios[0] = new double[intervalParaRepeatRatios.length];
+		System.arraycopy(intervalParaRepeatRatios, 0, this.intervalParaRepeatRatios[0], 0, intervalParaRepeatRatios.length);
 	}
 
 
 
 	public SequentialCtnsParaDistribution(long minValue, long maxValue, long[] highFrequencyItems,
 										  double[] hFItemFrequencies, long[] intervalCardinalities, double[] intervalFrequencies,
-										  ArrayList<double[]> intervalParaRepeatRatios, ArrayList<ArrayList<Double>> quantilePerInterval) {
+										  double[][] intervalParaRepeatRatios, ArrayList<ArrayList<Double>> quantilePerInterval) {
 		super(hFItemFrequencies, intervalCardinalities, intervalFrequencies, intervalParaRepeatRatios, quantilePerInterval);
 		this.minValue = minValue;
 		this.maxValue = maxValue;
@@ -48,8 +49,9 @@ public class SequentialCtnsParaDistribution extends SequentialParaDistribution {
 										  double[] hFItemFrequencies, long[] intervalCardinalities, double[] intervalFrequencies,
 										  double[] intervalParaRepeatRatios, ArrayList<ArrayList<Double>> quantilePerInterval) {
 		this(minValue, maxValue, highFrequencyItems, hFItemFrequencies, intervalCardinalities,
-				intervalFrequencies, new ArrayList<>(), quantilePerInterval);
-		this.intervalParaRepeatRatios.add(intervalParaRepeatRatios);
+				intervalFrequencies, new double[1][0], quantilePerInterval);
+		this.intervalParaRepeatRatios[0] = new double[intervalParaRepeatRatios.length];
+		System.arraycopy(intervalParaRepeatRatios, 0, this.intervalParaRepeatRatios[0], 0, intervalParaRepeatRatios.length);
 	}
 
 	public SequentialCtnsParaDistribution(SequentialCtnsParaDistribution sequentialCtnsParaDistribution){
@@ -58,9 +60,7 @@ public class SequentialCtnsParaDistribution extends SequentialParaDistribution {
 		this.maxValue = sequentialCtnsParaDistribution.maxValue;
 		this.highFrequencyItems = new long[sequentialCtnsParaDistribution.highFrequencyItems.length];
 
-		for (int i = 0 ;i< highFrequencyItems.length; ++i){
-			highFrequencyItems[i] = sequentialCtnsParaDistribution.highFrequencyItems[i];
-		}
+		System.arraycopy(sequentialCtnsParaDistribution.highFrequencyItems, 0, highFrequencyItems, 0, highFrequencyItems.length);
 		init();
 		geneCandidates(sequentialCtnsParaDistribution.currentParaCandidates);
 
@@ -95,7 +95,7 @@ public class SequentialCtnsParaDistribution extends SequentialParaDistribution {
 			if (intervalParaRepeatRatios == null) {
 				repeatedParaNums[i] = 0;
 			} else {
-				repeatedParaNums[i] = (int)(intervalCardinalities[i] * intervalParaRepeatRatios.get(k)[i]);
+				repeatedParaNums[i] = (int)(intervalCardinalities[i] * intervalParaRepeatRatios[k][i]);
 			}
 		}
 
@@ -104,8 +104,8 @@ public class SequentialCtnsParaDistribution extends SequentialParaDistribution {
 		for (long para : priorParaCandidateList) {
 			int intervalIndex = (int)((para - minValue) / avgIntervalLength);
 			if (intervalIndex >= 0 && intervalIndex < intervalNum &&
-					repeatedParaNumsCopy[intervalIndex] > 0 ) {
-				if (!base.get(intervalIndex).contains(para)) continue; // 去重
+					repeatedParaNumsCopy[intervalIndex] > 0 &&
+					!base.get(intervalIndex).contains(para)) { // 去重
 				base.get(intervalIndex).add(para);
 				repeatedParaNumsCopy[intervalIndex] --;
 			}
@@ -133,10 +133,12 @@ public class SequentialCtnsParaDistribution extends SequentialParaDistribution {
 		for (int i = 0; i < intervalNum; i++) {
 			// 对于区间内参数基数超过int最大值的情形暂不考虑~
 			currentParaCandidates[i] = new long[(int)intervalCardinalities[i]];
-			if (intervalParaRepeatRatios == null) {
+			if (intervalParaRepeatRatios == null
+					|| intervalParaRepeatRatios.length == 0
+				|| intervalParaRepeatRatios[0] == null) {
 				repeatedParaNums[i] = 0;
 			} else {
-				repeatedParaNums[i] = (int)(intervalCardinalities[i] * intervalParaRepeatRatios.get(intervalParaRepeatRatios.size() - 1)[i]);
+				repeatedParaNums[i] = (int)(intervalCardinalities[i] * intervalParaRepeatRatios[intervalParaRepeatRatios.length - 1][i]);
 			}
 		}
 
@@ -305,7 +307,7 @@ public class SequentialCtnsParaDistribution extends SequentialParaDistribution {
 		return "SequentialCtnsParaDistribution [minValue=" + minValue + ", maxValue=" + maxValue
 				+ ", highFrequencyItems=" + Arrays.toString(highFrequencyItems) + ", size of currentParaCandidates="
 				+ currentParaCandidates.length + ", intervalParaRepeatRatios="
-				+ Arrays.toString(intervalParaRepeatRatios.get(intervalParaRepeatRatios.size())) + ", time=" + time + ", highFrequencyItemNum="
+				+ Arrays.toString(intervalParaRepeatRatios) + ", time=" + time + ", highFrequencyItemNum="
 				+ highFrequencyItemNum + ", hFItemFrequencies=" + Arrays.toString(hFItemFrequencies) + ", intervalNum="
 				+ intervalNum + ", intervalCardinalities=" + Arrays.toString(intervalCardinalities)
 				+ ", intervalFrequencies=" + Arrays.toString(intervalFrequencies) + ", cumulativeFrequencies="

@@ -378,7 +378,7 @@ public class DistributionCounter {
 
 		long[] intervalCardinalities = (long[]) result[0];
 		double[] intervalFrequencies = (double[]) result[1];
-		ArrayList<double[]> intervalParaRepeatRatios = (ArrayList<double[]>) result[2];
+		double[][] intervalParaRepeatRatios = (double[][]) result[2];
 
 		// 仅仅是转化数据类型：Long[] -> long[]
 		long[] highFrequencyItems2 = new long[highFrequencyItems.length];
@@ -424,7 +424,7 @@ public class DistributionCounter {
 		txName2ParaId2Data.get(txName).put(paraIdentifier, priorData);
 		long[] intervalCardinalities = (long[]) result[0];
 		double[] intervalFrequencies = (double[]) result[1];
-		ArrayList<double[]> intervalParaRepeatRatios = (ArrayList<double[]>) result[2];
+		double[][] intervalParaRepeatRatios = (double[][]) result[2];
 
 		// 上一个时间窗口 从日志中统计得到的高频项
 		Long[] priorHighFrequencyItems = (Long[]) txName2ParaId2LogHFItems.get(txName).get(paraIdentifier);
@@ -657,18 +657,28 @@ public class DistributionCounter {
 		int intervalNum = Configurations.getIntervalNum();
 		double avgIntervalLength = (maxValue.doubleValue() - minValue.doubleValue() + 0.000000001) / intervalNum;
 		int k = Configurations.getMergeWeight().intValue();
-		ArrayList<double[]> intervalParaRepeatRatios = new ArrayList<>();
+
+		double[][] intervalParaRepeatRatios = null;
 
 		ArrayList<Object> priorDataList = (ArrayList<Object>) priorData;
+		if (priorDataList.size() > 0){
+			intervalParaRepeatRatios = new double[Math.min(k, priorDataList.size())][];
+		}
+		else{
+			intervalParaRepeatRatios = null;
+		}
+
 		// 统计已经重复的值，从而实现差分的统计
 		Set<T> priorDataSet = new HashSet<T>();
-		for (int i=priorDataList.size() - 1; i >= 0; i--){
+		for (int i=priorDataList.size() - 1; i >= priorDataList.size() - k && i >= 0; i--){
 
 			double[] intervalSum = new double[intervalNum];
 
+			int index = (i - Math.max(0,priorDataList.size() - k));
+
 			Object pData = priorDataList.get(i);
 			// pData是前面某个时间窗口的参数数据，用来统计intervalParaRepeatRatios
-			double[] repeatRatio = new double[intervalNum];
+			intervalParaRepeatRatios[index] = new double[intervalNum];
 			Set<T> frontDataSet = new HashSet<T>((List<T>) pData);
 
 			for (Entry<T, Integer> tIntegerEntry : valueNumEntryList) {
@@ -682,10 +692,10 @@ public class DistributionCounter {
 
 				// cond1 如果当前统计的周期的数据和之前的时间窗口的数据重了，cond2 而且是新发现的重合值
 				if (frontDataSet.contains(keyValue) && !priorDataSet.contains(keyValue)) {
-					repeatRatio[idx] += tIntegerEntry.getValue();
+					intervalParaRepeatRatios[index][idx] += tIntegerEntry.getValue();
 				}
 
-				intervalSum[idx] += valueNumEntryList.get(i).getValue();
+				intervalSum[idx] += tIntegerEntry.getValue();
 			}
 			priorDataSet.addAll((List<T>) pData);
 
@@ -694,10 +704,9 @@ public class DistributionCounter {
 				if (intervalSum[j] == 0) {
 					continue;
 				}
-				repeatRatio[j] /= intervalSum[j];
+				intervalParaRepeatRatios[index][j] /= intervalSum[j];
 			}
 
-			intervalParaRepeatRatios.add(repeatRatio);
 		}
 
 
@@ -991,7 +1000,7 @@ public class DistributionCounter {
 				}
 
 				// 计算前k个区间
-				for (int i = 0;i < k ;i ++){
+				for (int i = 0;i < k && i < baseDistributionPos ;i ++){
 					int mergeDistPos = baseDistributionPos - i;
 					if (mergeDistPos < 0){
 						continue;
