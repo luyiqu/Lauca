@@ -1,6 +1,7 @@
 package accessdistribution;
 
 import java.util.ArrayList;
+import java.util.Arrays;
 
 /**
  * 基于连续时间窗口的数据访问分布，体现了相邻时间窗口数据分布之间的连续性
@@ -48,12 +49,14 @@ public abstract class SequentialParaDistribution extends DataAccessDistribution 
 		for (int i = 0; i < intervalParaRepeatRatios.length; i++) {
 			try{
 				this.intervalParaRepeatRatios[i] = new double[intervalParaRepeatRatios[i].length];
+				System.out.println(Arrays.toString(intervalParaRepeatRatios[i]));
 				System.arraycopy(intervalParaRepeatRatios[i], 0, this.intervalParaRepeatRatios[i], 0, intervalParaRepeatRatios[i].length);
 			}
 			catch (Exception e){
 				e.printStackTrace();
 			}
 		}
+		System.out.println();
 	}
 
 	public SequentialParaDistribution(SequentialParaDistribution sequentialParaDistribution){

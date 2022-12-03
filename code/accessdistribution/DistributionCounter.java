@@ -1,18 +1,8 @@
 package accessdistribution;
 
 import java.math.BigDecimal;
-import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.Collections;
-import java.util.Comparator;
-import java.util.HashMap;
-import java.util.HashSet;
-import java.util.Iterator;
-import java.util.List;
-import java.util.Map;
+import java.util.*;
 import java.util.Map.Entry;
-import java.util.Set;
-import java.util.Vector;
 
 import config.Configurations;
 import serializable.DistributionCounter4Serial;
@@ -674,10 +664,10 @@ public class DistributionCounter {
 
 			double[] intervalSum = new double[intervalNum];
 
-			int index = (i - Math.max(0,priorDataList.size() - k));
+			int index = (priorDataList.size() - 1 - i);
 
 			Object pData = priorDataList.get(i);
-			// pData是前面某个时间窗口的参数数据，用来统计intervalParaRepeatRatios
+			// pData是前面某个时间窗口的参数数据，用来统计intervalParaRepeatRatios，重复率是倒序存储的
 			intervalParaRepeatRatios[index] = new double[intervalNum];
 			Set<T> frontDataSet = new HashSet<T>((List<T>) pData);
 
@@ -817,7 +807,7 @@ public class DistributionCounter {
 				Entry<String, Vector<DataAccessDistribution>> entry2 = iter2.next();
 
 				// 同一个参数的数据访问分布肯定由同一个线程按序分析得到的，故下面可不排序~
-				// Collections.sort(entry2.getValue());
+				 Collections.sort(entry2.getValue());
 
 				//TODO: 有些参数没有访问分布，是[]空的，但是这里直接忽视掉，怀疑是这里导致了windowDistribution读到别人身上 ~
 //				// bug fix: 事务模板中的某些事务可能没有实例数据
@@ -829,6 +819,8 @@ public class DistributionCounter {
 				if (entry2.getValue().get(0).getTime() < workloadStartTime) {
 					workloadStartTime = entry2.getValue().get(0).getTime();
 				}
+				System.out.println(entry2.getValue().get(0).getTime());
+				System.out.println(entry2.getValue().get(entry2.getValue().size() - 1).getTime());
 				allParaDistributionInfo.add(entry2.getValue());
 			}
 		}
@@ -1001,7 +993,7 @@ public class DistributionCounter {
 
 				// 计算前k个区间
 				for (int i = 0;i < k && i < baseDistributionPos ;i ++){
-					int mergeDistPos = baseDistributionPos - i;
+					int mergeDistPos = baseDistributionPos - i - 1;
 					if (mergeDistPos < 0){
 						continue;
 					}

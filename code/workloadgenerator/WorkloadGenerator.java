@@ -2,19 +2,14 @@ package workloadgenerator;
 
 import java.sql.Connection;
 import java.sql.SQLException;
-import java.util.ArrayList;
-import java.util.HashMap;
-import java.util.Iterator;
-import java.util.List;
-import java.util.Map;
+import java.util.*;
 import java.util.Map.Entry;
 
+import accessdistribution.SequentialCtnsParaDistribution;
 import org.apache.log4j.Logger;
 
 import accessdistribution.DataAccessDistribution;
 
-import java.util.Timer;
-import java.util.TimerTask;
 import java.util.concurrent.CountDownLatch;
 
 import config.Configurations;
@@ -216,6 +211,41 @@ class WorkloadGeneratorThread implements Runnable {
 		this.allThreadNum = allThreadNum;
 		this.windowThroughputList = windowThroughputList;
 		this.windowDistributionList = windowDistributionList;
+
+//		int k = Configurations.getMergeWeight().intValue();
+//		for (int i = k;i < windowDistributionList.size();++i){
+//			if (windowDistributionList.get(i).containsKey("Transaction2") &&
+//					windowDistributionList.get(i).get("Transaction2").containsKey("2_1")){
+//				SequentialCtnsParaDistribution dataAccessDistribution = (SequentialCtnsParaDistribution)windowDistributionList.get(i).get("Transaction2").get("2_1");
+//				long[][] candidate = dataAccessDistribution.getCurrentParaCandidates();
+//				HashSet<Long> currCan = new HashSet<>();
+//				for (long[] longs : candidate) {
+//					for (long can: longs ) {
+//						currCan.add(can);
+//					}
+//				}
+//
+//
+//				int repeatSize = 0;
+//				for (int j = i - 1;j > 0 &&j > i-k;j--){
+//					if (windowDistributionList.get(j).containsKey("Transaction2") &&
+//							windowDistributionList.get(j).get("Transaction2").containsKey("2_1")){
+//						dataAccessDistribution = (SequentialCtnsParaDistribution)windowDistributionList.get(j).get("Transaction2").get("2_1");
+//						candidate = dataAccessDistribution.getCurrentParaCandidates();
+//						for (long[] longs : candidate) {
+//							for (long can: longs ) {
+//								if (currCan.contains(can)) repeatSize ++;
+//							}
+//						}
+//					}
+//				}
+//
+//				System.out.println(repeatSize+"/"+currCan.size());
+//			}
+//
+//
+//		}
+
 		this.cdl = countDownLatch;
 	}
 

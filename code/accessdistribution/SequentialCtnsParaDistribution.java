@@ -15,6 +15,8 @@ public class SequentialCtnsParaDistribution extends SequentialParaDistribution {
 	// 当前时间窗口的候选输入参数集，第一层数组是针对区间的，第二层数组是针对区间内候选参数的
 	private long[][] currentParaCandidates = null;
 
+	private int[] innerIndex = null;
+
 
 	public SequentialCtnsParaDistribution(long minValue, long maxValue, long[] highFrequencyItems, 
 			double[] hFItemFrequencies, long[] intervalCardinalities, double[] intervalFrequencies,
@@ -111,6 +113,10 @@ public class SequentialCtnsParaDistribution extends SequentialParaDistribution {
 			}
 		}
 
+		for (ArrayList<Long> baseInterval:base ) {
+			Collections.shuffle(baseInterval);
+		}
+
 		return base;
 	}
 
@@ -118,73 +124,47 @@ public class SequentialCtnsParaDistribution extends SequentialParaDistribution {
 	// 通过priorParaCandidates生成满足要求（intervalParaRepeatRatios & intervalCardinalities）的currentParaCandidates
 	// 当intervalParaRepeatRatios & priorParaCandidates为Null时，即生成第一个（初始）时间窗口的currentParaCandidates
 	public void geneCandidates(long[][] priorParaCandidates) {
-		List<Long> priorParaCandidateList = new ArrayList<>();
-		if (priorParaCandidates != null) {
-			for (long[] tmpArr : priorParaCandidates) {
-				for (long tmpItem : tmpArr) {
-					priorParaCandidateList.add(tmpItem);
-				}
-			}
-			Collections.shuffle(priorParaCandidateList);
-		}
+		ArrayList<Integer> candidateSize = new ArrayList<>();
+		ArrayList<Integer> allSize = new ArrayList<>();
 
 		currentParaCandidates = new long[intervalNum][];
-		int[] repeatedParaNums = new int[intervalNum];
 		for (int i = 0; i < intervalNum; i++) {
 			// 对于区间内参数基数超过int最大值的情形暂不考虑~
 			currentParaCandidates[i] = new long[(int)intervalCardinalities[i]];
-			if (intervalParaRepeatRatios == null
-					|| intervalParaRepeatRatios.length == 0
-				|| intervalParaRepeatRatios[0] == null) {
-				repeatedParaNums[i] = 0;
-			} else {
-				repeatedParaNums[i] = (int)(intervalCardinalities[i] * intervalParaRepeatRatios[intervalParaRepeatRatios.length - 1][i]);
+
+			List<Long> existedParameterList = new ArrayList<>(); // 当前区间中已存在的候选参数
+			int idx = 0;
+			for (int j = 0; j < currentParaCandidates[i].length && (priorParaCandidates != null &&
+					priorParaCandidates[i] != null && j < priorParaCandidates[i].length); j++) {
+				existedParameterList.add(currentParaCandidates[i][j]);
+				idx ++;
 			}
-		}
-
-		double avgIntervalLength = (maxValue - minValue) / (double)intervalNum;
-		int[] repeatedParaNumsCopy = Arrays.copyOf(repeatedParaNums, repeatedParaNums.length);
-		for (long para : priorParaCandidateList) {
-			int intervalIndex = (int)((para - minValue) / avgIntervalLength);
-			if (intervalIndex >= 0 && intervalIndex < intervalNum && 
-					repeatedParaNumsCopy[intervalIndex] > 0) {
-				int idx = repeatedParaNums[intervalIndex] - repeatedParaNumsCopy[intervalIndex];
-				currentParaCandidates[intervalIndex][idx] = para;
-				repeatedParaNumsCopy[intervalIndex]--;
-			}
-		}
-
-		// for testing：大多数都为0才是正常现象。这里可以有个理论上的证明
-		// System.out.println("SequentialCtnsParaDistribution.geneCandidates - repeatedParaNumsCopy: \n\t" + 
-		// 		Arrays.toString(repeatedParaNumsCopy));
-
-		Set<Long> priorParameterSet = new HashSet<>();
-		priorParameterSet.addAll(priorParaCandidateList);
-
-		// 补齐各个分区剩下的候选参数
-		for (int i = 0; i < intervalNum; i++) {
-			int idx = repeatedParaNums[i] - repeatedParaNumsCopy[i];
-			Set<Long> existedParameterSet = new HashSet<>(); // 当前区间中已存在的候选参数
-			for (int j = 0; j < idx; j++) {
-				existedParameterSet.add(currentParaCandidates[i][j]);
-			}
-
+			candidateSize.add(idx);
+			allSize.add(currentParaCandidates[i].length);
+			// 补齐各个分区剩下的候选参数
 			while (idx < currentParaCandidates[i].length) {
 				long randomParameter = (long)getIntervalInnerRandomValue(i)  ;//((Math.random() + i) * avgIntervalLength) + minValue;//
 				int retryCount = 1;
-				while (priorParameterSet.contains(randomParameter) || 
-						existedParameterSet.contains(randomParameter)) {
+				while (existedParameterList.contains(randomParameter)) {
 					if (retryCount++ > 5) {
 						break;
 					}
 					randomParameter = (long)getIntervalInnerRandomValue(i) ;//((Math.random() + i) * avgIntervalLength) + minValue;//
 				}
 				// 这里有个假设：当前时间窗口中的参数基数是远小于参数阈值的，故这样处理引入的误差较小
-				currentParaCandidates[i][idx] = randomParameter;
-				existedParameterSet.add(randomParameter);
+				existedParameterList.add(randomParameter);
 				idx++;
 			}
-		} // for intervalNum
+
+			Collections.shuffle(existedParameterList);
+			for (int j = 0; j < existedParameterList.size(); j++) {
+				currentParaCandidates[i][j] = existedParameterList.get(j);
+			}
+		}
+
+		System.out.println(candidateSize.toString());
+		System.out.println(allSize.toString());
+		System.out.println();
 	}
 
 	@Override
@@ -274,6 +254,7 @@ public class SequentialCtnsParaDistribution extends SequentialParaDistribution {
 	@Override
 	public Long geneValue() {
 //		System.out.println(this.getClass());
+		if (innerIndex == null) innerIndex = new int[this.intervalNum];
 		try {
 			int randomIndex = binarySearch();
 
@@ -282,7 +263,8 @@ public class SequentialCtnsParaDistribution extends SequentialParaDistribution {
 			} else {
 				int intervalIndex = randomIndex - highFrequencyItemNum;
 				// long intervalInnerIndex = intervalInnerIndexes[intervalIndex]++ % intervalCardinalities[intervalIndex];
-				int intervalInnerIndex = (int)(Math.random() * intervalCardinalities[intervalIndex]);
+				int intervalInnerIndex = innerIndex[intervalIndex] % currentParaCandidates[intervalIndex].length;
+				innerIndex[intervalIndex] ++;
 				return currentParaCandidates[intervalIndex][intervalInnerIndex];
 			}
 		}
