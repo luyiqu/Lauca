@@ -3,6 +3,7 @@ package input;
 import java.io.File;
 import java.sql.Timestamp;
 import java.util.*;
+import java.util.regex.Pattern;
 
 import abstraction.Column;
 import abstraction.StoredProcedure;
@@ -16,6 +17,13 @@ public class SqlParser {
 
 	private List<Table> tables = null;
 	private List<StoredProcedure> storedProcedures = null;
+
+	private static Pattern readSqlTmplPattern = Pattern.compile("(SELECT|Select|select)[\\s]+(@@)[\\s\\S]+");
+	private static Pattern aggrTmplPattern = Pattern.compile("[ \\t]*select[ \\t]+(sum|count|avg|max|min)[\\s\\S]+");
+	private static Pattern limitTmplPattern = Pattern.compile("[ \\t]*select[\\s\\S^(limit)]+limit[ \\t]+1[\\s\\S]*");
+	private static Pattern commaPattern = Pattern.compile(",");
+	private static Pattern asPattern = Pattern.compile("(\\)as )|(\\) as )|[(|)| ]+");
+
 	public SqlParser(List<Table> tables) {
 		this.tables = tables;
 	}
@@ -126,10 +134,10 @@ public class SqlParser {
 
 		String[] tableNames = null;
 		if(index3 == -1){
-			tableNames = originalSql.substring(index2 + 6).replaceAll("[ \\t]+|`", "").split(",");
+			tableNames = commaPattern.split(originalSql.substring(index2 + 6).replaceAll("[ \\t]+|`", ""));
 		}
 		else{
-			tableNames = originalSql.substring(index2 + 6, index3).replaceAll("[ \\t]+|`", "").split(",");
+			tableNames = commaPattern.split(originalSql.substring(index2 + 6, index3).replaceAll("[ \\t]+|`", ""));
 		}
 
 //		try{
@@ -145,7 +153,7 @@ public class SqlParser {
 			if (returnItems[i].contains("##")) {
 				returnDataTypes[i] = dataType2int(returnItems[i].split("##")[1].trim());
 			} else {
-				String[] itemExpr = returnItems[i].split("(\\)as )|(\\) as )|[(|)| ]+");
+				String[] itemExpr = asPattern.split(returnItems[i]);
 				if (itemExpr.length == 1) {
 					Column column = searchColumn(tableNames, returnItems[i]); // 返回项为单属性形式
 					if (column != null) {
@@ -766,20 +774,22 @@ public class SqlParser {
 		int index5 = sql.indexOf(" order by ");
 		int index6 = sql.indexOf(" limit ");
 
-		if (index2 == -1 || sql.matches("(SELECT|Select|select)[\\s]+(@@)[\\s\\S]+")) {
+
+
+		if (index2 == -1 || readSqlTmplPattern.matcher(sql).matches()) {
 			return null;
 		}
 
 		// 数据表名一般区分大小写，同时可能含有多数据表
 		String[] tableNames = null;
 		if(index3 == -1){
-			tableNames = originalSql.substring(index2 + 6).replaceAll("[ \\t]+|`", "").split(",");
+			tableNames = commaPattern.split(originalSql.substring(index2 + 6).replaceAll("[ \\t]+|`", ""));
 		}
 		else{
-			tableNames = originalSql.substring(index2 + 6, index3).replaceAll("[ \\t]+|`", "").split(",");
+			tableNames = commaPattern.split(originalSql.substring(index2 + 6, index3).replaceAll("[ \\t]+|`", ""));
 		}
 		// 目前默认返回项都是简单的形式（仅属性），若不是简单形式需添加"##data_type"针对返回数据类型进行补充说明
-		String[] returnItems = originalSql.substring(index1 + 7, index2).split(",");
+		String[] returnItems = commaPattern.split(originalSql.substring(index1 + 7, index2));
 		ArrayList<String> returnItemsList = new ArrayList<String>();
 		//added by ct —— select * from a; select * from a,b; select a.*, b.* from a,b;
 		//但是原来没有考虑 表名.列名 的情况 TODO
@@ -811,7 +821,7 @@ public class SqlParser {
 			if (returnItems[i].contains("##")) {
 				returnDataTypes[i] = dataType2int(returnItems[i].split("##")[1].trim());
 			} else {
-				String[] itemExpr = returnItems[i].split("(\\)as )|(\\) as )|[(|)| ]+");
+				String[] itemExpr = asPattern.split(returnItems[i]);
 				if (itemExpr.length == 1) {
 					Column column = searchColumn(tableNames, returnItems[i]); // 返回项为单属性形式
 					if (column != null) {
@@ -938,8 +948,8 @@ public class SqlParser {
 
 		}
 
-		if (sql.matches("[ \\t]*select[ \\t]+(sum|count|avg|max|min)[\\s\\S]+")
-				|| sql.matches("[ \\t]*select[\\s\\S^(limit)]+limit[ \\t]+1[\\s\\S]*")) {
+		if (aggrTmplPattern.matcher(sql).matches()
+				|| limitTmplPattern.matcher(sql).matches()) {
 			filterPrimaryKey = true;
 		}
 
@@ -977,7 +987,7 @@ public class SqlParser {
 
 			String tableName = originalSql.substring(index1 + 6, index2).trim();
 
-			String[] columnNames = sql.substring(index2 + 1, index3).replaceAll("[ \\t]+", "").split(",");
+			String[] columnNames = commaPattern.split(sql.substring(index2 + 1, index3).replaceAll("[ \\t]+", ""));
 
 			if (columnNames[0].contains("?")){
 				tableName = tableName.substring(0,tableName.length() -6).trim();
@@ -1038,7 +1048,7 @@ public class SqlParser {
 
 			// set表达式也可能不包含任何输入参数，如：c=c+1
 
-			String[] setStatements = sql.substring(index2 + 5, index3).split(",");
+			String[] setStatements = commaPattern.split(sql.substring(index2 + 5, index3));
 
 			List<String> tmp = new ArrayList<>();
 

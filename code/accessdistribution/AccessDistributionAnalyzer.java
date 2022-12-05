@@ -367,7 +367,7 @@ public class AccessDistributionAnalyzer {
 				windowDataBlockingQueues.get(i).put(new WindowData("txName", "paraIdentifier", -1, null));
 			}
 
-			Thread.sleep(3000);
+			Thread.sleep(1000);
 		} catch (InterruptedException e) {
 			e.printStackTrace();
 		}

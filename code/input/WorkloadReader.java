@@ -5,6 +5,7 @@ import java.io.File;
 import java.io.FileInputStream;
 import java.io.IOException;
 import java.io.InputStreamReader;
+import java.nio.file.Files;
 import java.sql.Timestamp;
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -13,22 +14,11 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Map.Entry;
+import java.util.regex.Pattern;
 
 import abstraction.*;
-import accessdistribution.DataAccessDistribution;
-import accessdistribution.DeleteLogicalTxnPara;
-import accessdistribution.SequentialParaDistribution;
-import com.google.gson.Gson;
-import com.google.gson.GsonBuilder;
-import com.sun.org.apache.bcel.internal.generic.GOTO;
 import config.Configurations;
 import org.apache.log4j.Logger;
-import serializable.DataAccessDistributionAdapter;
-import serializable.SequentialParaDistributionAdapter;
-import serializable.SqlStatementAdapter;
-import serializable.TransactionBlockAdapter;
-
-import javax.swing.plaf.IconUIResource;
 
 
 public class WorkloadReader {
@@ -41,6 +31,8 @@ public class WorkloadReader {
 	public Map<Long, List<TraceInfo>> txnId2txnTrace = new HashMap<>();
 	/** 记录每个事务实例对应的事务模板号（相当于事务名）,模板号从1开始 */
 	public Map<Long, Integer> txnId2txnTemplateID = new HashMap<>();
+
+	private static Pattern blankLinePattern = Pattern.compile("[\\s]*");
 //	public Map<String,Integer> rollbackTxname2BlockId2Count = new HashMap<>();  //added by lyqu 支持主动回滚
 	public static Map<Long,List<String>> rollbacktxnId2txnInstance = new HashMap<>();  //added by lyqu
 	public WorkloadReader(List<Table> tables) {
@@ -174,20 +166,15 @@ public class WorkloadReader {
 		File[] logFiles = logDir.listFiles();
 
 		// 文件名的格式为: 'lauca.log.xx'，降序读
+		Pattern pointPattern = Pattern.compile("\\.");
 		Arrays.sort(logFiles, new Comparator<File>() {
 			@Override
 			public int compare(File file1, File file2) {
-				String[] fileName1 = file1.getName().split("\\.");
-				String[] fileName2 = file2.getName().split("\\.");
+				String[] fileName1 = pointPattern.split(file1.getName());
+				String[] fileName2 = pointPattern.split(file2.getName());
 				int sequenceNumber1 = (fileName1.length > 2) ? Integer.parseInt(fileName1[2]) : 0;
 				int sequenceNumber2 = (fileName2.length > 2) ? Integer.parseInt(fileName2[2]) : 0;
-				if (sequenceNumber1 < sequenceNumber2) {
-					return 1;
-				} else if (sequenceNumber1 > sequenceNumber2) {
-					return -1;
-				} else {
-					return 0;
-				}
+				return Integer.compare(sequenceNumber2, sequenceNumber1);
 			}
 		});
 
@@ -206,29 +193,28 @@ public class WorkloadReader {
 //		String beforeSql = null;
 		//--
 		List<input.OracleLog> oraclelogs = new ArrayList<>();
+		Pattern blankPattern = Pattern.compile("[ ]*");
+		Pattern equalPattern = Pattern.compile("=");
+		Pattern commaPattern = Pattern.compile(",");
 		for (int f = 0; f < logFiles.length; ++f) {
 			System.out.println(logFiles[f]);
 			try (BufferedReader br = new BufferedReader(
-					new InputStreamReader(new FileInputStream(logFiles[f]), "utf-8"))) {
+					new InputStreamReader(Files.newInputStream(logFiles[f].toPath()), "utf-8"))) {
 				String inputLine = null;
 				// 解析每一行Log
 				//记录上一条 判断是否重复
 				String beforeline = inputLine;
 				while ((inputLine = br.readLine()) != null) {
 					// 过滤掉空行
-					if (inputLine.matches("[\\s]*")) {
+					if (blankLinePattern.matcher(inputLine).matches()) {
 						continue;
 					}
 
-					if(beforeline!=null&&beforeline.equals(inputLine)){
-//						System.out.println("重复~~:  "+inputLine);
-						continue;
-					}
-//					beforeline = inputLine;
+					//					beforeline = inputLine;
 					String[] log = inputLine.split("\\[|\\]");
 					ArrayList<String> refineLog = new ArrayList<>();
 					for (String s : log) {
-						if (!s.matches("[ ]*")) {
+						if (!blankPattern.matcher(s).matches()) {
 							refineLog.add(s);
 						}
 					}
@@ -240,7 +226,7 @@ public class WorkloadReader {
 
 					input.OracleLog oracleLog = new input.OracleLog();
 					for (int i = 0; i < refineLog.size(); ++i) {
-						String[] nameAndValue = refineLog.get(i).split("=", 2);
+						String[] nameAndValue = equalPattern.split(refineLog.get(i),2);
 //						System.out.println(nameAndValue[0]);
 						switch (nameAndValue[0]) {
 							case "timestamp":
@@ -273,7 +259,7 @@ public class WorkloadReader {
 							case "batchpara":
 								oracleLog.setBatched(true);
 							case "para":
-								String[] paraArray = nameAndValue[1].split("\\,");
+								String[] paraArray = commaPattern.split(nameAndValue[1]);
 								oracleLog.parameters = new ArrayList<String>();
 								// 去掉参数头尾引号
 								for (int j = 0; j < paraArray.length; ++j) {
@@ -284,7 +270,7 @@ public class WorkloadReader {
 								oracleLog.parameters = Arrays.asList(paraArray);
 								break;
 							case "res":
-								String[] resArray = nameAndValue[1].split("\\,");
+								String[] resArray = commaPattern.split(nameAndValue[1]);
 								if (oracleLog.results == null) {
 									oracleLog.results = new ArrayList<List<String>>();
 								}
@@ -314,16 +300,16 @@ public class WorkloadReader {
 		// 记录每个链接当前在处理的事务号，没有在处理事务则为-1
 		Map<Long, Long> connId2txnId = new HashMap<>();
 		long txnId = 1;
+		Pattern sqlPattern = Pattern.compile("(CALL|call|Call|SELECT|Select|select|UPDATE|Update|update|INSERT|Insert|insert|DELETE|Delete|delete|REPLACE|Replace|replace)[\\s\\S]+");
 		for (input.OracleLog aLog : oraclelogs) {
 			// 将CRUD操作加入
-			if (aLog.sql != null && aLog.sql.matches(
-					"(CALL|call|Call|SELECT|Select|select|UPDATE|Update|update|INSERT|Insert|insert|DELETE|Delete|delete|REPLACE|Replace|replace)[\\s\\S]+")) {
+			if (aLog.sql != null && sqlPattern.matcher(aLog.sql).matches() ) {
 				// SqlParser里再淘汰这种特殊的事务
 //				if (aLog.sql.matches("(SELECT|Select|select)[\\s]+(@@)[\\s\\S]+")) {
 //					continue;
 //				}
 				// 多个空白字符变成一个
-				aLog.sql = aLog.sql.replaceAll("[\\s]+", " ");
+				aLog.sql =  aLog.sql.replaceAll("[\\s]+", " ");
 				// 变成小写方便找关键词
 				String tempSql = aLog.sql.toLowerCase();
 
@@ -333,7 +319,7 @@ public class WorkloadReader {
 				while ((betweenIndex = tempSql.indexOf(" between ")) != -1) {
 					// 找到col名字
 					String firstHalf = aLog.sql.substring(0, betweenIndex);
-					String[] subStrings = firstHalf.split(" ");
+					String[] subStrings = blankPattern.split(firstHalf);
 					String colName = subStrings[subStrings.length - 1];
 					// 找到between后第一个and
 					int andIndex = tempSql.indexOf("and", betweenIndex);
