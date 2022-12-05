@@ -4,16 +4,8 @@ import java.io.BufferedReader;
 import java.io.File;
 import java.io.FileInputStream;
 import java.io.InputStreamReader;
-import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.Comparator;
-import java.util.HashMap;
-import java.util.Iterator;
-import java.util.List;
-import java.util.Map;
+import java.util.*;
 import java.util.Map.Entry;
-import java.util.TreeMap;
-import java.util.Vector;
 import java.util.concurrent.ArrayBlockingQueue;
 import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.CountDownLatch;
@@ -505,13 +497,15 @@ class LogReaderForTidb implements Runnable {
 
 	@Override
 	public void run() {
-		for (Entry<Long, List<TraceInfo>> txnIdAndtxnTrace : this.txnId2txnTrace.entrySet()) {
+		List<Entry<Long, List<TraceInfo>>> txnIdAndtxnTraceList = new ArrayList<>(this.txnId2txnTrace.entrySet());
+		txnIdAndtxnTraceList.sort((o1, o2) -> (int)(o1.getValue().get(0).operationTS - o2.getValue().get(0).operationTS));
+
+		for (Entry<Long, List<TraceInfo>> txnIdAndtxnTrace : txnIdAndtxnTraceList) {
 //			System.out.println("************** AFTER ********");  //qly : 顺序没问题
 			String txnName = "Transaction" + this.txnId2txnTemplateID.get(txnIdAndtxnTrace.getKey());
 			for (TraceInfo trace : txnIdAndtxnTrace.getValue()) {
-				String prefix = trace.operationTS + ";" + trace.operationID + ";";  //qly: trace.operationTS是日志时间
+				String info = trace.operationTS + ";" + trace.operationID + ";";  //qly: trace.operationTS是日志时间
 				List<String> paras = trace.parameters;
-				String info = new String(prefix);
 				for (String para : paras) {
 					info = info + para + ",";   //qly: info 为 事务名称; 操作id; para1, para2, ...
 				}
@@ -525,10 +519,9 @@ class LogReaderForTidb implements Runnable {
 		}
 		try {
 			// 通知LogSplitter线程 日志文件已读取结束
-			Iterator<Entry<String, BlockingQueue<String>>> iter = LogSplitterQueueMap.entrySet().iterator();
-			while (iter.hasNext()) {
+			for (Entry<String, BlockingQueue<String>> stringBlockingQueueEntry : LogSplitterQueueMap.entrySet()) {
 				// 日志时间; 操作id和输入参数
-				iter.next().getValue().put("-1; end");
+				stringBlockingQueueEntry.getValue().put("-1; end");
 			}
 		} catch (InterruptedException e) {
 			e.printStackTrace();

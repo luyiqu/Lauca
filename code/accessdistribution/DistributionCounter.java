@@ -355,7 +355,7 @@ public class DistributionCounter {
 
 		// priorData是之前一段时间窗口的参数数据，用来统计intervalParaRepeatRatios
 		ArrayList<Object> priorData = (ArrayList<Object>)txName2ParaId2Data.get(txName).get(paraIdentifier);
-		int k = Configurations.getMergeWeight().intValue();
+		int k = Configurations.getMergeWeight();
 		if (priorData == null) priorData = new ArrayList<>();
 
 		Object[] result = getIntervalCardiFrequInfo(valueNumEntryList, maxValue, minValue, values.size(), priorData);
@@ -402,7 +402,7 @@ public class DistributionCounter {
 //
 		// priorData是之前一段时间窗口的参数数据，用来统计intervalParaRepeatRatios
 		ArrayList<Object> priorData = (ArrayList<Object>)txName2ParaId2Data.get(txName).get(paraIdentifier);
-		int k = Configurations.getMergeWeight().intValue();
+		int k = Configurations.getMergeWeight();
 		if (priorData == null) priorData = new ArrayList<>();
 
 		Object[] result = getIntervalCardiFrequInfo(valueNumEntryList, windowMaxValue, windowMinValue, values.size(), priorData);
@@ -646,7 +646,7 @@ public class DistributionCounter {
 
 		int intervalNum = Configurations.getIntervalNum();
 		double avgIntervalLength = (maxValue.doubleValue() - minValue.doubleValue() + 0.000000001) / intervalNum;
-		int k = Configurations.getMergeWeight().intValue();
+		int k = Configurations.getMergeWeight();
 
 		double[][] intervalParaRepeatRatios = null;
 
@@ -971,7 +971,7 @@ public class DistributionCounter {
 																					  List<Map<String, Map<String, DataAccessDistribution>>> mergeDistributionList
 																					  ) {
 		Map<String, Map<String, DataAccessDistribution>> trueDistribution = new HashMap<>();
-		int k = Configurations.getMergeWeight().intValue();
+		int k = Configurations.getMergeWeight();
 		// 当前的分布集合
 		Map<String, Map<String, DataAccessDistribution>> baseDistribution = mergeDistributionList.get(baseDistributionPos);
 

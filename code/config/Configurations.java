@@ -137,7 +137,7 @@ public class Configurations {
 	private static String anonymitySaveFile = "";
 
 	//平均化多段分布的权重
-	private static double mergeWeight = 0.8;
+	private static int mergeWeight = 1;
 
 	private static int quantileNum= 10;
 
@@ -627,9 +627,9 @@ public class Configurations {
 
 	public static Double getDataIncreaseRate(){return dataIncreaseRate;}
 
-	public static void setMergeWeight(Double mergeWeight){Configurations.mergeWeight = mergeWeight;}
+	public static void setMergeWeight(int mergeWeight){Configurations.mergeWeight = mergeWeight;}
 
-	public static Double getMergeWeight(){return mergeWeight;}
+	public static int getMergeWeight(){return mergeWeight;}
 
 	public static void setQuantileNum(int quantileNum){Configurations.quantileNum = quantileNum;}
 

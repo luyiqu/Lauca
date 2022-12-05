@@ -10,10 +10,10 @@ import java.util.*;
 public class SequentialCtnsParaDistribution extends SequentialParaDistribution {
 
 	private long minValue, maxValue;
-	private long[] highFrequencyItems = null;
+	private long[] highFrequencyItems = new long[0];
 
 	// 当前时间窗口的候选输入参数集，第一层数组是针对区间的，第二层数组是针对区间内候选参数的
-	private long[][] currentParaCandidates = null;
+	private long[][] currentParaCandidates = new long[0][];
 
 	private int[] innerIndex = null;
 
@@ -113,9 +113,9 @@ public class SequentialCtnsParaDistribution extends SequentialParaDistribution {
 			}
 		}
 
-		for (ArrayList<Long> baseInterval:base ) {
-			Collections.shuffle(baseInterval);
-		}
+//		for (ArrayList<Long> baseInterval:base ) {
+//			Collections.shuffle(baseInterval);
+//		}
 
 		return base;
 	}
@@ -287,7 +287,7 @@ public class SequentialCtnsParaDistribution extends SequentialParaDistribution {
 	@Override
 	public String toString() {
 		return "SequentialCtnsParaDistribution [minValue=" + minValue + ", maxValue=" + maxValue
-				+ ", highFrequencyItems=" + Arrays.toString(highFrequencyItems) + ", size of currentParaCandidates="
+				+ ", highFrequencyItems=" + Arrays.toString(this.highFrequencyItems) + ", size of currentParaCandidates="
 				+ currentParaCandidates.length + ", intervalParaRepeatRatios="
 				+ Arrays.toString(intervalParaRepeatRatios) + ", time=" + time + ", highFrequencyItemNum="
 				+ highFrequencyItemNum + ", hFItemFrequencies=" + Arrays.toString(hFItemFrequencies) + ", intervalNum="
