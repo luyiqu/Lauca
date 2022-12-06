@@ -196,6 +196,8 @@ public class WorkloadReader {
 		Pattern blankPattern = Pattern.compile("[ ]*");
 		Pattern equalPattern = Pattern.compile("=");
 		Pattern commaPattern = Pattern.compile(",");
+		Pattern bracketPattern = Pattern.compile("\\[|\\]");
+
 		for (int f = 0; f < logFiles.length; ++f) {
 			System.out.println(logFiles[f]);
 			try (BufferedReader br = new BufferedReader(
@@ -211,7 +213,7 @@ public class WorkloadReader {
 					}
 
 					//					beforeline = inputLine;
-					String[] log = inputLine.split("\\[|\\]");
+					String[] log = bracketPattern.split(inputLine);
 					ArrayList<String> refineLog = new ArrayList<>();
 					for (String s : log) {
 						if (!blankPattern.matcher(s).matches()) {
@@ -301,6 +303,7 @@ public class WorkloadReader {
 		Map<Long, Long> connId2txnId = new HashMap<>();
 		long txnId = 1;
 		Pattern sqlPattern = Pattern.compile("(CALL|call|Call|SELECT|Select|select|UPDATE|Update|update|INSERT|Insert|insert|DELETE|Delete|delete|REPLACE|Replace|replace)[\\s\\S]+");
+		Pattern blankSeqPattern = Pattern.compile("[\\s]+");
 		for (input.OracleLog aLog : oraclelogs) {
 			// 将CRUD操作加入
 			if (aLog.sql != null && sqlPattern.matcher(aLog.sql).matches() ) {
@@ -309,7 +312,7 @@ public class WorkloadReader {
 //					continue;
 //				}
 				// 多个空白字符变成一个
-				aLog.sql =  aLog.sql.replaceAll("[\\s]+", " ");
+				aLog.sql =  blankSeqPattern.matcher(aLog.sql).replaceAll(" ");
 				// 变成小写方便找关键词
 				String tempSql = aLog.sql.toLowerCase();
 

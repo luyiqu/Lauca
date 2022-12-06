@@ -22,6 +22,8 @@ public class SqlParser {
 	private static Pattern aggrTmplPattern = Pattern.compile("[ \\t]*select[ \\t]+(sum|count|avg|max|min)[\\s\\S]+");
 	private static Pattern limitTmplPattern = Pattern.compile("[ \\t]*select[\\s\\S^(limit)]+limit[ \\t]+1[\\s\\S]*");
 	private static Pattern commaPattern = Pattern.compile(",");
+	private static Pattern dotPattern = Pattern.compile("\\.");
+	private static Pattern predicatePattern = Pattern.compile("(=|>=|>|<|<=)");
 	private static Pattern asPattern = Pattern.compile("(\\)as )|(\\) as )|[(|)| ]+");
 
 	public SqlParser(List<Table> tables) {
@@ -796,7 +798,7 @@ public class SqlParser {
 		for(int i = 0; i < returnItems.length; i++){
 			if(returnItems[i].contains("*")){
 				if(returnItems[i].contains(".")) {
-					String tN = returnItems[i].split("\\.")[0].trim();
+					String tN = dotPattern.split(returnItems[i])[0].trim();
 					//System.out.println("name "+tN);
 					returnItemsList.addAll(allColumnNames(tN));
 				}
@@ -906,7 +908,7 @@ public class SqlParser {
 
 		for (int i = 0; i < predicates.length; i++) {
 
-			String columnName = predicates[i].split("(=|>=|>|<|<=)")[0];
+			String columnName = predicatePattern.split(predicates[i])[0];
 
 			columnNames.add(columnName);
 
@@ -1118,7 +1120,7 @@ public class SqlParser {
 
 			for (int i = 0; i < predicates.length; i++) {
 
-				String columnName = predicates[i].split("(=|>=|>|<|<=)")[0].trim();
+				String columnName = predicatePattern.split(predicates[i])[0].trim();
 
 				Column column = searchColumn(tableName, columnName);
 
@@ -1183,7 +1185,7 @@ public class SqlParser {
 
 			for (int i = 0; i < predicates.length; i++) {
 
-				String columnName = predicates[i].split("(=|>=|>|<|<=)")[0].trim();
+				String columnName = predicatePattern.split(predicates[i])[0].trim();
 
 				Column column = searchColumn(tableName, columnName);
 
