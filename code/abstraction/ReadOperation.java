@@ -93,13 +93,13 @@ public class ReadOperation extends SqlStatement {
 			saveResultSet(rs);
 			return 1;
 		} catch (Exception e) {
-			if (e.getMessage().contains("Deadlock")) {
+			if (e instanceof  SQLException) {
 				return -1;
 			}
 			System.out.println("bbbbbbb"+pstmt.toString());
 			System.out.println(this.getClass().getName());
 			System.out.println(sql);
-//			e.printStackTrace();
+			e.printStackTrace();
 			return 0;
 		}
 	}

@@ -26,6 +26,7 @@ public class Table implements Serializable, Cloneable {
 	private Column[] columns = null;
 	private String[] primaryKey = null;
 	private ForeignKey[] foreignKeys = null;
+	private Partition partition = null;
 
 	// 下面这些类成员信息是为了高效生成测试数据的
 	// 每个主键属性的阈值（or数值范围）
@@ -50,6 +51,16 @@ public class Table implements Serializable, Cloneable {
 	private long singleThreadTupleNum;
 
 	// 这些信息是从输入的schema文件中读取的
+	public Table(String name, long size, Column[] columns, String[] primaryKey, ForeignKey[] foreignKeys, Partition partition) {
+		super();
+		this.name = name;
+		this.size = size;
+		this.columns = columns;
+		this.primaryKey = primaryKey;
+		this.foreignKeys = foreignKeys;
+		this.partition = partition;
+	}
+
 	public Table(String name, long size, Column[] columns, String[] primaryKey, ForeignKey[] foreignKeys) {
 		super();
 		this.name = name;
@@ -57,18 +68,14 @@ public class Table implements Serializable, Cloneable {
 		this.columns = columns;
 		this.primaryKey = primaryKey;
 		this.foreignKeys = foreignKeys;
+		this.partition = null;
 	}
 
-	public Table(String name, long size, Column[] columns, String[] primaryKey, ForeignKey[] foreignKeys,
+	public Table(String name, long size, Column[] columns, String[] primaryKey, ForeignKey[] foreignKeys, Partition partition,
 			long[] pkColumnRanges, long[] pkColumnGeneCounts, double pkPersistRatio, int[] pkColumnIndexes,
 			long[][] allFkColumnRanges, int[][] allFkColumnIndexes, int[] nonKeyColumnIndexes, int threadNum,
 			long singleThreadTupleNum) {
-		super();
-		this.name = name;
-		this.size = size;
-		this.columns = columns;
-		this.primaryKey = primaryKey;
-		this.foreignKeys = foreignKeys;
+		this(name, size, columns, primaryKey, foreignKeys, partition);
 		this.pkColumnRanges = pkColumnRanges;
 		this.pkColumnGeneCounts = pkColumnGeneCounts;
 		this.pkPersistRatio = pkPersistRatio;
@@ -94,6 +101,7 @@ public class Table implements Serializable, Cloneable {
 		for (int i = 0; i < foreignKeys.length; i++) {
 			foreignKeys[i] = this.foreignKeys[i].clone();
 		}
+		Partition partition = new Partition(this.partition);
 
 		long[] pkColumnRanges = Arrays.copyOf(this.pkColumnRanges, this.pkColumnRanges.length);
 		long[] pkColumnGeneCounts = Arrays.copyOf(this.pkColumnGeneCounts, this.pkColumnGeneCounts.length);
@@ -113,7 +121,7 @@ public class Table implements Serializable, Cloneable {
 		int threadNum = this.threadNum;
 		long singleThreadTupleNum = this.singleThreadTupleNum;
 
-		return new Table(name, size, columns, primaryKey, foreignKeys, pkColumnRanges, pkColumnGeneCounts, pkPersistRatio, 
+		return new Table(name, size, columns, primaryKey, foreignKeys, partition, pkColumnRanges, pkColumnGeneCounts, pkPersistRatio,
 				pkColumnIndexes, allFkColumnRanges, allFkColumnIndexes, nonKeyColumnIndexes, threadNum, singleThreadTupleNum);
 	}
 

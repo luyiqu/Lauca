@@ -101,7 +101,7 @@ public class WriteOperation extends SqlStatement {
 			return 1;
 		} catch (Exception e) {
 //			return -1;
-			if (e.getMessage().contains("Deadlock")) {
+			if (e instanceof  SQLException) {
 				return -1;
 			}
 //			e.printStackTrace();
@@ -151,13 +151,7 @@ public class WriteOperation extends SqlStatement {
 //			e.printStackTrace();
 //			System.out.println(tmp);
 //			System.exit(0);
-			if (e.getMessage().contains("Deadlock")) {
-				return -1;
-			}
-			System.out.println(e.getMessage());
-			System.out.println(sql);
-			System.err.println("ERROR!!!");
-			return 0;
+			return -1;
 		}
 	}
 
@@ -221,13 +215,8 @@ public class WriteOperation extends SqlStatement {
 			return 1;
 		} catch (SQLException e) {
 //			e.printStackTrace();
-			if (e.getMessage().contains("Deadlock")) {
-				return -1;
-			}
-			System.out.println(e.getMessage());
-			System.out.println(sql);
-			System.err.println("ERROR!!!");
-			return 0;
+			return -1;
+
 		}
 	}
 
@@ -262,14 +251,7 @@ public class WriteOperation extends SqlStatement {
 			}
 			return 1;
 		} catch (SQLException e) {
-//			e.printStackTrace();
-			if (e.getMessage().contains("Deadlock")) {
-				return -1;
-			}
-			System.err.println("ERROR!!!");
-			System.out.println(e.getMessage());
-			System.out.println(sql);
-			return 0;
+			return -1;
 		}
 	}
 

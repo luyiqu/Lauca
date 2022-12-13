@@ -819,8 +819,6 @@ public class DistributionCounter {
 				if (entry2.getValue().get(0).getTime() < workloadStartTime) {
 					workloadStartTime = entry2.getValue().get(0).getTime();
 				}
-				System.out.println(entry2.getValue().get(0).getTime());
-				System.out.println(entry2.getValue().get(entry2.getValue().size() - 1).getTime());
 				allParaDistributionInfo.add(entry2.getValue());
 			}
 		}
@@ -963,7 +961,7 @@ public class DistributionCounter {
 		for (int i = 1; i < windowDistributionList.size(); ++i){
 			averageList.add(mergeDistribution(i, windowDistributionList));
 		}
-		System.out.println("merge and with time(ms):" + (System.currentTimeMillis() - startTime));
+//		System.out.println("merge and with time(ms):" + (System.currentTimeMillis() - startTime));
 		return averageList;
 	}
 

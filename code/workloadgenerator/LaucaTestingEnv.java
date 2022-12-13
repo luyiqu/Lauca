@@ -14,7 +14,6 @@ import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.atomic.AtomicInteger;
 
 import abstraction.*;
-import com.sun.corba.se.spi.ior.WriteContents;
 import input.DdlAutoReaderWOA;
 import org.apache.log4j.PropertyConfigurator;
 import org.postgresql.copy.CopyManager;
@@ -222,7 +221,7 @@ public class LaucaTestingEnv {
 			e.printStackTrace();
 		}
 		DistributionCounter.deserialInit(dcs);
-		System.out.println("反序列化结束~");
+//		System.out.println("反序列化结束~");
 		int allThreadNum = Configurations.getAllTestThreadNum();
 		int localThreadNum = Configurations.getLocalTestThreadNum();
 		Workload workload = new Workload(transactions);

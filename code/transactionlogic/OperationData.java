@@ -5,7 +5,6 @@ import java.util.Arrays;
 import java.util.List;
 
 import input.TraceInfo;
-import org.omg.CORBA.OBJECT_NOT_EXIST;
 
 /**
  * 一个操作的数据

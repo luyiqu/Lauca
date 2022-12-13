@@ -2,7 +2,6 @@ package accessdistribution;
 
 import abstraction.*;
 import accessdistribution.DataAccessDistribution;
-import org.omg.Messaging.SYNC_WITH_TRANSPORT;
 
 
 import javax.swing.plaf.LabelUI;

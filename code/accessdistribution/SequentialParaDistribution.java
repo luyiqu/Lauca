@@ -49,14 +49,14 @@ public abstract class SequentialParaDistribution extends DataAccessDistribution 
 		for (int i = 0; i < intervalParaRepeatRatios.length; i++) {
 			try{
 				this.intervalParaRepeatRatios[i] = new double[intervalParaRepeatRatios[i].length];
-				System.out.println(Arrays.toString(intervalParaRepeatRatios[i]));
+//				System.out.println(Arrays.toString(intervalParaRepeatRatios[i]));
 				System.arraycopy(intervalParaRepeatRatios[i], 0, this.intervalParaRepeatRatios[i], 0, intervalParaRepeatRatios[i].length);
 			}
 			catch (Exception e){
 				e.printStackTrace();
 			}
 		}
-		System.out.println();
+//		System.out.println();
 	}
 
 	public SequentialParaDistribution(SequentialParaDistribution sequentialParaDistribution){

@@ -81,6 +81,7 @@ public class SequentialCtnsParaDistribution extends SequentialParaDistribution {
 	 * @return 合并后的结果
 	 */
 	public ArrayList<ArrayList<Long>> mergeCandidate(long[][] priorParaCandidates,ArrayList<ArrayList<Long>> base, int k ){
+		if (k >= intervalParaRepeatRatios.length) return base;
 		List<Long> priorParaCandidateList = new ArrayList<>();
 		if (priorParaCandidates != null) {
 			for (long[] tmpArr : priorParaCandidates) {
@@ -97,7 +98,12 @@ public class SequentialCtnsParaDistribution extends SequentialParaDistribution {
 			if (intervalParaRepeatRatios == null) {
 				repeatedParaNums[i] = 0;
 			} else {
-				repeatedParaNums[i] = (int)(intervalCardinalities[i] * intervalParaRepeatRatios[k][i]);
+				try {
+					repeatedParaNums[i] = (int)(intervalCardinalities[i] * intervalParaRepeatRatios[k][i]);
+				}
+				catch (Exception e){
+					e.printStackTrace();
+				}
 			}
 		}
 
@@ -162,9 +168,9 @@ public class SequentialCtnsParaDistribution extends SequentialParaDistribution {
 			}
 		}
 
-		System.out.println(candidateSize.toString());
-		System.out.println(allSize.toString());
-		System.out.println();
+//		System.out.println(candidateSize.toString());
+//		System.out.println(allSize.toString());
+//		System.out.println();
 	}
 
 	@Override
