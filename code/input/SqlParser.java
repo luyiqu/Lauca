@@ -164,19 +164,26 @@ public class SqlParser {
 						System.err.println("Unrecognized column: " + returnItems[i]);
 					}
 				}
-				if (itemExpr[0].equals("sum") || itemExpr[0].equals("min") || itemExpr[0].equals("max")) {
-					System.out.printf(itemExpr[1]);
-					Column column = searchColumn(tableNames, itemExpr[1]); // 返回项为单属性形式
-					if (column != null) {
-						returnDataTypes[i] = column.getDataType();
-					} else {
-						System.err.println("Unrecognized column: " + returnItems[i]);
-					}
-				} else if (itemExpr[0].equals("count")) {
-					returnDataTypes[i] = 0;
-				} else if (itemExpr[0].equals("avg")) {
-					// 取平均的都按decimal
-					returnDataTypes[i] = 2;
+				switch (itemExpr[0]) {
+					case "sum":
+					case "min":
+					case "max":
+						System.out.printf(itemExpr[1]);
+						Column column = searchColumn(tableNames, itemExpr[1]); // 返回项为单属性形式
+
+						if (column != null) {
+							returnDataTypes[i] = column.getDataType();
+						} else {
+							System.err.println("Unrecognized column: " + returnItems[i]);
+						}
+						break;
+					case "count":
+						returnDataTypes[i] = 0;
+						break;
+					case "avg":
+						// 取平均的都按decimal
+						returnDataTypes[i] = 2;
+						break;
 				}
 
 			}
@@ -222,6 +229,7 @@ public class SqlParser {
 		List<Integer> paraDataTypes = new ArrayList<Integer>();
 		// sql参数的数据分布类型信息
 		List<DistributionTypeInfo> paraDistTypeInfos = new ArrayList<DistributionTypeInfo>();
+		List<String> paraSchemaInfos = new ArrayList<>();
 
 		// 目前条件谓词中只支持条件运算符：=,>=,>,<,<=；不支持between and, like等运算符
 		// 目前条件谓词中不支持任何算术运算，具体形式为：columnName op ?
@@ -233,14 +241,14 @@ public class SqlParser {
 		// 存储sql语句谓词的模板
 		String predicateTemplate = new String();
 
-		for (int i = 0; i < predicates.length; i++) {
+		for (String predicate : predicates) {
 			// modified by zsy:划分
 			int opStartIndex = -1, opEndIndex = -1;// 关系运算符位置的开始和结束
-			for (int j = 0; j < predicates[i].length(); ++j) {
-				if (predicates[i].charAt(j) == '>' || predicates[i].charAt(j) == '<' || predicates[i].charAt(j) == '='
-						|| predicates[i].charAt(j) == '!') {
+			for (int j = 0; j < predicate.length(); ++j) {
+				if (predicate.charAt(j) == '>' || predicate.charAt(j) == '<' || predicate.charAt(j) == '='
+						|| predicate.charAt(j) == '!') {
 					opStartIndex = j;
-					if (predicates[i].charAt(j + 1) == '=' || predicates[i].charAt(j + 1) == '>') {
+					if (predicate.charAt(j + 1) == '=' || predicate.charAt(j + 1) == '>') {
 						opEndIndex = j + 1;
 					} else {
 						opEndIndex = j;
@@ -251,9 +259,9 @@ public class SqlParser {
 
 			// added by zsy:分解谓词
 			String[] predicateStrings = new String[3];
-			predicateStrings[0] = predicates[i].substring(0, opStartIndex).trim();
-			predicateStrings[1] = predicates[i].substring(opStartIndex, opEndIndex + 1).trim();
-			predicateStrings[2] = predicates[i].substring(opEndIndex + 1).trim();
+			predicateStrings[0] = predicate.substring(0, opStartIndex).trim();
+			predicateStrings[1] = predicate.substring(opStartIndex, opEndIndex + 1).trim();
+			predicateStrings[2] = predicate.substring(opEndIndex + 1).trim();
 			// 谓词不包含输入参数的情况仅支持 column1 op column2
 			if (searchColumn(tableNames, predicateStrings[2]) != null) {
 				predicateTemplate += " " + predicateStrings[0] + " " + predicateStrings[1] + " " + predicateStrings[2]
@@ -263,10 +271,12 @@ public class SqlParser {
 
 			String columnName = predicateStrings[0];
 			columnNames.add(columnName);
-			Column column = searchColumn(tableNames, columnName);
+			String tableName = searchTableName4Column(tableNames, columnName);
+			Column column = searchColumn(tableName, columnName);
 			if (column != null) {
 				paraDataTypes.add(column.getDataType());
-				paraDistTypeInfos.add(getParaDistTypeInfo(tableNames, columnName));
+				paraDistTypeInfos.add(getParaDistTypeInfo(tableName, columnName));
+				paraSchemaInfos.add(tableName + "_" + columnName);
 			} else {
 				System.err.println("Unrecognized column: " + columnName);
 			}
@@ -289,7 +299,7 @@ public class SqlParser {
 
 		// added by zsy
 		if (!isTemplate) {
-			StringBuffer sqlBuffer = new StringBuffer(originalSql);
+			StringBuilder sqlBuffer = new StringBuilder(originalSql);
 			// 结尾可能没有分号
 			originalSql = new String(sqlBuffer.replace(index3 + 6, minIdx == Integer.MAX_VALUE ? sql.length() : minIdx,
 					predicateTemplate.substring(0, predicateTemplate.length() - 4)));
@@ -297,17 +307,8 @@ public class SqlParser {
 		// for test
 //		System.out.println(parameters);
 
-		boolean filterPrimaryKey = false;
-		if (tableNames.length == 1) {
-			for (int i = 0; i < tables.size(); i++) {
-				if (tables.get(i).getName().equals(tableNames[0])) {
-					if (columnNames.containsAll(Arrays.asList(tables.get(i).getPrimaryKey()))) {
-						filterPrimaryKey = true;
-						break;
-					}
-				}
-			}
-		}
+
+		boolean filterPrimaryKey = checkFilterPK(tableNames, columnNames);
 
 		if (sql.matches("[ \\t]*select[ \\t]+(sum|count|avg|max|min)[\\s\\S]+")
 				|| sql.matches("[ \\t]*select[\\s\\S^(limit)]+limit[ \\t]+1[\\s\\S]*")) {
@@ -316,16 +317,30 @@ public class SqlParser {
 
 		int[] tmp = new int[paraDataTypes.size()];
 		for (int i = 0; i < tmp.length; ++i) {
-			// 将timestamp的类型转换
-			if (paraDataTypes.get(i) == 3 && parameters.size() > 0 && parameters.get(i).contains("-")) {
-				Timestamp ts = new Timestamp(0);
-				parameters.set(i, "" + ts.valueOf(parameters.get(i)).getTime());
-			}
 			tmp[i] = paraDataTypes.get(i);
 		}
+		transTimestamp(parameters, tmp);
+
+
 		return new ReadOperation(operationId, originalSql.replaceAll("##[a-zA-Z]+", ""), tmp,
-				paraDistTypeInfos.toArray(new DistributionTypeInfo[paraDistTypeInfos.size()]), returnItems,
+				paraDistTypeInfos.toArray(new DistributionTypeInfo[0]), paraSchemaInfos, returnItems,
 				returnDataTypes, filterPrimaryKey);
+	}
+
+	private boolean checkFilterPK(String[] tableNames, List<String> columnNames) {
+		boolean filterPrimaryKey = false;
+		if (tableNames.length == 1) {
+			Set<String> columnNameSet = new HashSet<>(columnNames);
+			for (Table table : tables) {
+				if (table.getName().equals(tableNames[0])) {
+					if (columnNameSet.containsAll(Arrays.asList(table.getPrimaryKey()))) {
+						filterPrimaryKey = true;
+						break;
+					}
+				}
+			}
+		}
+		return filterPrimaryKey;
 	}
 
 	// modified by zsy:解析sql语句，parameters用来返回sql中的参数.如果是解析sql模板的话就不管这个参数了
@@ -392,12 +407,7 @@ public class SqlParser {
 //			System.out.println(parameters);
 
 			// 将timestamp的类型转换
-			for (int i = 0; i < paraDataTypes.length; ++i) {
-				if (paraDataTypes[i] == 3 && parameters.size() > 0 && parameters.get(i).contains("-")) {
-					Timestamp ts = new Timestamp(0);
-					parameters.set(i, "" + ts.valueOf(parameters.get(i)).getTime());
-				}
-			}
+			transTimestamp(parameters, paraDataTypes);
 			return new WriteOperation(operationId, originalSql, paraDataTypes, paraDistTypeInfos, paraSchemaInfos, batchExecute);
 		} else if (sql.startsWith("update")) {
 			int index1 = sql.indexOf("update ");
@@ -452,31 +462,31 @@ public class SqlParser {
 			boolean isTemplate = false;
 			String setExprTemplate = new String();
 
-			for (int i = 0; i < setStatements.length; i++) {
+			for (String setStatement : setStatements) {
 				// modified by zsy:划分
 				// set后表达式的形式: column = (column或参数) op (column或参数)，目前一个set表达式只支持有最多1个参数
 				// 或 column = column或参数
 				int assignmentSignIndex = -1;// 赋值等号的位置
 				int opIndex = -1;// 运算符的位置
-				for (int j = 0; j < setStatements[i].length(); ++j) {
-					if (setStatements[i].charAt(j) == '=') {
+				for (int j = 0; j < setStatement.length(); ++j) {
+					if (setStatement.charAt(j) == '=') {
 						assignmentSignIndex = j;
 						break;
 					}
 				}
 				int cursor = assignmentSignIndex + 1;
-				while (setStatements[i].charAt(cursor) == ' ') {
+				while (setStatement.charAt(cursor) == ' ') {
 					++cursor;
 				}
-				if (setStatements[i].charAt(cursor) == '"' || setStatements[i].charAt(cursor) == '\'') {
+				if (setStatement.charAt(cursor) == '"' || setStatement.charAt(cursor) == '\'') {
 					// 去掉前后引号。这证明该表达式是一个字符串，此时后面必定没有运算符
-					setStatements[i].replaceAll("[\"']", "");
+					setStatement.replaceAll("[\"']", "");
 				} else {
 					// 第一个正负号是不能算的
-					for (int j = cursor + 1; j < setStatements[i].length(); ++j) {
-						if (setStatements[i].charAt(j) == '+' || setStatements[i].charAt(j) == '-'
-								|| setStatements[i].charAt(j) == '*' || setStatements[i].charAt(j) == '/'
-								|| setStatements[i].charAt(j) == '%') {
+					for (int j = cursor + 1; j < setStatement.length(); ++j) {
+						if (setStatement.charAt(j) == '+' || setStatement.charAt(j) == '-'
+								|| setStatement.charAt(j) == '*' || setStatement.charAt(j) == '/'
+								|| setStatement.charAt(j) == '%') {
 							opIndex = j;
 							break;
 						}
@@ -484,23 +494,23 @@ public class SqlParser {
 				}
 				// added by zsy:分解表达式
 				String[] exprStrings = new String[3];
-				exprStrings[0] = setStatements[i].substring(0, assignmentSignIndex).trim();
+				exprStrings[0] = setStatement.substring(0, assignmentSignIndex).trim();
 				if (opIndex != -1) {
-					exprStrings[1] = setStatements[i].substring(assignmentSignIndex + 1, opIndex).trim();
-					exprStrings[2] = setStatements[i].substring(opIndex + 1).trim();
+					exprStrings[1] = setStatement.substring(assignmentSignIndex + 1, opIndex).trim();
+					exprStrings[2] = setStatement.substring(opIndex + 1).trim();
 				} else {
-					exprStrings[1] = setStatements[i].substring(assignmentSignIndex + 1).trim();
+					exprStrings[1] = setStatement.substring(assignmentSignIndex + 1).trim();
 					exprStrings[2] = null;
 				}
 				// 谓词不包含输入参数的情况仅支持 column1 op column2
 				boolean leftExprIsColumn = (searchColumn(tableName, exprStrings[1]) != null);
-				boolean rightExprIsColumn = exprStrings[2] == null ? true : (searchColumn(tableName, exprStrings[2]) != null);
+				boolean rightExprIsColumn = (exprStrings[2] == null) || (searchColumn(tableName, exprStrings[2]) != null);
 				if (leftExprIsColumn && rightExprIsColumn) {
 					if (opIndex == -1) {
 						setExprTemplate += " " + exprStrings[0] + " = " + exprStrings[1] + ",";
 					} else {
 						setExprTemplate += " " + exprStrings[0] + " = " + exprStrings[1] + " "
-								+ setStatements[i].charAt(opIndex) + " " + exprStrings[2] + ",";
+								+ setStatement.charAt(opIndex) + " " + exprStrings[2] + ",";
 					}
 					continue;
 				}
@@ -540,10 +550,10 @@ public class SqlParser {
 						}
 						parameters.add(exprStrings[1]);
 						// 将SQL中参数换成?
-						setExprTemplate += " " + exprStrings[0] + " = ? " + setStatements[i].charAt(opIndex);
+						setExprTemplate += " " + exprStrings[0] + " = ? " + setStatement.charAt(opIndex);
 					} else {
 						setExprTemplate += " " + exprStrings[0] + " = " + exprStrings[1] + " "
-								+ setStatements[i].charAt(opIndex);
+								+ setStatement.charAt(opIndex);
 					}
 					if (!rightExprIsColumn) {
 						if (exprStrings[2].charAt(0) == '\'' || exprStrings[2].charAt(0) == '"') {
@@ -562,14 +572,14 @@ public class SqlParser {
 			// 存储sql语句谓词的模板
 			String predicateTemplate = new String();
 
-			for (int i = 0; i < predicates.length; i++) {
+			for (String predicate : predicates) {
 				// modified by zsy:划分
 				int opStartIndex = -1, opEndIndex = -1;// 关系运算符位置的开始和结束
-				for (int j = 0; j < predicates[i].length(); ++j) {
-					if (predicates[i].charAt(j) == '>' || predicates[i].charAt(j) == '<'
-							|| predicates[i].charAt(j) == '=' || predicates[i].charAt(j) == '!') {
+				for (int j = 0; j < predicate.length(); ++j) {
+					if (predicate.charAt(j) == '>' || predicate.charAt(j) == '<'
+							|| predicate.charAt(j) == '=' || predicate.charAt(j) == '!') {
 						opStartIndex = j;
-						if (predicates[i].charAt(j + 1) == '=' || predicates[i].charAt(j + 1) == '>') {
+						if (predicate.charAt(j + 1) == '=' || predicate.charAt(j + 1) == '>') {
 							opEndIndex = j + 1;
 						} else {
 							opEndIndex = j;
@@ -579,9 +589,9 @@ public class SqlParser {
 				}
 				// added by zsy:分解谓词
 				String[] predicateStrings = new String[3];
-				predicateStrings[0] = predicates[i].substring(0, opStartIndex).trim();
-				predicateStrings[1] = predicates[i].substring(opStartIndex, opEndIndex + 1).trim();
-				predicateStrings[2] = predicates[i].substring(opEndIndex + 1).trim();
+				predicateStrings[0] = predicate.substring(0, opStartIndex).trim();
+				predicateStrings[1] = predicate.substring(opStartIndex, opEndIndex + 1).trim();
+				predicateStrings[2] = predicate.substring(opEndIndex + 1).trim();
 				// 谓词不包含输入参数的情况仅支持 column1 op column2
 				if (searchColumn(tableName, predicateStrings[2]) != null) {
 					predicateTemplate += " " + predicateStrings[0] + " " + predicateStrings[1] + " "
@@ -617,18 +627,18 @@ public class SqlParser {
 			}
 			// added by zsy:替换成表达式模板和谓词模板
 			if (!isTemplate) {
-				StringBuffer sqlBuffer = new StringBuffer(originalSql);
+				StringBuilder sqlBuffer = new StringBuilder(originalSql);
 				// 结尾可能没有分号
-				sqlBuffer = sqlBuffer.replace(index3 + 6, sql.length(),
+				sqlBuffer.replace(index3 + 6, sql.length(),
 						predicateTemplate.substring(0, predicateTemplate.length() - 4));
 				// added by zsy:去掉最后的逗号
 				setExprTemplate = setExprTemplate.substring(0, setExprTemplate.length() - 1);
-				sqlBuffer = sqlBuffer.replace(index2 + 4, index3, setExprTemplate);
+				sqlBuffer.replace(index2 + 4, index3, setExprTemplate);
 				originalSql = new String(sqlBuffer);
 			} else {// 替换表达式模板，针对+1
-				StringBuffer sqlBuffer = new StringBuffer(originalSql);
+				StringBuilder sqlBuffer = new StringBuilder(originalSql);
 				setExprTemplate = setExprTemplate.substring(0, setExprTemplate.length() - 1);
-				sqlBuffer = sqlBuffer.replace(index2 + 4, index3, setExprTemplate);
+				sqlBuffer.replace(index2 + 4, index3, setExprTemplate);
 				originalSql = new String(sqlBuffer);
 			}
 
@@ -681,14 +691,14 @@ public class SqlParser {
 			// 存储sql语句谓词的模板
 			String predicateTemplate = new String();
 
-			for (int i = 0; i < predicates.length; i++) {
+			for (String predicate : predicates) {
 				// modified by zsy:划分
 				int opStartIndex = -1, opEndIndex = -1;// 关系运算符位置的开始和结束
-				for (int j = 0; j < predicates[i].length(); ++j) {
-					if (predicates[i].charAt(j) == '>' || predicates[i].charAt(j) == '<'
-							|| predicates[i].charAt(j) == '=' || predicates[i].charAt(j) == '!') {
+				for (int j = 0; j < predicate.length(); ++j) {
+					if (predicate.charAt(j) == '>' || predicate.charAt(j) == '<'
+							|| predicate.charAt(j) == '=' || predicate.charAt(j) == '!') {
 						opStartIndex = j;
-						if (predicates[i].charAt(j + 1) == '=' || predicates[i].charAt(j + 1) == '>') {
+						if (predicate.charAt(j + 1) == '=' || predicate.charAt(j + 1) == '>') {
 							opEndIndex = j + 1;
 						} else {
 							opEndIndex = j;
@@ -698,9 +708,9 @@ public class SqlParser {
 				}
 				// added by zsy:分解谓词
 				String[] predicateStrings = new String[3];
-				predicateStrings[0] = predicates[i].substring(0, opStartIndex).trim();
-				predicateStrings[1] = predicates[i].substring(opStartIndex, opEndIndex + 1).trim();
-				predicateStrings[2] = predicates[i].substring(opEndIndex + 1).trim();
+				predicateStrings[0] = predicate.substring(0, opStartIndex).trim();
+				predicateStrings[1] = predicate.substring(opStartIndex, opEndIndex + 1).trim();
+				predicateStrings[2] = predicate.substring(opEndIndex + 1).trim();
 				// 谓词不包含输入参数的情况仅支持 column1 op column2
 				if (searchColumn(tableName, predicateStrings[2]) != null) {
 					predicateTemplate += " " + predicateStrings[0] + " " + predicateStrings[1] + " "
@@ -795,20 +805,17 @@ public class SqlParser {
 		ArrayList<String> returnItemsList = new ArrayList<String>();
 		//added by ct —— select * from a; select * from a,b; select a.*, b.* from a,b;
 		//但是原来没有考虑 表名.列名 的情况 TODO
-		for(int i = 0; i < returnItems.length; i++){
-			if(returnItems[i].contains("*")){
-				if(returnItems[i].contains(".")) {
-					String tN = dotPattern.split(returnItems[i])[0].trim();
+		for (String returnItem : returnItems) {
+			if (returnItem.contains("*")) {
+				if (returnItem.contains(".")) {
+					String tN = dotPattern.split(returnItem)[0].trim();
 					//System.out.println("name "+tN);
 					returnItemsList.addAll(allColumnNames(tN));
+				} else {
+					for (String tableName : tableNames) returnItemsList.addAll(allColumnNames(tableName));
 				}
-				else{
-					for(int j = 0; j < tableNames.length; j++)
-						returnItemsList.addAll(allColumnNames(tableNames[j]));
-				}
-			}
-			else{
-				returnItemsList.add(returnItems[i]);
+			} else {
+				returnItemsList.add(returnItem);
 			}
 		}
 		returnItems = returnItemsList.toArray(new String[returnItemsList.size()]);
@@ -832,18 +839,25 @@ public class SqlParser {
 						System.err.println("Unrecognized column: " + returnItems[i]);
 					}
 				}
-				if (itemExpr[0].equals("sum") || itemExpr[0].equals("min") || itemExpr[0].equals("max")) {
-					Column column = searchColumn(tableNames, itemExpr[1]); // 返回项为单属性形式
-					if (column != null) {
-						returnDataTypes[i] = column.getDataType();
-					} else {
-						System.err.println("Unrecognized column: " + returnItems[i]);
-					}
-				} else if (itemExpr[0].equals("count")) {
-					returnDataTypes[i] = 0;
-				} else if (itemExpr[0].equals("avg")) {
-					// 取平均的都按decimal
-					returnDataTypes[i] = 2;
+				switch (itemExpr[0]) {
+					case "sum":
+					case "min":
+					case "max":
+						Column column = searchColumn(tableNames, itemExpr[1]); // 返回项为单属性形式
+
+						if (column != null) {
+							returnDataTypes[i] = column.getDataType();
+						} else {
+							System.err.println("Unrecognized column: " + returnItems[i]);
+						}
+						break;
+					case "count":
+						returnDataTypes[i] = 0;
+						break;
+					case "avg":
+						// 取平均的都按decimal
+						returnDataTypes[i] = 2;
+						break;
 				}
 
 			}
@@ -854,16 +868,13 @@ public class SqlParser {
 
 		int minIdx = Integer.MAX_VALUE;
 
-		if (index4 != -1 && minIdx > index4)
-
+		if (index4 != -1 )
 			minIdx = index4;
 
 		if (index5 != -1 && minIdx > index5)
-
 			minIdx = index5;
 
 		if (index6 != -1 && minIdx > index6)
-
 			minIdx = index6;
 
 		// 目前默认条件谓词之间只有'and'运算符，并且一个谓词之中仅含有一个待输入参数（谓词中可能不含任何输入参数）
@@ -871,21 +882,16 @@ public class SqlParser {
 		// between and 需转化成两个谓词表示的形式，此时两个参数之间是有大小关系的，属于事务逻辑的一部分（暂不实现）。
 
 		String[] predicates = sql.substring(index3 + 7, minIdx == Integer.MAX_VALUE ? sql.length() : minIdx)
-
 				.replaceAll("[ \\t]+", "").split("and");
 
 		// 有些谓词中可能不含输入参数
 
 		List<String> tmp = new ArrayList<>();
 
-		for (int i = 0; i < predicates.length; i++) {
-
-			if (predicates[i].contains("?")) {
-
-				tmp.add(predicates[i]);
-
+		for (String predicate : predicates) {
+			if (predicate.contains("?")) {
+				tmp.add(predicate);
 			}
-
 		}
 
 		predicates = new String[tmp.size()];
@@ -893,6 +899,7 @@ public class SqlParser {
 		tmp.toArray(predicates);
 
 		int[] paraDataTypes = new int[predicates.length];
+		List<String> paraSchemaInfos = new ArrayList<>();
 
 		Arrays.fill(paraDataTypes, -1);
 
@@ -909,62 +916,43 @@ public class SqlParser {
 		for (int i = 0; i < predicates.length; i++) {
 
 			String columnName = predicatePattern.split(predicates[i])[0];
-
 			columnNames.add(columnName);
-
-			Column column = searchColumn(tableNames, columnName);
+			String tableName = searchTableName4Column(tableNames, columnName);
+			Column column = searchColumn(tableName, columnName);
 
 			if (column != null) {
-
 				paraDataTypes[i] = column.getDataType();
-
-				paraDistTypeInfos[i] = getParaDistTypeInfo(tableNames, columnName);
-
+				paraDistTypeInfos[i] = getParaDistTypeInfo(tableName, columnName);
+				paraSchemaInfos.add(tableName + "_" + columnName);
 			} else {
-
 				System.err.println("Unrecognized column: " + columnName);
-
 			}
 
 		}
 
-		boolean filterPrimaryKey = false;
-
-		if (tableNames.length == 1) {
-
-			for (int i = 0; i < tables.size(); i++) {
-
-				if (tables.get(i).getName().equals(tableNames[0])) {
-
-					if (columnNames.containsAll(Arrays.asList(tables.get(i).getPrimaryKey()))) {
-
-						filterPrimaryKey = true;
-
-						break;
-
-					}
-
-				}
-
-			}
-
-		}
+		boolean filterPrimaryKey = checkFilterPK(tableNames, columnNames);
 
 		if (aggrTmplPattern.matcher(sql).matches()
 				|| limitTmplPattern.matcher(sql).matches()) {
 			filterPrimaryKey = true;
 		}
 
+		transTimestamp(parameters, paraDataTypes);
+
+		return new ReadOperation(operationId, originalSql.replaceAll("##[a-zA-Z]+", ""), paraDataTypes,
+				paraDistTypeInfos,paraSchemaInfos, returnItems, returnDataTypes, filterPrimaryKey);
+	}
+
+	/**
+	 * 将timestamp的类型转换
+ 	 */
+	private void transTimestamp(List<String> parameters, int[] paraDataTypes) {
 		for (int i = 0; i < paraDataTypes.length; ++i) {
 			// 将timestamp的类型转换
 			if (paraDataTypes[i] == 3 && parameters.size() > 0 && parameters.get(i).contains("-")) {
-				Timestamp ts = new Timestamp(0);
-				parameters.set(i, "" + ts.valueOf(parameters.get(i)).getTime());
+				parameters.set(i, "" + Timestamp.valueOf(parameters.get(i)).getTime());
 			}
 		}
-
-		return new ReadOperation(operationId, originalSql.replaceAll("##[a-zA-Z]+", ""), paraDataTypes,
-				paraDistTypeInfos, returnItems, returnDataTypes, filterPrimaryKey);
 	}
 
 	/**
@@ -1027,13 +1015,7 @@ public class SqlParser {
 
 			}
 
-			for (int i = 0; i < paraDataTypes.length; ++i) {
-				// 将timestamp的类型转换
-				if (paraDataTypes[i] == 3 && parameters.size() > 0 && parameters.get(i).contains("-")) {
-					Timestamp ts = new Timestamp(0);
-					parameters.set(i, "" + ts.valueOf(parameters.get(i)).getTime());
-				}
-			}
+			transTimestamp(parameters, paraDataTypes);
 			return new WriteOperation(operationId, originalSql, paraDataTypes, paraDistTypeInfos, paraSchemaInfos, batchExecute);
 
 		} else if (sql.startsWith("update")) {
@@ -1138,13 +1120,7 @@ public class SqlParser {
 				}
 
 			}
-			for (int i = 0; i < paraDataTypes.length; ++i) {
-				// 将timestamp的类型转换
-				if (paraDataTypes[i] == 3 && parameters.size() > 0 && parameters.get(i).contains("-")) {
-					Timestamp ts = new Timestamp(0);
-					parameters.set(i, "" + ts.valueOf(parameters.get(i)).getTime());
-				}
-			}
+			transTimestamp(parameters, paraDataTypes);
 			return new WriteOperation(operationId, originalSql, paraDataTypes, paraDistTypeInfos, paraSchemaInfos, batchExecute);
 
 		} else if (sql.startsWith("delete")) {
@@ -1161,11 +1137,11 @@ public class SqlParser {
 
 			List<String> tmp = new ArrayList<>();
 
-			for (int i = 0; i < predicates.length; i++) {
+			for (String predicate : predicates) {
 
-				if (predicates[i].contains("?")) {
+				if (predicate.contains("?")) {
 
-					tmp.add(predicates[i]);
+					tmp.add(predicate);
 
 				}
 
@@ -1203,13 +1179,7 @@ public class SqlParser {
 				}
 
 			}
-			for (int i = 0; i < paraDataTypes.length; ++i) {
-				// 将timestamp的类型转换
-				if (paraDataTypes[i] == 3 && parameters.size() > 0 && parameters.get(i).contains("-")) {
-					Timestamp ts = new Timestamp(0);
-					parameters.set(i, "" + ts.valueOf(parameters.get(i)).getTime());
-				}
-			}
+			transTimestamp(parameters, paraDataTypes);
 
 			return new WriteOperation(operationId, originalSql, paraDataTypes, paraDistTypeInfos, paraSchemaInfos, batchExecute);
 
@@ -1252,14 +1222,14 @@ public class SqlParser {
 
 	// 假设所有属性名都不带表名前缀 & 所有数据表的属性名都不一样
 	// 主外键属性也具有相应的Column对象
-	private Column searchColumn(String[] tableNames, String columnName) {
-		for (int i = 0; i < tables.size(); i++) {
-			for (int j = 0; j < tableNames.length; j++) {
-				if (tables.get(i).getName().equals(tableNames[j])) {
-					Column[] columns = tables.get(i).getColumns();
-					for (int k = 0; k < columns.length; k++) {
-						if (columns[k].getName().equals(columnName)) {
-							return columns[k];
+	private String searchTableName4Column(String[] tableNames, String columnName){
+		for (Table table : tables) {
+			for (String tableName : tableNames) {
+				if (table.getName().equals(tableName)) {
+					Column[] columns = table.getColumns();
+					for (Column column : columns) {
+						if (column.getName().equals(columnName)) {
+							return tableName;
 						}
 					}
 				}
@@ -1267,14 +1237,18 @@ public class SqlParser {
 		}
 		return null;
 	}
+	private Column searchColumn(String[] tableNames, String columnName) {
+		String tableName = searchTableName4Column(tableNames, columnName);
+		return searchColumn(tableName, columnName);
+	}
 
 	private Column searchColumn(String tableName, String columnName) {
-		for (int i = 0; i < tables.size(); i++) {
-			if (tables.get(i).getName().equals(tableName)) {
-				Column[] columns = tables.get(i).getColumns();
-				for (int j = 0; j < columns.length; j++) {
-					if (columns[j].getName().equals(columnName)) {
-						return columns[j];
+		for (Table table : tables) {
+			if (table.getName().equals(tableName)) {
+				Column[] columns = table.getColumns();
+				for (Column column : columns) {
+					if (column.getName().equals(columnName)) {
+						return column;
 					}
 				}
 			}
@@ -1285,11 +1259,11 @@ public class SqlParser {
 	//added by ct —— 针对 select *
 	private ArrayList<String> allColumnNames(String tableName) {
 		ArrayList<String> columnNames = new ArrayList<String>();
-		for (int i = 0; i < tables.size(); i++) {
-			if (tables.get(i).getName().equals(tableName)) {
-				Column[] columns = tables.get(i).getColumns();
-				for (int j = 0; j < columns.length; j++) {
-					columnNames.add(columns[j].getName());
+		for (Table table : tables) {
+			if (table.getName().equals(tableName)) {
+				Column[] columns = table.getColumns();
+				for (Column column : columns) {
+					columnNames.add(column.getName());
 				}
 			}
 		}
@@ -1328,14 +1302,14 @@ public class SqlParser {
 	private DistributionTypeInfo getParaDistTypeInfo(String[] tableNames, String columnName) {
 		Table table = null;
 		Column column = null;
-		for (int i = 0; i < tables.size(); i++) {
-			for (int j = 0; j < tableNames.length; j++) {
-				if (tables.get(i).getName().equals(tableNames[j])) {
-					Column[] columns = tables.get(i).getColumns();
-					for (int k = 0; k < columns.length; k++) {
-						if (columns[k].getName().equals(columnName)) {
-							table = tables.get(i);
-							column = columns[k];
+		for (Table value : tables) {
+			for (String tableName : tableNames) {
+				if (value.getName().equals(tableName)) {
+					Column[] columns = value.getColumns();
+					for (Column item : columns) {
+						if (item.getName().equals(columnName)) {
+							table = value;
+							column = item;
 						}
 					}
 				}
@@ -1348,13 +1322,13 @@ public class SqlParser {
 	private DistributionTypeInfo getParaDistTypeInfo(String tableName, String columnName) {
 		Table table = null;
 		Column column = null;
-		for (int i = 0; i < tables.size(); i++) {
-			if (tables.get(i).getName().equals(tableName)) {
-				Column[] columns = tables.get(i).getColumns();
-				for (int j = 0; j < columns.length; j++) {
-					if (columns[j].getName().equals(columnName)) {
-						table = tables.get(i);
-						column = columns[j];
+		for (Table value : tables) {
+			if (value.getName().equals(tableName)) {
+				Column[] columns = value.getColumns();
+				for (Column item : columns) {
+					if (item.getName().equals(columnName)) {
+						table = value;
+						column = item;
 					}
 				}
 			}

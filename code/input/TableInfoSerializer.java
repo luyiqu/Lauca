@@ -6,6 +6,7 @@ import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.ObjectInputStream;
 import java.io.ObjectOutputStream;
+import java.nio.file.Files;
 import java.util.List;
 
 import org.apache.log4j.PropertyConfigurator;
@@ -28,7 +29,7 @@ public class TableInfoSerializer {
 	}
 	
 	public void write(List<Table> tables, File output) {
-		try (ObjectOutputStream writer = new ObjectOutputStream(new FileOutputStream(output))) {
+		try (ObjectOutputStream writer = new ObjectOutputStream(Files.newOutputStream(output.toPath()))) {
 			writer.writeObject(tables);
 		} catch (IOException e) {
 			e.printStackTrace();
@@ -37,7 +38,7 @@ public class TableInfoSerializer {
 	
 	@SuppressWarnings("unchecked")
 	public List<Table> read(File input) {
-		try (ObjectInputStream reader = new ObjectInputStream(new FileInputStream(input))) {
+		try (ObjectInputStream reader = new ObjectInputStream(Files.newInputStream(input.toPath()))) {
 			return (List<Table>)reader.readObject();
 		} catch (Exception e) {
 			e.printStackTrace();

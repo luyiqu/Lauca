@@ -46,9 +46,9 @@ public class Branch extends TransactionBlock {
 
 	@Override
 	public void prepare(Connection conn) {
-		for (int i = 0; i < branches.size(); i++) {
-			for (int j = 0; j < branches.get(i).size(); j++) {
-				branches.get(i).get(j).prepare(conn);
+		for (List<SqlStatement> branch : branches) {
+			for (SqlStatement sqlStatement : branch) {
+				sqlStatement.prepare(conn);
 			}
 		}
 	}
@@ -102,10 +102,21 @@ public class Branch extends TransactionBlock {
 	}
 
 	@Override
+	public Map<String, String> getParaId2Name() {
+		Map<String, String> paraId2Name = new HashMap<>();
+		for (List<SqlStatement> branch: branches ) {
+			for (SqlStatement sql : branch) {
+				paraId2Name.putAll(sql.getParaId2Name());
+			}
+		}
+		return paraId2Name;
+	}
+
+	@Override
 	public String toString() {
 		StringBuilder sb = new StringBuilder();
-		for (int i = 0; i < branches.size(); i++) {
-			sb.append(branches.get(i));
+		for (List<SqlStatement> branch : branches) {
+			sb.append(branch);
 			sb.append("\n\t\t---------------------------------");
 		}
 		return "\n\t\tBranch [branchRatios=" + Arrays.toString(branchRatios) + ", branches=" + sb.toString() + "]";

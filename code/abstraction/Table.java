@@ -169,8 +169,8 @@ public class Table implements Serializable, Cloneable {
 		
 		// 对于是外键的主键属性，其范围需要从外键那里获得
 		loop : for (int i = 0; i < primaryKey.length; i++) {
-			for (int j = 0; j < foreignKeys.length; j++) {
-				String[] localColumns = foreignKeys[j].getLocalColumns();
+			for (ForeignKey foreignKey : foreignKeys) {
+				String[] localColumns = foreignKey.getLocalColumns();
 				for (int k = 0; k < localColumns.length; k++) {
 					if (primaryKey[i].equals(localColumns[k])) {
 						pkColumnRanges[i] = fk2ColumnRanges.get(Arrays.toString(localColumns))[k];
@@ -194,9 +194,9 @@ public class Table implements Serializable, Cloneable {
 		// 根据数据表大小以及参照属性的范围，确定主键中该本地属性的范围
 		if (flag) {
 			long pkColumnRangesProduct = 1;
-			for (int i = 0; i < pkColumnRanges.length; i++) {
-				if (pkColumnRanges[i] != 0) {  //排除是复合主键中为本地属性的属性
-					pkColumnRangesProduct *= pkColumnRanges[i];
+			for (long pkColumnRange : pkColumnRanges) {
+				if (pkColumnRange != 0) {  //排除是复合主键中为本地属性的属性
+					pkColumnRangesProduct *= pkColumnRange;
 				}
 			}
 			pkColumnRanges[firstNoFkPkColumnIndex] = Math.round(size / (double)pkColumnRangesProduct); //table_size / 外键组成主键的情况 得到该本地属性的range
@@ -214,8 +214,8 @@ public class Table implements Serializable, Cloneable {
 		if (primaryKey.length != 0 && !flag) {
 			// 根据数据表大小和所有主键属性的范围，确定主键的存留比例
 			long pkColumnRangesProduct = 1;
-			for (int i = 0; i < pkColumnRanges.length; i++) {
-				pkColumnRangesProduct *= pkColumnRanges[i];
+			for (long pkColumnRange : pkColumnRanges) {
+				pkColumnRangesProduct *= pkColumnRange;
 			}
 			pkPersistRatio = size / (double)pkColumnRangesProduct;
 			// pkPersistRatio若小于1，这样的主键如果被参照，外键那边无法保证参照完全性 TODO
@@ -244,8 +244,8 @@ public class Table implements Serializable, Cloneable {
 
 			for (int j = 0; j < localColumns.length; j++) {
 				boolean tmp = true;
-				for (int k = 0; k < primaryKey.length; k++) {
-					if (localColumns[j].equals(primaryKey[k])) {
+				for (String s : primaryKey) {
+					if (localColumns[j].equals(s)) {
 						tmp = false;
 						break;
 					}
@@ -273,12 +273,12 @@ public class Table implements Serializable, Cloneable {
 		}
 
 		Set<Integer> keyColumnIndexSet = new HashSet<>();
-		for (int i = 0; i < pkColumnIndexes.length; i++) {
-			keyColumnIndexSet.add(pkColumnIndexes[i]);
+		for (int pkColumnIndex : pkColumnIndexes) {
+			keyColumnIndexSet.add(pkColumnIndex);
 		}
-		for (int i = 0; i < allFkColumnIndexes.length; i++) {
-			for (int j = 0; j < allFkColumnIndexes[i].length; j++) {
-				keyColumnIndexSet.add(allFkColumnIndexes[i][j]);
+		for (int[] allFkColumnIndex : allFkColumnIndexes) {
+			for (int fkColumnIndex : allFkColumnIndex) {
+				keyColumnIndexSet.add(fkColumnIndex);
 			}
 		}
 		nonKeyColumnIndexes = new int[columns.length - keyColumnIndexSet.size()];
@@ -330,8 +330,8 @@ public class Table implements Serializable, Cloneable {
 			}
 		}
 
-		for (int i = 0; i < nonKeyColumnIndexes.length; i++) {
-			tuple[nonKeyColumnIndexes[i]] = columns[nonKeyColumnIndexes[i]].geneData(sdf);
+		for (int nonKeyColumnIndex : nonKeyColumnIndexes) {
+			tuple[nonKeyColumnIndex] = columns[nonKeyColumnIndex].geneData(sdf);
 		}
 
 		return tuple;
@@ -355,6 +355,10 @@ public class Table implements Serializable, Cloneable {
 
 	public ForeignKey[] getForeignKeys() {
 		return foreignKeys;
+	}
+
+	public Partition getPartition() {
+		return partition;
 	}
 
 	public void setName(String name) { this.name = name; }
@@ -383,11 +387,9 @@ public class Table implements Serializable, Cloneable {
 
 	//add by qly， 为了模糊化columnSize，生成一些无实际含义的column，只会被执行一次
 	public void modifyColumns(){
-		List<Column> modifyColumns = new ArrayList<>();
 
-		for(Column col:columns){   //真实的column在最前面
-			modifyColumns.add(col);
-		}
+		//真实的column在最前面
+		List<Column> modifyColumns = new ArrayList<>(Arrays.asList(columns));
 
 		double increaseRate = Configurations.getFakeColumnRate();
 		int generateTotalTableSize = (int)(columns.length*(1+increaseRate));

@@ -4,6 +4,9 @@ import java.math.BigDecimal;
 import java.util.*;
 import java.util.Map.Entry;
 
+import abstraction.Partition;
+import abstraction.Table;
+import abstraction.Transaction;
 import config.Configurations;
 import serializable.DistributionCounter4Serial;
 
@@ -47,6 +50,8 @@ public class DistributionCounter {
 	// 记录每个参数的数据分布类型
 	private static Map<String, Map<String, DistributionTypeInfo>> txName2ParaId2DistributionType = null;
 
+	private static Map<String, Map<String, Partition>> txName2ParaId2PartitionRule = null;
+
 	// 初始化所有成员变量
 	public static void init(Map<String, List<List<String>>> txName2StatParameters) {
 		txName2ParaId2DistributionList = new HashMap<>();
@@ -62,11 +67,9 @@ public class DistributionCounter {
 		txName2ParaId2CumulativeSize = new HashMap<>();
 		txName2ParaId2FullLifeCycleDistribution = new HashMap<>();
 		txName2ParaId2DistributionType = new HashMap<>();
+		txName2ParaId2PartitionRule = new HashMap<>();
 
-		Iterator<Entry<String, List<List<String>>>> iter = txName2StatParameters.entrySet().iterator();
-		while (iter.hasNext()) {
-			Entry<String, List<List<String>>> entry = iter.next();
-
+		for (Entry<String, List<List<String>>> entry : txName2StatParameters.entrySet()) {
 			Map<String, Vector<DataAccessDistribution>> paraId2DistributionList = new HashMap<>();
 			txName2ParaId2DistributionList.put(entry.getKey(), paraId2DistributionList);
 
@@ -83,6 +86,7 @@ public class DistributionCounter {
 			txName2ParaId2CumulativeSize.put(entry.getKey(), paraId2CumulativeSize);
 			txName2ParaId2FullLifeCycleDistribution.put(entry.getKey(), new HashMap<>());
 			txName2ParaId2DistributionType.put(entry.getKey(), new HashMap<>());
+			txName2ParaId2PartitionRule.put(entry.getKey(), new HashMap<>());
 
 			for (List<String> parameters : entry.getValue()) {
 				for (String parameter : parameters) {
@@ -110,6 +114,8 @@ public class DistributionCounter {
 			return;
 		}
 
+		Partition partition = txName2ParaId2PartitionRule.get(txName).get(paraIdentifier);
+
 		// 获取事务吞吐信息
 		//todo 20210127 先看一下这个模块对不对，再追溯到data.size的统计
 		if (txName2ParaId2AvgRunTimes.get(txName).containsKey(paraIdentifier)) {
@@ -126,7 +132,6 @@ public class DistributionCounter {
 			txName2ThroughputList.get(txName).add(new Throughput(txName, windowTime, throughput));
 		}
 
-		//todo 这里吧data=#@#的值删掉吧！
 		data.removeIf(d -> d.equals("#@#"));
 		if(data.isEmpty()){
 //			txName2ParaId2DistributionList.get(txName).get(paraIdentifier).add(null);
@@ -138,6 +143,7 @@ public class DistributionCounter {
 		switch (distTypeInfo.distributionType) {
 		case 0:
 			DataAccessDistribution distribution0 = countContinuousParaDistribution(distTypeInfo.dataType, data);
+			assert distribution0 != null;
 			distribution0.setTime(windowTime);
 //			System.out.println("DistributionCounter "+"windowTime: "+windowTime);
 //			txName2ParaId2DistributionList.get(txName).get(paraIdentifier).add(distribution0);
@@ -214,7 +220,7 @@ public class DistributionCounter {
 			if (cumulativeSize <= samplingSize) {
 				samplingData.add(item);
 			} else {
-				if (Math.random() < samplingSize / cumulativeSize) {
+				if (Math.random() < 1.0* samplingSize / cumulativeSize) {
 					samplingData.set((int) (Math.random() * samplingSize), item);
 				}
 			}
@@ -226,14 +232,10 @@ public class DistributionCounter {
 	}
 
 	public static void countFullLifeCycleDistribution() {
-		Iterator<Entry<String, Map<String, List<String>>>> iter1 = txName2ParaId2SamplingData.entrySet().iterator();
-		while (iter1.hasNext()) {
-			Entry<String, Map<String, List<String>>> entry1 = iter1.next();
+		for (Entry<String, Map<String, List<String>>> entry1 : txName2ParaId2SamplingData.entrySet()) {
 			String txName = entry1.getKey();
 			Map<String, List<String>> paraId2SamplingData = entry1.getValue();
-			Iterator<Entry<String, List<String>>> iter2 = paraId2SamplingData.entrySet().iterator();
-			while (iter2.hasNext()) {
-				Entry<String, List<String>> entry2 = iter2.next();
+			for (Entry<String, List<String>> entry2 : paraId2SamplingData.entrySet()) {
 				String paraIdentifier = entry2.getKey();
 				List<String> data = entry2.getValue();
 				DistributionTypeInfo distTypeInfo = txName2ParaId2DistributionType.get(txName).get(paraIdentifier);
@@ -270,24 +272,24 @@ public class DistributionCounter {
 		// 三个分支中的代码非常相似，没办法~
 		if (dataType == 0 || dataType == 3) { // Long（Integer、DateTime）
 			List<Long> values = new ArrayList<>();
-			for (int i = 0; i < data.size(); i++) {
-				values.add(Long.parseLong(data.get(i)));
+			for (String datum : data) {
+				values.add(Long.parseLong(datum));
 			}
 			Long[] highFrequencyItems = new Long[Configurations.getHighFrequencyItemNum()];
 
 			return getContinuousParaDistribution(values, highFrequencyItems);
 		} else if (dataType == 1) { // Double
 			List<Double> values = new ArrayList<>();
-			for (int i = 0; i < data.size(); i++) {
-				values.add(Double.parseDouble(data.get(i)));
+			for (String datum : data) {
+				values.add(Double.parseDouble(datum));
 			}
 			Double[] highFrequencyItems = new Double[Configurations.getHighFrequencyItemNum()];
 
 			return getContinuousParaDistribution(values, highFrequencyItems);
 		} else if (dataType == 2) { // BigDecimal
 			List<BigDecimal> values = new ArrayList<>();
-			for (int i = 0; i < data.size(); i++) {
-				values.add(new BigDecimal(data.get(i)));
+			for (String datum : data) {
+				values.add(new BigDecimal(datum));
 			}
 			BigDecimal[] highFrequencyItems = new BigDecimal[Configurations.getHighFrequencyItemNum()];
 
@@ -303,8 +305,8 @@ public class DistributionCounter {
 	// 该函数中的代码与countContinuousParaDistribution函数中第一个分支的代码基本相同~
 	private static IntegerParaDistribution countIntegerParaDistribution(List<String> data) {
 		List<Long> values = new ArrayList<>();
-		for (int i = 0; i < data.size(); i++) {
-			values.add(Long.parseLong(data.get(i)));
+		for (String datum : data) {
+			values.add(Long.parseLong(datum));
 		}
 		Long windowMinValue = Collections.min(values);
 		Long windowMaxValue = Collections.max(values);
@@ -342,8 +344,8 @@ public class DistributionCounter {
 	private static SequentialCtnsParaDistribution countSequentialCtnsParaDistribution(List<String> data, String txName,
 			String paraIdentifier) {
 		List<Long> values = new ArrayList<>();
-		for (int i = 0; i < data.size(); i++) {
-			values.add(Long.parseLong(data.get(i)));
+		for (String datum : data) {
+			values.add(Long.parseLong(datum));
 		}
 		Long minValue = Collections.min(values);
 		Long maxValue = Collections.max(values);
@@ -381,15 +383,15 @@ public class DistributionCounter {
 		ArrayList<ArrayList<Double>> quantilePerInterval = getQuantilePerInterval(valueNumEntryList, intervalCardinalities,
 				intervalFrequencies, maxValue, minValue, values.size());
 
-		return new SequentialCtnsParaDistribution(minValue.longValue(), maxValue.longValue(), highFrequencyItems2,
+		return new SequentialCtnsParaDistribution(minValue, maxValue, highFrequencyItems2,
 				hFItemFrequencies, intervalCardinalities, intervalFrequencies, intervalParaRepeatRatios, quantilePerInterval);
 	}
 
 	private static SequentialIntParaDistribution countSequentialIntParaDistribution(List<String> data, String txName,
 			String paraIdentifier) {
 		List<Long> values = new ArrayList<>();
-		for (int i = 0; i < data.size(); i++) {
-			values.add(Long.parseLong(data.get(i)));
+		for (String datum : data) {
+			values.add(Long.parseLong(datum));
 		}
 		Long windowMinValue = Collections.min(values);
 		Long windowMaxValue = Collections.max(values);
@@ -422,12 +424,12 @@ public class DistributionCounter {
 
 		int hFItemRepeatNum = 0, currentHFItemNum = 0;
 		if (priorHighFrequencyItems != null) {
-			for (int i = 0; i < highFrequencyItems.length; i++) {
-				if (highFrequencyItems[i] != null) {
+			for (Long highFrequencyItem : highFrequencyItems) {
+				if (highFrequencyItem != null) {
 					currentHFItemNum++;
-					for (int j = 0; j < priorHighFrequencyItems.length; j++) {
-						if (priorHighFrequencyItems[j] != null
-								&& priorHighFrequencyItems[j].longValue() == highFrequencyItems[i].longValue()) {
+					for (Long priorHighFrequencyItem : priorHighFrequencyItems) {
+						if (priorHighFrequencyItem != null
+								&& priorHighFrequencyItem.longValue() == highFrequencyItem.longValue()) {
 							hFItemRepeatNum++;
 							break;
 						}
@@ -466,12 +468,12 @@ public class DistributionCounter {
 
 		int hFItemRepeatNum = 0, currentHFItemNum = 0;
 		if (priorHighFrequencyItems != null) {
-			for (int i = 0; i < highFrequencyItems.length; i++) {
-				if (highFrequencyItems[i] != null) {
+			for (String highFrequencyItem : highFrequencyItems) {
+				if (highFrequencyItem != null) {
 					currentHFItemNum++;
-					for (int j = 0; j < priorHighFrequencyItems.length; j++) {
-						if (priorHighFrequencyItems[j] != null
-								&& priorHighFrequencyItems[j].equals(highFrequencyItems[i])) {
+					for (String priorHighFrequencyItem : priorHighFrequencyItems) {
+						if (priorHighFrequencyItem != null
+								&& priorHighFrequencyItem.equals(highFrequencyItem)) {
 							hFItemRepeatNum++;
 							break;
 						}
@@ -495,7 +497,6 @@ public class DistributionCounter {
 		// Entry：<参数，参数出现的个数>；所有Entry按照出现个数升序排列
 		List<Entry<T, Integer>> valueNumEntryList = getValueNumEntryList(values);
 
-		// 因为一个函数无法有两个返回值，并且有些访问分布中不需要统计highFrequencyItems（此时传入一个null即可），故采用如下处理形式
 		double[] hFItemFrequencies = getHighFrequencyItemInfo(valueNumEntryList, values.size(), highFrequencyItems);
 
 		// Object[] result -> 为了可以有多个函数返回值~
@@ -512,12 +513,12 @@ public class DistributionCounter {
 	// 统计values中所有非重复值的出现个数，并按出现次数升序排列
 	private static <T> List<Entry<T, Integer>> getValueNumEntryList(List<T> values) {
 		Map<T, Integer> value2Num = new HashMap<>();
-		for (int i = 0; i < values.size(); i++) {
-			if (value2Num.containsKey(values.get(i))) {
-				int num = value2Num.get(values.get(i)) + 1;
-				value2Num.put(values.get(i), num);
+		for (T value : values) {
+			if (value2Num.containsKey(value)) {
+				int num = value2Num.get(value) + 1;
+				value2Num.put(value, num);
 			} else {
-				value2Num.put(values.get(i), 1);
+				value2Num.put(value, 1);
 			}
 		}
 
@@ -526,7 +527,7 @@ public class DistributionCounter {
 		while (iter.hasNext()) {
 			valueNumEntryList.add(iter.next());
 		}
-		Collections.sort(valueNumEntryList, new EntryComparator<T>());
+		valueNumEntryList.sort(new EntryComparator<T>());
 
 		return valueNumEntryList;
 	}
@@ -620,8 +621,8 @@ public class DistributionCounter {
 
 		// 这里加 0.000000001 是为了避免针对maxValue的idx越界
 		double avgIntervalLength = (maxValue.doubleValue() - minValue.doubleValue() + 0.000000001) / intervalNum;
-		for (int i = 0; i < valueNumEntryList.size(); i++) {
-			int idx = (int) ((valueNumEntryList.get(i).getKey().doubleValue() - minValue.doubleValue())
+		for (Entry<T, Integer> tIntegerEntry : valueNumEntryList) {
+			int idx = (int) ((tIntegerEntry.getKey().doubleValue() - minValue.doubleValue())
 					/ avgIntervalLength);
 
 			// bug fix: 同下面函数中的 bug fix 说明
@@ -631,7 +632,7 @@ public class DistributionCounter {
 			// -------------------
 
 			intervalCardinalities[idx]++;
-			intervalFrequencies[idx] += valueNumEntryList.get(i).getValue() / (double) valueSize;
+			intervalFrequencies[idx] += tIntegerEntry.getValue() / (double) valueSize;
 		}
 
 		Object[] result = new Object[2];
@@ -653,9 +654,6 @@ public class DistributionCounter {
 		ArrayList<Object> priorDataList = (ArrayList<Object>) priorData;
 		if (priorDataList.size() > 0){
 			intervalParaRepeatRatios = new double[Math.min(k, priorDataList.size())][];
-		}
-		else{
-			intervalParaRepeatRatios = null;
 		}
 
 		// 统计已经重复的值，从而实现差分的统计
@@ -706,8 +704,8 @@ public class DistributionCounter {
 		double[] intervalFrequencies = new double[intervalNum];
 
 
-		for (int i = 0; i < valueNumEntryList.size(); i++) {
-			int idx = (int) ((valueNumEntryList.get(i).getKey().doubleValue() - minValue.doubleValue())
+		for (Entry<T, Integer> tIntegerEntry : valueNumEntryList) {
+			int idx = (int) ((tIntegerEntry.getKey().doubleValue() - minValue.doubleValue())
 					/ avgIntervalLength);
 
 			// bug fix: idx 还是可能出现越界 （smallbank-mysql-sf20-tn20 实验时发现的，此时idx刚好等于区间数）
@@ -718,7 +716,7 @@ public class DistributionCounter {
 			// -------------------
 
 			intervalCardinalities[idx]++;
-			intervalFrequencies[idx] += valueNumEntryList.get(i).getValue() / (double) valueSize;
+			intervalFrequencies[idx] += tIntegerEntry.getValue() / (double) valueSize;
 		}
 
 
@@ -737,10 +735,10 @@ public class DistributionCounter {
 		double[] intervalFrequencies = new double[intervalNum];
 
 		// 对于字符串类型属性（参数），为了可用直方图来表示其数据分布，我们采用其hashcode进行数据分段
-		for (int i = 0; i < valueNumEntryList.size(); i++) {
-			int idx = Math.abs(valueNumEntryList.get(i).getKey().hashCode()) % intervalNum;
+		for (Entry<String, Integer> stringIntegerEntry : valueNumEntryList) {
+			int idx = Math.abs(stringIntegerEntry.getKey().hashCode()) % intervalNum;
 			intervalCardinalities[idx]++;
-			intervalFrequencies[idx] += valueNumEntryList.get(i).getValue() / (double) valueSize;
+			intervalFrequencies[idx] += stringIntegerEntry.getValue() / (double) valueSize;
 		}
 
 		Object[] result = new Object[2];
@@ -763,13 +761,13 @@ public class DistributionCounter {
 		double[] intervalFrequencies = new double[intervalNum];
 		double[] intervalParaRepeatRatios = new double[intervalNum];
 
-		for (int i = 0; i < valueNumEntryList.size(); i++) {
-			int idx = Math.abs(valueNumEntryList.get(i).getKey().hashCode()) % intervalNum;
+		for (Entry<String, Integer> stringIntegerEntry : valueNumEntryList) {
+			int idx = Math.abs(stringIntegerEntry.getKey().hashCode()) % intervalNum;
 			intervalCardinalities[idx]++;
-			intervalFrequencies[idx] += valueNumEntryList.get(i).getValue() / (double) valueSize;
+			intervalFrequencies[idx] += stringIntegerEntry.getValue() / (double) valueSize;
 
-			if (priorDataSet.contains(valueNumEntryList.get(i).getKey())) {
-				intervalParaRepeatRatios[idx] += valueNumEntryList.get(i).getValue() / (double) valueSize;
+			if (priorDataSet.contains(stringIntegerEntry.getKey())) {
+				intervalParaRepeatRatios[idx] += stringIntegerEntry.getValue() / (double) valueSize;
 			}
 		}
 
@@ -798,16 +796,11 @@ public class DistributionCounter {
 		// 存放与allParaDistributionInfo一一对应的标识符信息（含事务名和参数标识符）
 		List<String> identifiers = new ArrayList<>();
 
-		Iterator<Entry<String, Map<String, Vector<DataAccessDistribution>>>> iter1 = txName2ParaId2DistributionList
-				.entrySet().iterator();
-		while (iter1.hasNext()) {
-			Entry<String, Map<String, Vector<DataAccessDistribution>>> entry1 = iter1.next();
-			Iterator<Entry<String, Vector<DataAccessDistribution>>> iter2 = entry1.getValue().entrySet().iterator();
-			while (iter2.hasNext()) {
-				Entry<String, Vector<DataAccessDistribution>> entry2 = iter2.next();
-
+		for (Entry<String, Map<String, Vector<DataAccessDistribution>>> entry1 : txName2ParaId2DistributionList
+				.entrySet()) {
+			for (Entry<String, Vector<DataAccessDistribution>> entry2 : entry1.getValue().entrySet()) {
 				// 同一个参数的数据访问分布肯定由同一个线程按序分析得到的，故下面可不排序~
-				 Collections.sort(entry2.getValue());
+				Collections.sort(entry2.getValue());
 
 				//TODO: 有些参数没有访问分布，是[]空的，但是这里直接忽视掉，怀疑是这里导致了windowDistribution读到别人身上 ~
 //				// bug fix: 事务模板中的某些事务可能没有实例数据
@@ -845,7 +838,7 @@ public class DistributionCounter {
 						if (!txName2ParaId2Distribution.containsKey(arr[0])) {
 							txName2ParaId2Distribution.put(arr[0], new HashMap<>());
 						}
-						txName2ParaId2Distribution.get(arr[0]).put(arr[1], distribution); //TODO:lyqu: 这里完全没有绑定！！！
+						txName2ParaId2Distribution.get(arr[0]).put(arr[1], distribution);
 						indexes[i]++;
 					}
 					flag = false;
@@ -1023,10 +1016,29 @@ public class DistributionCounter {
 		return trueDistribution;
 	}
 
+	public static void mapPara2PartitionRule(List<Table> tables, List<Transaction> transactions) {
+		Map<String, Partition> tableName2PartitionRule = new HashMap<>();
+		for (Table table: tables){
+			tableName2PartitionRule.put(table.getName().toLowerCase(),table.getPartition());
+		}
+
+		for (Transaction transaction : transactions) {
+			Map<String,String> paraId2Name = transaction.getParaId2Name();
+			for (String paraId : paraId2Name.keySet()){
+				String tableName = paraId2Name.get(paraId).split("_")[0];
+				String columnName = paraId2Name.get(paraId).split("_")[1];
+
+				if (tableName2PartitionRule.get(tableName).getPartitionKey().equals(columnName)){
+					txName2ParaId2PartitionRule.get(transaction.getName()).put(paraId, tableName2PartitionRule.get(tableName));
+				}
+			}
+		}
+	}
+
 	public void setTxName2ParaId2DistributionList
 			(String txName, String paraIdentifier, long windowTime, IntegerParaDistribution distribution){
 		distribution.setTime(windowTime);
-		this.txName2ParaId2DistributionList.get(txName).get(paraIdentifier).add(distribution);
+		txName2ParaId2DistributionList.get(txName).get(paraIdentifier).add(distribution);
 	}
 	//txName2ParaId2DistributionList.get(txName).get(paraIdentifier).add(distribution1);
 	public static Map<String, Map<String, DataAccessDistribution>> getTxName2ParaId2FullLifeCycleDistribution() {
@@ -1039,12 +1051,6 @@ class EntryComparator<T> implements Comparator<Entry<T, Integer>> {
 
 	@Override
 	public int compare(Entry<T, Integer> o1, Entry<T, Integer> o2) {
-		if (o1.getValue() < o2.getValue()) {
-			return -1;
-		} else if (o1.getValue() > o2.getValue()) {
-			return 1;
-		} else {
-			return 0;
-		}
+		return o1.getValue().compareTo(o2.getValue());
 	}
 }

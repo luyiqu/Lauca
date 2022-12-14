@@ -130,8 +130,6 @@ public class SequentialCtnsParaDistribution extends SequentialParaDistribution {
 	// 通过priorParaCandidates生成满足要求（intervalParaRepeatRatios & intervalCardinalities）的currentParaCandidates
 	// 当intervalParaRepeatRatios & priorParaCandidates为Null时，即生成第一个（初始）时间窗口的currentParaCandidates
 	public void geneCandidates(long[][] priorParaCandidates) {
-		ArrayList<Integer> candidateSize = new ArrayList<>();
-		ArrayList<Integer> allSize = new ArrayList<>();
 
 		currentParaCandidates = new long[intervalNum][];
 		for (int i = 0; i < intervalNum; i++) {
@@ -145,8 +143,6 @@ public class SequentialCtnsParaDistribution extends SequentialParaDistribution {
 				existedParameterList.add(currentParaCandidates[i][j]);
 				idx ++;
 			}
-			candidateSize.add(idx);
-			allSize.add(currentParaCandidates[i].length);
 			// 补齐各个分区剩下的候选参数
 			while (idx < currentParaCandidates[i].length) {
 				long randomParameter = (long)getIntervalInnerRandomValue(i)  ;//((Math.random() + i) * avgIntervalLength) + minValue;//

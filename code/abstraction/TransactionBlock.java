@@ -22,6 +22,8 @@ public abstract class TransactionBlock {
 	public abstract int execute(Map<String, Integer> cardinality4paraInSchema, Map<String, Set<Object>> paraUsed);
 	public abstract int execute(Map<String, Integer> cardinality4paraInSchema, Map<String, Set<Object>> paraUsed,
 								Statement stmt);
+	// 返回paraid和对应的tableName_columnName
+	public abstract Map<String, String> getParaId2Name();
 
 	// String: paraIdentifier = operationId + "_para_" + paraIndex;
 	// TxRunningValue: 事务运行过程中一些中间状态的值，包含SQL操作的输入参数和返回结果集

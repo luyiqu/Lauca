@@ -6,6 +6,7 @@ import java.io.FileInputStream;
 import java.io.FileReader;
 import java.io.FileWriter;
 import java.io.IOException;
+import java.nio.charset.StandardCharsets;
 import java.sql.Connection;
 import java.sql.SQLException;
 import java.sql.Statement;
@@ -109,40 +110,42 @@ public class LaucaTestingEnv {
 		DdlAutoReaderWOA ddlAutoReaderWOA;
 		//先建表语句，再压数据，最后加上外键、索引等约束
 		ArrayList<String> FKs_Indexes = new ArrayList<String>();
-		if (databaseType.equals("mysql")||databaseType.equals("tidb")) {
-			oriConn = oriDBConnector.getMySQLConnection();
-			laucaConn = laucaDBConnector.getMySQLConnection();
-			if(Configurations.isEnableAnonymity()){
-				ddlAutoReader = new DdlAutoReader(Configurations.getOriginalDatabaseUserName(), oriConn, laucaConn);
-				FKs_Indexes = ddlAutoReader.createTables4Mysql();
-			}
-			else{
-				ddlAutoReaderWOA = new DdlAutoReaderWOA(Configurations.getOriginalDatabaseUserName(), oriConn, laucaConn);
-				FKs_Indexes = ddlAutoReaderWOA.createTables4Mysql();
-			}
-		} else if (databaseType.equals("postgresql")) {
-			oriConn = oriDBConnector.getPostgreSQLConnection();
-			laucaConn = laucaDBConnector.getPostgreSQLConnection();
-			if(Configurations.isEnableAnonymity()){
-				ddlAutoReader = new DdlAutoReader(Configurations.getOriginalDatabaseUserName(), oriConn, laucaConn);
-				FKs_Indexes = ddlAutoReader.createTables4Postgres();
-			}
-			else{
-				ddlAutoReaderWOA = new DdlAutoReaderWOA(Configurations.getOriginalDatabaseUserName(), oriConn, laucaConn);
-				FKs_Indexes = ddlAutoReaderWOA.createTables4Postgres();
-			}
+		switch (databaseType) {
+			case "mysql":
+			case "tidb":
+				oriConn = oriDBConnector.getMySQLConnection();
+				laucaConn = laucaDBConnector.getMySQLConnection();
+				if (Configurations.isEnableAnonymity()) {
+					ddlAutoReader = new DdlAutoReader(Configurations.getOriginalDatabaseUserName(), oriConn, laucaConn);
+					FKs_Indexes = ddlAutoReader.createTables4Mysql();
+				} else {
+					ddlAutoReaderWOA = new DdlAutoReaderWOA(Configurations.getOriginalDatabaseUserName(), oriConn, laucaConn);
+					FKs_Indexes = ddlAutoReaderWOA.createTables4Mysql();
+				}
+				break;
+			case "postgresql":
+				oriConn = oriDBConnector.getPostgreSQLConnection();
+				laucaConn = laucaDBConnector.getPostgreSQLConnection();
+				if (Configurations.isEnableAnonymity()) {
+					ddlAutoReader = new DdlAutoReader(Configurations.getOriginalDatabaseUserName(), oriConn, laucaConn);
+					FKs_Indexes = ddlAutoReader.createTables4Postgres();
+				} else {
+					ddlAutoReaderWOA = new DdlAutoReaderWOA(Configurations.getOriginalDatabaseUserName(), oriConn, laucaConn);
+					FKs_Indexes = ddlAutoReaderWOA.createTables4Postgres();
+				}
 
-		} else if (databaseType.equals("oracle")) {
-			oriConn = oriDBConnector.getOracleConnection();
-			laucaConn = laucaDBConnector.getOracleConnection();
-			if(Configurations.isEnableAnonymity()) {
-				ddlAutoReader = new DdlAutoReader(Configurations.getOriginalDatabaseUserName(), oriConn, laucaConn);
-				FKs_Indexes = ddlAutoReader.createTables4Oracle();
-			}
-			else{
-				ddlAutoReaderWOA = new DdlAutoReaderWOA(Configurations.getOriginalDatabaseUserName(), oriConn, laucaConn);
-				FKs_Indexes = ddlAutoReaderWOA.createTables4Oracle();
-			}
+				break;
+			case "oracle":
+				oriConn = oriDBConnector.getOracleConnection();
+				laucaConn = laucaDBConnector.getOracleConnection();
+				if (Configurations.isEnableAnonymity()) {
+					ddlAutoReader = new DdlAutoReader(Configurations.getOriginalDatabaseUserName(), oriConn, laucaConn);
+					FKs_Indexes = ddlAutoReader.createTables4Oracle();
+				} else {
+					ddlAutoReaderWOA = new DdlAutoReaderWOA(Configurations.getOriginalDatabaseUserName(), oriConn, laucaConn);
+					FKs_Indexes = ddlAutoReaderWOA.createTables4Oracle();
+				}
+				break;
 		}
 
 		try {
@@ -150,27 +153,32 @@ public class LaucaTestingEnv {
             //将Table中的数据全部导入数据库中
 			File laucaTablesDir = new File(Configurations.getLaucaTablesDir());
 			File[] tableDataFiles = laucaTablesDir.listFiles();
-			for (int i = 0; i < tableDataFiles.length; i++) {
-				String tableName = tableDataFiles[i].getName().substring(0, tableDataFiles[i].getName().length() - 6);
-				if (databaseType.equals("mysql")||databaseType.equals("tidb")) {
-					stmt.execute("LOAD DATA LOCAL INFILE '" + tableDataFiles[i].getCanonicalPath() + "' INTO TABLE "
-							+ tableName + " FIELDS TERMINATED BY ',' LINES TERMINATED BY '\\n'");
-				} else if (databaseType.equals("postgresql")) {
-					CopyManager copyManager = new CopyManager((BaseConnection) laucaConn);
-					copyManager.copyIn("COPY " + tableName + " FROM stdin DELIMITER as ',';", new FileReader(new File(
-							String.valueOf(tableDataFiles[i].getCanonicalPath()))));
-				} else if (databaseType.equals("oracle")) {
-					File ctldir = new File(".//testdata//ctl");
-					if (!ctldir.exists()) {
-						ctldir.mkdirs();
-					}
-					TableInfoSerializer serializer = new TableInfoSerializer();
-					List<Table> tables = serializer.read(new File(Configurations.getDataCharacteristicSaveFile()));
-					Map<String, Table> name2table = new HashMap<String, Table>();
-					for (Table table : tables) {
-						name2table.put(table.getName(), table);
-					}
-					LaucaTestingEnv.oracleLoader(tableDataFiles[i], name2table.get(tableName));
+			for (File tableDataFile : tableDataFiles) {
+				String tableName = tableDataFile.getName().substring(0, tableDataFile.getName().length() - 6);
+				switch (databaseType) {
+					case "mysql":
+					case "tidb":
+						stmt.execute("LOAD DATA LOCAL INFILE '" + tableDataFile.getCanonicalPath() + "' INTO TABLE "
+								+ tableName + " FIELDS TERMINATED BY ',' LINES TERMINATED BY '\\n'");
+						break;
+					case "postgresql":
+						CopyManager copyManager = new CopyManager((BaseConnection) laucaConn);
+						copyManager.copyIn("COPY " + tableName + " FROM stdin DELIMITER as ',';", new FileReader(new File(
+								String.valueOf(tableDataFile.getCanonicalPath()))));
+						break;
+					case "oracle":
+						File ctldir = new File(".//testdata//ctl");
+						if (!ctldir.exists()) {
+							ctldir.mkdirs();
+						}
+						TableInfoSerializer serializer = new TableInfoSerializer();
+						List<Table> tables = serializer.read(new File(Configurations.getDataCharacteristicSaveFile()));
+						Map<String, Table> name2table = new HashMap<String, Table>();
+						for (Table table : tables) {
+							name2table.put(table.getName(), table);
+						}
+						LaucaTestingEnv.oracleLoader(tableDataFile, name2table.get(tableName));
+						break;
 				}
 			}
 			System.out.println("数据导入成功！");
@@ -197,9 +205,10 @@ public class LaucaTestingEnv {
 		List<Transaction> transactions = null;
 		DistributionCounter4Serial dcs = null;
 		try {
+			// 获取事务逻辑
 			File file = new File(Configurations.getTxLogicSaveFile());
-			Long filelength = file.length();
-			byte[] filecontent = new byte[filelength.intValue()];
+			long filelength = file.length();
+			byte[] filecontent = new byte[(int) filelength];
 			FileInputStream in = new FileInputStream(file);
 			in.read(filecontent);
 			in.close();
@@ -208,20 +217,23 @@ public class LaucaTestingEnv {
 					.registerTypeAdapter(DataAccessDistribution.class, new DataAccessDistributionAdapter())
 					.registerTypeAdapter(SequentialParaDistribution.class, new SequentialParaDistributionAdapter())
 					.create();
-			transactions = Arrays.asList(gson.fromJson(new String(filecontent, "UTF-8"), Transaction[].class));
+			transactions = Arrays.asList(gson.fromJson(new String(filecontent, StandardCharsets.UTF_8), Transaction[].class));
 
+			// 获取访问参数分布
 			file = new File(Configurations.getDistributionSaveFile());
 			filelength = file.length();
-			filecontent = new byte[filelength.intValue()];
+			filecontent = new byte[(int) filelength];
 			in = new FileInputStream(file);
 			in.read(filecontent);
 			in.close();
-			dcs = gson.fromJson(new String(filecontent, "UTF-8"), DistributionCounter4Serial.class);
+			dcs = gson.fromJson(new String(filecontent, StandardCharsets.UTF_8), DistributionCounter4Serial.class);
 		} catch (Exception e) {
 			e.printStackTrace();
 		}
 		DistributionCounter.deserialInit(dcs);
 //		System.out.println("反序列化结束~");
+
+		// 读取配置信息
 		int allThreadNum = Configurations.getAllTestThreadNum();
 		int localThreadNum = Configurations.getLocalTestThreadNum();
 		Workload workload = new Workload(transactions);
@@ -230,6 +242,8 @@ public class LaucaTestingEnv {
 		String dbName = Configurations.getLaucaDatabaseName();
 		String userName = Configurations.getLaucaDatabaseUserName();
 		String passwd = Configurations.getLaucaDatabasePasswd();
+
+		// 获取，生成数据
 		DBConnector dbConnector = new DBConnector(ip, port, dbName, userName, passwd);
 		WorkloadGenerator workloadGenerator = new WorkloadGenerator(allThreadNum, localThreadNum, workload,
 				dbConnector);
@@ -238,16 +252,18 @@ public class LaucaTestingEnv {
 		windowDistributionList = DistributionCounter.windowDistributionAverage(windowDistributionList);
 		workloadGenerator.setWindowDistributionList(windowDistributionList);
 
-		CountDownLatch countDownLatch =new CountDownLatch(allThreadNum+1);
+
 		workloadGenerator
 				.setTxName2ParaId2FullLifeCycleDistribution(DistributionCounter.getTxName2ParaId2GlobalDistribution());
+		// 开始执行
+		CountDownLatch countDownLatch =new CountDownLatch(allThreadNum+1);
 		new Thread(new Monitor(Configurations.getStatWindowSize(),countDownLatch)).start();
 
 		workloadGenerator.startAllThreads(countDownLatch);
 
 		//使用join 等待所有线程结束
 		try {
-			Thread.sleep(Configurations.getTestTimeLength() * 1000);
+			Thread.sleep(Configurations.getTestTimeLength() * 1000L);
 		} catch (InterruptedException e) {
 			e.printStackTrace();
 		}

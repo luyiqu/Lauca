@@ -4,6 +4,8 @@ import java.io.File;
 import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.OutputStreamWriter;
+import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
 import java.util.*;
 
 import abstraction.*;
@@ -135,7 +137,7 @@ public class LaucaProductionEnv {
 
 //						System.out.println(transaction.getOperationId2AvgRunTimes().get(operationId));
 							double decimalPart = transaction.getOperationId2AvgRunTimes().get(operationId)% 1;
-							int runTimes = new Double(transaction.getOperationId2AvgRunTimes().get(operationId)).intValue();
+							int runTimes = transaction.getOperationId2AvgRunTimes().get(operationId).intValue();
 							if (Math.random() < decimalPart) {
 								runTimes += 1;
 							}
@@ -190,11 +192,11 @@ public class LaucaProductionEnv {
 			}
 			//todo 分解rollbackTxname block是从0开始的
 
-			for (int i = 0; i < transactions.size(); i++) {
-				int size = transactions.get(i).getTransactionBlocks().size();
+			for (Transaction value : transactions) {
+				int size = value.getTransactionBlocks().size();
 				double[] rollbackProbabilities = new double[size];
 				Arrays.fill(rollbackProbabilities, 0);
-				transactions.get(i).setRollbackProbabilities(rollbackProbabilities);
+				value.setRollbackProbabilities(rollbackProbabilities);
 			}
 //
 //			System.out.println(rollbackTxname2BlockId2Count);
@@ -219,11 +221,11 @@ public class LaucaProductionEnv {
 				}
 			}
 		}else{
-			for (int i = 0; i < transactions.size(); i++) {
-				int size = transactions.get(i).getTransactionBlocks().size();
+			for (Transaction transaction : transactions) {
+				int size = transaction.getTransactionBlocks().size();
 				double[] rollbackProbabilities = new double[size];
 				Arrays.fill(rollbackProbabilities, 0);
-				transactions.get(i).setRollbackProbabilities(rollbackProbabilities);
+				transaction.setRollbackProbabilities(rollbackProbabilities);
 			}
 		}
 
@@ -307,7 +309,7 @@ public class LaucaProductionEnv {
 				file.delete();
 			}
 			file.createNewFile();
-			OutputStreamWriter osw = new OutputStreamWriter(new FileOutputStream(file), "UTF-8");
+			OutputStreamWriter osw = new OutputStreamWriter(Files.newOutputStream(file.toPath()), StandardCharsets.UTF_8);
 			Gson gson = new GsonBuilder().registerTypeAdapter(TransactionBlock.class, new TransactionBlockAdapter())
 					.registerTypeAdapter(SqlStatement.class, new SqlStatementAdapter())
 					.registerTypeAdapter(DataAccessDistribution.class, new DataAccessDistributionAdapter())
@@ -325,7 +327,7 @@ public class LaucaProductionEnv {
 				file.delete();
 			}
 			file.createNewFile();
-			osw = new OutputStreamWriter(new FileOutputStream(file), "UTF-8");
+			osw = new OutputStreamWriter(Files.newOutputStream(file.toPath()), StandardCharsets.UTF_8);
 			s = gson.toJson(dcs);
 			osw.write(s);
 			osw.flush();

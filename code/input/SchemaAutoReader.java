@@ -139,7 +139,7 @@ public class SchemaAutoReader {
                     primaryKey = new String[0];
                 }
                 //对主键排序
-                primaryKey = sortPrimaryKeys(primaryKey,tmp1);
+                sortPrimaryKeys(primaryKey, tmp1);
                 tmp.put(tableName,new Table(tableName, tableSize, tmp1, primaryKey, tmp2, partition));
                 if(foreignKeys.size() == 0) {
                     queue.offer(tableName);
@@ -174,7 +174,12 @@ public class SchemaAutoReader {
         return tables;
     }
 
+    // 从建表语句中得到分区信息，现在只支持ob，int型分区键，列名全小写
     private Partition getPartition(Connection conn, String databaseType, String tableName, List<Column> columns) throws SQLException {
+        if (!databaseType.equals("mysql")){
+            return null;
+        }
+
         Statement statement = conn.createStatement();
 
         ResultSet rs = statement.executeQuery("show create table "+tableName+";");
@@ -194,6 +199,17 @@ public class SchemaAutoReader {
         PartitionFunction  partitionRule;
         List<List<Integer>> partitionParam = new ArrayList<>();
         String partitionKey = partitionSQLs[0].split(" ")[partitionSQLs[0].split(" ").length - 1];
+
+        // 检查是否真的有这个列，并且是否是int类型
+        for (Column c : columns) {
+            if (c.getName().toLowerCase().equals(partitionKey)){
+                if (c.getDataType() >= 3){
+                    System.err.println("not support data type!");
+                    return null;
+                }
+            }
+        }
+
 
         // 只支持hash list range 三种
         switch (partitionSQLs[0].trim().split(" ")[0]){
@@ -218,9 +234,22 @@ public class SchemaAutoReader {
 
             switch (partitionRule){
                 case HASH:
+                    /*
+                     partition by hash(c_w_id)
+                     (partition p0,
+                     partition p1,
+                     partition p2)
+                     */
                     params.add(i-1);
                     break;
                 case RANGE:
+                    /*
+                    partition by range(c1) (
+                        partition p0 values less than(100),
+                        partition p1 values less than(500),
+                        partitions p2 values less than(maxvalue)
+                    );
+                     */
                     params.add(lowerBound);
                     int upperBound = Integer.MAX_VALUE;
                     if (!token[token.length - 1].matches(".*[a-z].*")){ // 如果不是最后一个
@@ -230,6 +259,13 @@ public class SchemaAutoReader {
                     lowerBound = upperBound;
                     break;
                 case LIST:
+                    /*
+                    partition by list(c1) (
+                        partition p0 values in (1,2,3),
+                        partition p1 values in (5, 6)，
+                        partition p2 values in (default)
+                    );
+                     */
                     for (int j = 4; j < token.length; j++) {
                         if (!token[token.length - 1].matches(".*[a-z].*")){ // 如果是最后一个
                             params.add( Integer.parseInt(token[token.length - 1]) );
@@ -245,12 +281,7 @@ public class SchemaAutoReader {
             partitionParam.add(params);
         }
 
-            /**
-             partition by hash(c_w_id)
-             (partition p0,
-             partition p1,
-             partition p2)
-             */
+
         return new Partition<>(partitionNameList, partitionRule, partitionParam, partitionKey);
     }
 
@@ -315,12 +346,12 @@ public class SchemaAutoReader {
     }
 
     //按照主键在所有列中的次序排序
-    private String[] sortPrimaryKeys (String[] primaryKey, Column[] columns){
+    private void sortPrimaryKeys (String[] primaryKey, Column[] columns){
         Map<Integer, String> pks = new HashMap<>();
-        for(int i=0;i<primaryKey.length;i++){
-            for(int j=0;j<columns.length;j++){
-                if(primaryKey[i].equals(columns[j].getName()))
-                    pks.put(j,primaryKey[i]);
+        for (String s : primaryKey) {
+            for (int j = 0; j < columns.length; j++) {
+                if (s.equals(columns[j].getName()))
+                    pks.put(j, s);
             }
         }
         int i = 0;
@@ -328,7 +359,6 @@ public class SchemaAutoReader {
             primaryKey[i] = pk;
             i ++;
         }
-        return primaryKey;
     }
 
 }

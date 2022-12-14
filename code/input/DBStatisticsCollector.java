@@ -49,12 +49,17 @@ public class DBStatisticsCollector {
 
 		Connection conn = null;
 		String databaseType = Configurations.getDatabaseType().toLowerCase();
-		if (databaseType.equals("mysql")||databaseType.equals("tidb")) {
-			conn = dbConnector.getMySQLConnection();
-		} else if (databaseType.equals("postgresql")) {
-			conn = dbConnector.getPostgreSQLConnection();
-		} else if (databaseType.equals("oracle")) {
-			conn = dbConnector.getOracleConnection();
+		switch (databaseType) {
+			case "mysql":
+			case "tidb":
+				conn = dbConnector.getMySQLConnection();
+				break;
+			case "postgresql":
+				conn = dbConnector.getPostgreSQLConnection();
+				break;
+			case "oracle":
+				conn = dbConnector.getOracleConnection();
+				break;
 		}
 
 
@@ -78,7 +83,7 @@ public class DBStatisticsCollector {
 			for (int i = 0; i < tables.size(); i++) {
 				Table table = tables.get(i);
 
-				if (table.getSize() == -1 || true) { // 数据集大小的扩展，随机增加或table表的数量
+				{ // 数据集大小的扩展，随机增加或table表的数量
 					String sql = "select count(*) from " + table.getName();
 					ResultSet rs = stmt.executeQuery(sql);
 
@@ -111,9 +116,7 @@ public class DBStatisticsCollector {
 				}
 
 				Column[] columns = table.getColumns();
-				for (int j = 0; j < columns.length; j++) {
-					Column column = columns[j];
-
+				for (Column column : columns) {
 					ResultSet rs = stmt.executeQuery(
 							"select count(*) from " + table.getName() + " where " + column.getName() + " is null");
 					rs.next();
@@ -125,38 +128,38 @@ public class DBStatisticsCollector {
 					column.setCardinality(rs.getLong(1));
 
 					switch (column.getDataType()) {
-					case 0:
-					case 1:
-					case 2:
-					case 3:
-						// 注意我们的datetime对应mysql的timestamp
-						rs = stmt.executeQuery("select min(" + column.getName() + ") from " + table.getName());
-						rs.next();
-						double minValue = column.getDataType() != 3 ? rs.getDouble(1) : rs.getTimestamp(1).getTime();
-						rs = stmt.executeQuery("select max(" + column.getName() + ") from " + table.getName());
-						rs.next();
-						double maxValue = column.getDataType() != 3 ? rs.getDouble(1) : rs.getTimestamp(1).getTime();
-						column.setPara1(minValue);
-						column.setPara2(maxValue);
-						break;
-					case 4:
-						rs = stmt.executeQuery("select avg(length(" + column.getName() + ")) from " + table.getName());
-						rs.next();
-						double avgLength = rs.getDouble(1);
-						rs = stmt.executeQuery("select max(length(" + column.getName() + ")) from " + table.getName());
-						rs.next();
-						double maxLength = rs.getInt(1);
-						column.setPara1(avgLength);
-						column.setPara2(maxLength);
-						break;
-					case 5:
-						rs = stmt.executeQuery(
-								"select count(*) from " + table.getName() + " where " + column.getName() + " is True");
-						rs.next();
-						double trueRatio = rs.getLong(1) / ((1 - column.getNullRatio()) * table.getSize());
-						column.setPara1(trueRatio);
-						column.setPara2(1 - trueRatio);
-						break;
+						case 0:
+						case 1:
+						case 2:
+						case 3:
+							// 注意我们的datetime对应mysql的timestamp
+							rs = stmt.executeQuery("select min(" + column.getName() + ") from " + table.getName());
+							rs.next();
+							double minValue = column.getDataType() != 3 ? rs.getDouble(1) : rs.getTimestamp(1).getTime();
+							rs = stmt.executeQuery("select max(" + column.getName() + ") from " + table.getName());
+							rs.next();
+							double maxValue = column.getDataType() != 3 ? rs.getDouble(1) : rs.getTimestamp(1).getTime();
+							column.setPara1(minValue);
+							column.setPara2(maxValue);
+							break;
+						case 4:
+							rs = stmt.executeQuery("select avg(length(" + column.getName() + ")) from " + table.getName());
+							rs.next();
+							double avgLength = rs.getDouble(1);
+							rs = stmt.executeQuery("select max(length(" + column.getName() + ")) from " + table.getName());
+							rs.next();
+							double maxLength = rs.getInt(1);
+							column.setPara1(avgLength);
+							column.setPara2(maxLength);
+							break;
+						case 5:
+							rs = stmt.executeQuery(
+									"select count(*) from " + table.getName() + " where " + column.getName() + " is True");
+							rs.next();
+							double trueRatio = rs.getLong(1) / ((1 - column.getNullRatio()) * table.getSize());
+							column.setPara1(trueRatio);
+							column.setPara2(1 - trueRatio);
+							break;
 					}
 
 					rs.close();
@@ -165,15 +168,13 @@ public class DBStatisticsCollector {
 
 				// averageReferenceScale
 				ForeignKey[] foreignKeys = table.getForeignKeys();
-				for (int j = 0; j < foreignKeys.length; j++) {
-					ForeignKey foreignKey = foreignKeys[j];
-					if (foreignKey.getAverageReferenceScale() == -1 || true) { // 目前外键扩展因子不支持用户指定 TODO
-						// The referenced table must be defined before
-						for (int k = 0; k < tables.size(); k++) {
-							if (tables.get(k).getName().equals(foreignKey.getReferencedTable())) {
-								foreignKey.setAverageReferenceScale((double) table.getSize() / tables.get(k).getSize());
-								break;
-							}
+				for (ForeignKey foreignKey : foreignKeys) {
+					// 目前外键扩展因子不支持用户指定 TODO
+					// The referenced table must be defined before
+					for (Table value : tables) {
+						if (value.getName().equals(foreignKey.getReferencedTable())) {
+							foreignKey.setAverageReferenceScale((double) table.getSize() / value.getSize());
+							break;
 						}
 					}
 				}

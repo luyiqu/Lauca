@@ -12,6 +12,7 @@ public class WriteOperation extends SqlStatement {
 
 	private boolean batchExecute;
 
+	// tableName_columnName
 	private List<String> paraSchemaInfos = new ArrayList<>();
 
 	public WriteOperation(int operationId, String sql, int[] paraDataTypes, 
@@ -153,6 +154,17 @@ public class WriteOperation extends SqlStatement {
 //			System.exit(0);
 			return -1;
 		}
+	}
+
+	@Override
+	public Map<String, String> getParaId2Name() {
+		Map<String, String> paraId2Name = new HashMap<>();
+		for (int i = 0; i < paraSchemaInfos.size(); i++) {
+			String paraIdentifier = operationId + "_" + i;
+			paraId2Name.put(paraIdentifier, paraSchemaInfos.get(i));
+		}
+
+		return paraId2Name;
 	}
 
 	@Override

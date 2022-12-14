@@ -18,13 +18,17 @@ public class ReadOperation extends SqlStatement {
 	private int[] returnDataTypes = null;
 	private boolean filterPrimaryKey;
 
-	public ReadOperation(int operationId, String sql, int[] paraDataTypes, DistributionTypeInfo[] paraDistTypeInfos, 
+	// tableName_columnName
+	private List<String> paraSchemaInfos = new ArrayList<>();
+
+	public ReadOperation(int operationId, String sql, int[] paraDataTypes, DistributionTypeInfo[] paraDistTypeInfos,List<String> paraSchemaInfos,
 			String[] returnItems, int[] returnDataTypes, boolean filterPrimaryKey) {
 		super();
 		this.operationId = operationId;
 		this.sql = sql;
 		this.paraDataTypes = paraDataTypes;
 		this.paraDistTypeInfos = paraDistTypeInfos;
+		this.paraSchemaInfos = paraSchemaInfos;
 		
 		this.returnItems = returnItems;
 		this.returnDataTypes = returnDataTypes;
@@ -66,6 +70,9 @@ public class ReadOperation extends SqlStatement {
 		this.returnItems = readOperation.returnItems;
 		this.returnDataTypes = readOperation.returnDataTypes;
 		this.filterPrimaryKey = readOperation.filterPrimaryKey;
+
+		if (readOperation.paraSchemaInfos != null)
+			this.paraSchemaInfos = new ArrayList<>(readOperation.paraSchemaInfos);
 
 		windowParaGenerators = new DataAccessDistribution[paraDataTypes == null ? 0 : paraDataTypes.length];
 		fullLifeCycleParaGenerators = new DataAccessDistribution[paraDataTypes == null ? 0 : paraDataTypes.length];
@@ -188,6 +195,17 @@ public class ReadOperation extends SqlStatement {
 		}
 	}
 
+	@Override
+	public Map<String, String> getParaId2Name() {
+		Map<String, String> paraId2Name = new HashMap<>();
+		for (int i = 0; i < paraSchemaInfos.size(); i++) {
+			String paraIdentifier = operationId + "_" + i;
+			paraId2Name.put(paraIdentifier, paraSchemaInfos.get(i));
+		}
+
+		return paraId2Name;
+	}
+
 	private void saveResultSet(ResultSet rs) throws SQLException {
 		// 先把整个ResultSet中的数据取出来
 		List<Object[]> resultList = new ArrayList<>();
@@ -225,23 +243,23 @@ public class ReadOperation extends SqlStatement {
 	private Object getReturnValue(int index, int dataType, ResultSet rs) throws SQLException {
 		switch (dataType) {
 		case 0:
-			return new Long(rs.getLong(index));
+			return rs.getLong(index);
 		case 1:
-			return new Double(rs.getDouble(index));
+			return rs.getDouble(index);
 		case 2:
 			return rs.getBigDecimal(index);
 		case 3:
 			// bug fix：对于TPC-C，这里返回的日期可能为null
 			Timestamp time = rs.getTimestamp(index);
 			if (time != null) {
-				return new Long(time.getTime());
+				return time.getTime();
 			} else {
 				return null;
 			}
 		case 4:
 			return rs.getString(index);
 		case 5:
-			return new Boolean(rs.getBoolean(index));
+			return rs.getBoolean(index);
 		default:
 			System.err.println("Unrecognized data type!");
 			return null;

@@ -98,8 +98,8 @@ public class Transaction{
 	public void init(Connection conn) {
 		this.conn = conn;
 		if (prepared) {
-			for (int i = 0; i < transactionBlocks.size(); i++) {
-				transactionBlocks.get(i).prepare(conn);
+			for (TransactionBlock transactionBlock : transactionBlocks) {
+				transactionBlock.prepare(conn);
 			}
 		} else {
 			try {
@@ -137,10 +137,10 @@ public class Transaction{
 			} else if (txBlock.getClass().getSimpleName().equals("Branch")) {
 				Branch branch = (Branch) txBlock;
 				List<List<SqlStatement>> branches = branch.getBranches();
-				for (int i = 0; i < branches.size(); i++) {
-					for (int j = 0; j < branches.get(i).size(); j++) {
-						branches.get(i).get(j).setIntermediateState(intermediateState);
-						branches.get(i).get(j).setParameterNodeMap(parameterNodeMap);
+				for (List<SqlStatement> sqlStatements : branches) {
+					for (SqlStatement sqlStatement : sqlStatements) {
+						sqlStatement.setIntermediateState(intermediateState);
+						sqlStatement.setParameterNodeMap(parameterNodeMap);
 					}
 				}
 				double[] branchRatios = new double[branches.size()];
@@ -244,6 +244,8 @@ public class Transaction{
 		return responceTime;
 	}
 
+
+
 	public void setRatio(double ratio) {
 		this.ratio = ratio;
 	}
@@ -262,15 +264,15 @@ public class Transaction{
 			if (txBlock.getClass().getSimpleName().equals("Multiple")) {
 				Multiple multiple = (Multiple) txBlock;
 				List<SqlStatement> sqls = multiple.getSqls();
-				for (int i = 0; i < sqls.size(); i++) {
-					sqls.get(i).setParaDistribution(paraId2Distribution, type);
+				for (SqlStatement sql : sqls) {
+					sql.setParaDistribution(paraId2Distribution, type);
 				}
 			} else if (txBlock.getClass().getSimpleName().equals("Branch")) {
 				Branch branch = (Branch) txBlock;
 				List<List<SqlStatement>> branches = branch.getBranches();
-				for (int i = 0; i < branches.size(); i++) {
-					for (int j = 0; j < branches.get(i).size(); j++) {
-						branches.get(i).get(j).setParaDistribution(paraId2Distribution, type);
+				for (List<SqlStatement> sqlStatements : branches) {
+					for (SqlStatement sqlStatement : sqlStatements) {
+						sqlStatement.setParaDistribution(paraId2Distribution, type);
 					}
 				}
 			} else {
@@ -288,10 +290,10 @@ public class Transaction{
 				List<SqlStatement> sqls = multiple.getSqls();
 				if (multiple.isBatchExecute()) {
 					// bug fix: clearBatch
-					for (int j = 0; j < sqls.size(); j++) {
-						if (sqls.get(j).getClass().getSimpleName().equals("WriteOperation")) {
+					for (SqlStatement sql : sqls) {
+						if (sql.getClass().getSimpleName().equals("WriteOperation")) {
 							try {
-								sqls.get(j).pstmt.clearBatch();
+								sql.pstmt.clearBatch();
 							} catch (SQLException e) {
 								e.printStackTrace();
 							}
@@ -372,6 +374,20 @@ public class Transaction{
 		}
 		return true;
 	}
+
+	/**
+	 * 获取事务中所有的操作id和对应的tableName_columnName
+	 * @return
+	 */
+	public Map<String, String> getParaId2Name() {
+		Map<String, String> paraId2Name = new HashMap<>();
+		for (TransactionBlock transactionBlock :transactionBlocks) {
+			Map<String, String> paraId2NameInBlock = transactionBlock.getParaId2Name();
+			paraId2Name.putAll(paraId2NameInBlock);
+		}
+
+		return paraId2Name;
+	}
 }
 
 // 事务运行过程中一些中间状态的值，包含SQL操作的输入参数和返回结果集
@@ -434,10 +450,10 @@ class TxRunningValue {
 		case 0:
 		case 3:
 			paraValue = (Long) value + increment;
-			return new Long((long) paraValue);
+			return (long) paraValue;
 		case 1:
 			paraValue = (Double) value + increment;
-			return new Double(paraValue);
+			return paraValue;
 		case 2:
 			paraValue = new BigDecimal(value.toString()).doubleValue() + increment;
 			return new BigDecimal(paraValue);

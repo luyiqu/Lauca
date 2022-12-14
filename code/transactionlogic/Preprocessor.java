@@ -24,8 +24,7 @@ public class Preprocessor {
 		txName2OperationId2paraDistTypeInfos = new HashMap<>();
 		txName2OperationId2paraSchema = new HashMap<>();
 
-		for (int i = 0; i < transactions.size(); i++) {
-			Transaction tx = transactions.get(i);
+		for (Transaction tx : transactions) {
 			txName2OperationId2Template.put(tx.getName(), new HashMap<>());
 			txName2OperationId2paraDistTypeInfos.put(tx.getName(), new HashMap<>());
 			txName2OperationId2paraSchema.put(tx.getName(), new HashMap<>());
@@ -34,66 +33,71 @@ public class Preprocessor {
 			for (int j = 0; j < tx.getTransactionBlocks().size(); j++) {
 				String className = tx.getTransactionBlocks().get(j).getClass().getName();
 
-				if (className.equals("abstraction.ReadOperation")) {
-					ReadOperation op = (ReadOperation)tx.getTransactionBlocks().get(j);
-					txName2OperationId2Template.get(tx.getName()).put(operationId, new OperationData(operationId, 
-							op.getReturnDataTypes(), op.isFilterPrimaryKey(), op.getParaDataTypes()));
-					txName2OperationId2paraDistTypeInfos.get(tx.getName()).put(operationId, op.getParaDistTypeInfos());
-					operationId++;
+				switch (className) {
+					case "abstraction.ReadOperation": {
+						ReadOperation op = (ReadOperation) tx.getTransactionBlocks().get(j);
+						txName2OperationId2Template.get(tx.getName()).put(operationId, new OperationData(operationId,
+								op.getReturnDataTypes(), op.isFilterPrimaryKey(), op.getParaDataTypes()));
+						txName2OperationId2paraDistTypeInfos.get(tx.getName()).put(operationId, op.getParaDistTypeInfos());
+						operationId++;
 
-				} else if (className.equals("abstraction.WriteOperation")) {
-					WriteOperation op = (WriteOperation)tx.getTransactionBlocks().get(j);
-					txName2OperationId2Template.get(tx.getName()).put(operationId, new OperationData(operationId, 
-							null, false, op.getParaDataTypes()));
-					txName2OperationId2paraDistTypeInfos.get(tx.getName()).put(operationId, op.getParaDistTypeInfos());
-					txName2OperationId2paraSchema.get(tx.getName()).put(operationId, op.getParaSchemaInfos());
-					operationId++;
-
-				} else if (className.equals("abstraction.Multiple")) {
-					Multiple multiple = (Multiple)tx.getTransactionBlocks().get(j);
-					List<SqlStatement> sqls = multiple.getSqls();
-
-					for (int k = 0; k < sqls.size(); k++) {
-						String className2 = sqls.get(k).getClass().getName();
-						if (className2.equals("abstraction.ReadOperation")) {
-							ReadOperation op = (ReadOperation)sqls.get(k);
-							txName2OperationId2Template.get(tx.getName()).put(operationId, new OperationData(operationId, 
-									op.getReturnDataTypes(), op.isFilterPrimaryKey(), op.getParaDataTypes()));
-							txName2OperationId2paraDistTypeInfos.get(tx.getName()).put(operationId, op.getParaDistTypeInfos());
-							operationId++;
-						} else if (className2.equals("abstraction.WriteOperation")) {
-							WriteOperation op = (WriteOperation)sqls.get(k);
-							txName2OperationId2Template.get(tx.getName()).put(operationId, new OperationData(operationId, 
-									null, false, op.getParaDataTypes()));
-							txName2OperationId2paraDistTypeInfos.get(tx.getName()).put(operationId, op.getParaDistTypeInfos());
-							txName2OperationId2paraSchema.get(tx.getName()).put(operationId, op.getParaSchemaInfos());
-							operationId++;
-						}
+						break;
 					}
-				} else if (className.equals("abstraction.Branch")) {
-					Branch branch = (Branch)tx.getTransactionBlocks().get(j);
-					List<List<SqlStatement>> branches = branch.getBranches();
+					case "abstraction.WriteOperation": {
+						WriteOperation op = (WriteOperation) tx.getTransactionBlocks().get(j);
+						txName2OperationId2Template.get(tx.getName()).put(operationId, new OperationData(operationId,
+								null, false, op.getParaDataTypes()));
+						txName2OperationId2paraDistTypeInfos.get(tx.getName()).put(operationId, op.getParaDistTypeInfos());
+						txName2OperationId2paraSchema.get(tx.getName()).put(operationId, op.getParaSchemaInfos());
+						operationId++;
 
-					for (int k = 0; k < branches.size(); k++) {
-						List<SqlStatement> sqls = branches.get(k);
-						for (int m = 0; m < sqls.size(); m++) {
-							String className2 = sqls.get(m).getClass().getName();
+						break;
+					}
+					case "abstraction.Multiple":
+						Multiple multiple = (Multiple) tx.getTransactionBlocks().get(j);
+
+						for (SqlStatement sql : multiple.getSqls()) {
+							String className2 = sql.getClass().getName();
 							if (className2.equals("abstraction.ReadOperation")) {
-								ReadOperation op = (ReadOperation)sqls.get(m);
-								txName2OperationId2Template.get(tx.getName()).put(operationId, new OperationData(operationId, 
+								ReadOperation op = (ReadOperation) sql;
+								txName2OperationId2Template.get(tx.getName()).put(operationId, new OperationData(operationId,
 										op.getReturnDataTypes(), op.isFilterPrimaryKey(), op.getParaDataTypes()));
 								txName2OperationId2paraDistTypeInfos.get(tx.getName()).put(operationId, op.getParaDistTypeInfos());
 								operationId++;
 							} else if (className2.equals("abstraction.WriteOperation")) {
-								WriteOperation op = (WriteOperation)sqls.get(m);
-								txName2OperationId2Template.get(tx.getName()).put(operationId, new OperationData(operationId, 
+								WriteOperation op = (WriteOperation) sql;
+								txName2OperationId2Template.get(tx.getName()).put(operationId, new OperationData(operationId,
 										null, false, op.getParaDataTypes()));
 								txName2OperationId2paraDistTypeInfos.get(tx.getName()).put(operationId, op.getParaDistTypeInfos());
 								txName2OperationId2paraSchema.get(tx.getName()).put(operationId, op.getParaSchemaInfos());
 								operationId++;
 							}
 						}
-					}
+						break;
+					case "abstraction.Branch":
+						Branch branch = (Branch) tx.getTransactionBlocks().get(j);
+						List<List<SqlStatement>> branches = branch.getBranches();
+
+						for (List<SqlStatement> sqls : branches) {
+							for (SqlStatement sql : sqls) {
+								String className2 = sql.getClass().getName();
+								if (className2.equals("abstraction.ReadOperation")) {
+									ReadOperation op = (ReadOperation) sql;
+									txName2OperationId2Template.get(tx.getName()).put(operationId, new OperationData(operationId,
+											op.getReturnDataTypes(), op.isFilterPrimaryKey(), op.getParaDataTypes()));
+									txName2OperationId2paraDistTypeInfos.get(tx.getName()).put(operationId, op.getParaDistTypeInfos());
+									operationId++;
+								} else if (className2.equals("abstraction.WriteOperation")) {
+									WriteOperation op = (WriteOperation) sql;
+									txName2OperationId2Template.get(tx.getName()).put(operationId, new OperationData(operationId,
+											null, false, op.getParaDataTypes()));
+									txName2OperationId2paraDistTypeInfos.get(tx.getName()).put(operationId, op.getParaDistTypeInfos());
+									txName2OperationId2paraSchema.get(tx.getName()).put(operationId, op.getParaSchemaInfos());
+									operationId++;
+								}
+							}
+						}
+						break;
 				}
 			}
 		}
