@@ -61,12 +61,10 @@ public class SequentialCtnsParaDistribution extends SequentialParaDistribution {
 		this.minValue = sequentialCtnsParaDistribution.minValue;
 		this.maxValue = sequentialCtnsParaDistribution.maxValue;
 		this.highFrequencyItems = new long[sequentialCtnsParaDistribution.highFrequencyItems.length];
-
+		innerIndex = null;
 		System.arraycopy(sequentialCtnsParaDistribution.highFrequencyItems, 0, highFrequencyItems, 0, highFrequencyItems.length);
 		init();
 		geneCandidates(sequentialCtnsParaDistribution.currentParaCandidates);
-
-
 	}
 
 	public SequentialCtnsParaDistribution copy(){

@@ -1,10 +1,11 @@
 package abstraction;
 
+import java.io.Serializable;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Objects;
 
-public class Partition<T extends Number> {
+public class Partition<T extends Number>implements Serializable {
     public List<String> getPartitionNameList() {
         return partitionNameList;
     }
@@ -75,7 +76,7 @@ public class Partition<T extends Number> {
         }
     }
 
-    private int getLength() {
+    public int getLength() {
         return partitionNameList.size();
     }
 

@@ -107,6 +107,89 @@ public class DistributionCounter {
 		DistributionCounter.txName2ParaId2AvgRunTimes = txName2ParaId2AvgRunTimes;
 	}
 
+	/**
+	 * 构造访问分布
+	 * @param txName 当前事务名
+	 * @param paraIdentifier 当前参数名，operationId_No
+	 * @param distTypeInfo 分布类型
+	 * @param data 数据
+	 * @return 构建得到的不含分区的访问分布
+	 */
+	private static DataAccessDistribution countDistribution(String txName, String paraIdentifier, DistributionTypeInfo distTypeInfo,
+										  List<String> data){
+		DataAccessDistribution distribution = null;
+		switch (distTypeInfo.distributionType) {
+			case 0:
+				DataAccessDistribution distribution0 = countContinuousParaDistribution(distTypeInfo.dataType, data);
+				assert distribution0 != null;
+				distribution = distribution0;
+				break;
+			case 1:
+				IntegerParaDistribution distribution1 = countIntegerParaDistribution(data);
+				distribution1.setColumnInfo(distTypeInfo.columnMinValue, distTypeInfo.columnMaxValue,
+						distTypeInfo.columnCardinality, distTypeInfo.coefficient);
+				distribution1.init4IntegerParaGene();
+				distribution = distribution1;
+//			System.out.println(txName + " " + paraIdentifier + "\n" + distribution1);
+				break;
+			case 2:
+				VarcharParaDistribution distribution2 = countVarcharParaDistribution(data);
+				distribution2.setColumnInfo(distTypeInfo.columnCardinality, distTypeInfo.minLength, distTypeInfo.maxLength,
+						distTypeInfo.seedStrings);
+				distribution2.init4VarcharParaGene();
+				distribution = distribution2;
+				// System.out.println(txName + " " + paraIdentifier + "\n" + distribution2);
+				break;
+			case 3: // 分布3、4、5是有写盘需求的（暂不实现，目前全部存储在内存中） TODO
+				SequentialCtnsParaDistribution distribution3 = countSequentialCtnsParaDistribution(data, txName,
+						paraIdentifier);
+
+				long[][] priorParaCandidates = (long[][]) txName2ParaId2ParaCandidates.get(txName).get(paraIdentifier);
+				distribution3.geneCandidates(priorParaCandidates);
+				txName2ParaId2ParaCandidates.get(txName).put(paraIdentifier, distribution3.getCurrentParaCandidates());
+
+				distribution = distribution3;
+				// System.out.println(txName + " " + paraIdentifier + "\n" + distribution3);
+				break;
+			case 4:
+				SequentialIntParaDistribution distribution4 = countSequentialIntParaDistribution(data, txName,
+						paraIdentifier);
+				distribution4.setColumnInfo(distTypeInfo.columnMinValue, distTypeInfo.columnMaxValue,
+						distTypeInfo.columnCardinality, distTypeInfo.coefficient);
+
+				long[] priorHighFrequencyItems = (long[]) txName2ParaId2GeneHFItems.get(txName).get(paraIdentifier);
+				distribution4.geneHighFrequencyItems(priorHighFrequencyItems);
+				txName2ParaId2GeneHFItems.get(txName).put(paraIdentifier, distribution4.getHighFrequencyItems());
+
+				priorParaCandidates = (long[][]) txName2ParaId2ParaCandidates.get(txName).get(paraIdentifier);
+				distribution4.geneCandidates(priorParaCandidates);
+				txName2ParaId2ParaCandidates.get(txName).put(paraIdentifier, distribution4.getCurrentParaCandidates());
+
+				distribution = distribution4;
+				break;
+			case 5:
+				SequentialVcharParaDistribution distribution5 = countSequentialVcharParaDistribution(data, txName,
+						paraIdentifier);
+				distribution5.setColumnInfo(distTypeInfo.columnCardinality, distTypeInfo.minLength, distTypeInfo.maxLength,
+						distTypeInfo.seedStrings);
+
+				String[] priorHighFrequencyItems2 = (String[]) txName2ParaId2GeneHFItems.get(txName).get(paraIdentifier);
+				distribution5.geneHighFrequencyItems(priorHighFrequencyItems2);
+				txName2ParaId2GeneHFItems.get(txName).put(paraIdentifier, distribution5.getHighFrequencyItems());
+
+				String[][] priorParaCandidates2 = (String[][]) txName2ParaId2ParaCandidates.get(txName).get(paraIdentifier);
+				distribution5.geneCandidates(priorParaCandidates2);
+				txName2ParaId2ParaCandidates.get(txName).put(paraIdentifier, distribution5.getCurrentParaCandidates());
+
+				distribution = distribution5;
+				break;
+			default:
+				System.err.println("尚不支持的数据分布类型！ -- " + distTypeInfo.distributionType);
+		}
+
+		return distribution;
+	}
+
 	public static void count(String txName, String paraIdentifier, long windowTime, DistributionTypeInfo distTypeInfo,
 			List<String> data) {
 
@@ -139,76 +222,16 @@ public class DistributionCounter {
 		}
 
 //		System.out.println(data);
-//
-		switch (distTypeInfo.distributionType) {
-		case 0:
-			DataAccessDistribution distribution0 = countContinuousParaDistribution(distTypeInfo.dataType, data);
-			assert distribution0 != null;
-			distribution0.setTime(windowTime);
-//			System.out.println("DistributionCounter "+"windowTime: "+windowTime);
-//			txName2ParaId2DistributionList.get(txName).get(paraIdentifier).add(distribution0);
-			// System.out.println(txName + " " + paraIdentifier + "\n" + distribution0);
-			break;
-		case 1:
-			IntegerParaDistribution distribution1 = countIntegerParaDistribution(data);
-			distribution1.setColumnInfo(distTypeInfo.columnMinValue, distTypeInfo.columnMaxValue,
-					distTypeInfo.columnCardinality, distTypeInfo.coefficient);
-			distribution1.setTime(windowTime);
-			distribution1.init4IntegerParaGene();
-			txName2ParaId2DistributionList.get(txName).get(paraIdentifier).add(distribution1);
-//			System.out.println(txName + " " + paraIdentifier + "\n" + distribution1);
-			break;
-		case 2:
-			VarcharParaDistribution distribution2 = countVarcharParaDistribution(data);
-			distribution2.setColumnInfo(distTypeInfo.columnCardinality, distTypeInfo.minLength, distTypeInfo.maxLength,
-					distTypeInfo.seedStrings);
-			distribution2.setTime(windowTime);
-			distribution2.init4VarcharParaGene();
-			txName2ParaId2DistributionList.get(txName).get(paraIdentifier).add(distribution2);
-			// System.out.println(txName + " " + paraIdentifier + "\n" + distribution2);
-			break;
-		case 3: // 分布3、4、5是有写盘需求的（暂不实现，目前全部存储在内存中） TODO
-			SequentialCtnsParaDistribution distribution3 = countSequentialCtnsParaDistribution(data, txName,
-					paraIdentifier);
-			distribution3.setTime(windowTime);
-			long[][] priorParaCandidates = (long[][]) txName2ParaId2ParaCandidates.get(txName).get(paraIdentifier);
-			distribution3.geneCandidates(priorParaCandidates);
-			txName2ParaId2ParaCandidates.get(txName).put(paraIdentifier, distribution3.getCurrentParaCandidates());
-			txName2ParaId2DistributionList.get(txName).get(paraIdentifier).add(distribution3);
-			// System.out.println(txName + " " + paraIdentifier + "\n" + distribution3);
-			break;
-		case 4:
-			SequentialIntParaDistribution distribution4 = countSequentialIntParaDistribution(data, txName,
-					paraIdentifier);
-			distribution4.setColumnInfo(distTypeInfo.columnMinValue, distTypeInfo.columnMaxValue,
-					distTypeInfo.columnCardinality, distTypeInfo.coefficient);
-			distribution4.setTime(windowTime);
-			long[] priorHighFrequencyItems = (long[]) txName2ParaId2GeneHFItems.get(txName).get(paraIdentifier);
-			distribution4.geneHighFrequencyItems(priorHighFrequencyItems);
-			txName2ParaId2GeneHFItems.get(txName).put(paraIdentifier, distribution4.getHighFrequencyItems());
-			priorParaCandidates = (long[][]) txName2ParaId2ParaCandidates.get(txName).get(paraIdentifier);
-			distribution4.geneCandidates(priorParaCandidates);
-			txName2ParaId2ParaCandidates.get(txName).put(paraIdentifier, distribution4.getCurrentParaCandidates());
-			txName2ParaId2DistributionList.get(txName).get(paraIdentifier).add(distribution4);
-//			 System.out.println(txName + " " + paraIdentifier + "\n" + distribution4);
-			break;
-		case 5:
-			SequentialVcharParaDistribution distribution5 = countSequentialVcharParaDistribution(data, txName,
-					paraIdentifier);
-			distribution5.setColumnInfo(distTypeInfo.columnCardinality, distTypeInfo.minLength, distTypeInfo.maxLength,
-					distTypeInfo.seedStrings);
-			distribution5.setTime(windowTime);
-			String[] priorHighFrequencyItems2 = (String[]) txName2ParaId2GeneHFItems.get(txName).get(paraIdentifier);
-			distribution5.geneHighFrequencyItems(priorHighFrequencyItems2);
-			txName2ParaId2GeneHFItems.get(txName).put(paraIdentifier, distribution5.getHighFrequencyItems());
-			String[][] priorParaCandidates2 = (String[][]) txName2ParaId2ParaCandidates.get(txName).get(paraIdentifier);
-			distribution5.geneCandidates(priorParaCandidates2);
-			txName2ParaId2ParaCandidates.get(txName).put(paraIdentifier, distribution5.getCurrentParaCandidates());
-			txName2ParaId2DistributionList.get(txName).get(paraIdentifier).add(distribution5);
-			// System.out.println(txName + " " + paraIdentifier + "\n" + distribution5);
-			break;
-		default:
-			System.err.println("尚不支持的数据分布类型！ -- " + distTypeInfo.distributionType);
+		// 没有分区键或者不是数值类型的情况下，不建分区的分布
+		if (partition == null || distTypeInfo.dataType >= 3){
+			DataAccessDistribution distribution = countDistribution(txName, paraIdentifier, distTypeInfo, data);
+			distribution.setTime(windowTime);
+			txName2ParaId2DistributionList.get(txName).get(paraIdentifier).add(distribution);
+		}
+		else {
+			DataAccessDistribution distribution = countMultiDistribution(partition,txName, paraIdentifier, distTypeInfo, data);
+			distribution.setTime(windowTime);
+			txName2ParaId2DistributionList.get(txName).get(paraIdentifier).add(distribution);
 		}
 
 		// 数据采样 -- 支持全负载周期数据访问分布统计
@@ -229,6 +252,53 @@ public class DistributionCounter {
 		if (!txName2ParaId2DistributionType.get(txName).containsKey(paraIdentifier)) {
 			txName2ParaId2DistributionType.get(txName).put(paraIdentifier, distTypeInfo);
 		}
+	}
+
+	/**
+	 * 当前版本只支持int型
+	 * @param partition
+	 * @param txName
+	 * @param paraIdentifier
+	 * @param distTypeInfo
+	 * @param data
+	 * @return
+	 */
+	private static DataAccessDistribution countMultiDistribution(Partition<Long> partition,String txName, String paraIdentifier, DistributionTypeInfo distTypeInfo, List<String> data) {
+		int length = partition.getLength();
+
+		List<DataAccessDistribution> distributions = new ArrayList<>();
+		double[] hFItemFrequencies = new double[0];
+		long[] intervalCardinalities = new long[length];
+		double[] intervalFrequencies = new double[length];
+
+		// 分到不同分区
+		Map<String, List<String>> dataInPartition = new HashMap<>();
+		for (String partitionName : partition.getPartitionNameList()){
+			dataInPartition.put(partitionName,new ArrayList<>());
+		}
+		for (String d: data) {
+			String partitionName = partition.getPartition(Long.parseLong(d));
+			dataInPartition.get(partitionName).add(d);
+		}
+
+		for (int i = 0; i < length; i++) {
+			String partitionName = partition.getPartitionNameList().get(i);
+
+			List<String> values = dataInPartition.get(partitionName);
+			List<Entry<String, Integer>> valueNumEntryList = getValueNumEntryList(values);
+
+			intervalCardinalities[i] = valueNumEntryList.size();
+
+			int sum = 0;
+			for (Entry<String, Integer> value : valueNumEntryList){
+				sum += value.getValue();
+			}
+			intervalFrequencies[i] = sum;
+
+			distributions.add(countDistribution(txName, paraIdentifier, distTypeInfo, values));
+		}
+
+		return new MultiPartitionDistribution<>(hFItemFrequencies, intervalCardinalities, intervalFrequencies, partition, distributions);
 	}
 
 	public static void countFullLifeCycleDistribution() {
@@ -1028,7 +1098,8 @@ public class DistributionCounter {
 				String tableName = paraId2Name.get(paraId).split("_")[0];
 				String columnName = paraId2Name.get(paraId).split("_")[1];
 
-				if (tableName2PartitionRule.get(tableName).getPartitionKey().equals(columnName)){
+				if (tableName2PartitionRule.get(tableName) != null &&
+						tableName2PartitionRule.get(tableName).getPartitionKey().equals(columnName)){
 					txName2ParaId2PartitionRule.get(transaction.getName()).put(paraId, tableName2PartitionRule.get(tableName));
 				}
 			}

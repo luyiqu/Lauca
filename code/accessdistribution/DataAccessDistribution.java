@@ -64,9 +64,7 @@ public abstract class DataAccessDistribution implements Comparable<DataAccessDis
 		this.quantileNum = dataAccessDistribution.quantileNum;
 
 		this.hFItemFrequencies = new double[highFrequencyItemNum];
-		for (int i = 0;i < highFrequencyItemNum; ++i){
-			this.hFItemFrequencies[i] = dataAccessDistribution.hFItemFrequencies[i];
-		}
+		System.arraycopy(dataAccessDistribution.hFItemFrequencies, 0, this.hFItemFrequencies, 0, highFrequencyItemNum);
 
 		this.intervalCardinalities = new long[this.intervalNum];
 		this.intervalFrequencies = new double[this.intervalNum];
@@ -215,13 +213,7 @@ public abstract class DataAccessDistribution implements Comparable<DataAccessDis
 
 	@Override
 	public int compareTo(DataAccessDistribution o) {
-		if (this.time < o.time) {
-			return -1;
-		} else if (this.time > o.time) {
-			return 1;
-		} else {
-			return 0;
-		}
+		return Long.compare(this.time, o.time);
 	}
 	
 	// bug fix：判断利用事务逻辑生成的参数是否在当前属性的阈值内
