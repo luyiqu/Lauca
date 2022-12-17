@@ -158,7 +158,7 @@ public class LaucaTestingEnv {
 				switch (databaseType) {
 					case "mysql":
 					case "tidb":
-						stmt.execute("LOAD DATA LOCAL INFILE '" + tableDataFile.getCanonicalPath() + "' INTO TABLE "
+						stmt.execute("LOAD DATA  INFILE '" + tableDataFile.getCanonicalPath() + "' INTO TABLE "
 								+ tableName + " FIELDS TERMINATED BY ',' LINES TERMINATED BY '\\n'");
 						break;
 					case "postgresql":
@@ -183,15 +183,15 @@ public class LaucaTestingEnv {
 			}
 			System.out.println("数据导入成功！");
 			//建外键，UNIQUE，索引等
-			stmt.addBatch("SET @OLD_UNIQUE_CHECKS=@@UNIQUE_CHECKS, UNIQUE_CHECKS=0");
-			stmt.addBatch("SET @OLD_FOREIGN_KEY_CHECKS=@@FOREIGN_KEY_CHECKS, FOREIGN_KEY_CHECKS=0");
+			stmt.execute("SET @OLD_UNIQUE_CHECKS=@@UNIQUE_CHECKS, UNIQUE_CHECKS=0");
+			stmt.execute("SET @OLD_FOREIGN_KEY_CHECKS=@@FOREIGN_KEY_CHECKS, FOREIGN_KEY_CHECKS=0");
 			for(String cons : FKs_Indexes){
 				//System.out.println(cons);
-				stmt.addBatch(cons);
+				stmt.execute(cons);
 			}
-			stmt.addBatch("SET FOREIGN_KEY_CHECKS=@OLD_FOREIGN_KEY_CHECKS");
-            stmt.addBatch("SET UNIQUE_CHECKS=@OLD_UNIQUE_CHECKS");
-			stmt.executeBatch();
+			stmt.execute("SET FOREIGN_KEY_CHECKS=@OLD_FOREIGN_KEY_CHECKS");
+            stmt.execute("SET UNIQUE_CHECKS=@OLD_UNIQUE_CHECKS");
+//			stmt.executeBatch();
 			stmt.close();
 			oriConn.close();
 			laucaConn.close();

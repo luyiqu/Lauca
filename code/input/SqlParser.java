@@ -136,10 +136,10 @@ public class SqlParser {
 
 		String[] tableNames = null;
 		if(index3 == -1){
-			tableNames = commaPattern.split(originalSql.substring(index2 + 6).replaceAll("[ \\t]+|`", ""));
+			tableNames = commaPattern.split(sql.substring(index2 + 6).replaceAll("[ \\t]+|`", ""));
 		}
 		else{
-			tableNames = commaPattern.split(originalSql.substring(index2 + 6, index3).replaceAll("[ \\t]+|`", ""));
+			tableNames = commaPattern.split(sql.substring(index2 + 6, index3).replaceAll("[ \\t]+|`", ""));
 		}
 
 //		try{
@@ -361,7 +361,7 @@ public class SqlParser {
 			int index2 = sql.indexOf("(");
 			int index3 = sql.indexOf(")");
 
-			String tableName = originalSql.substring(index1 + 6, index2).trim();
+			String tableName = sql.substring(index1 + 6, index2).trim();
 
 			String[] columnNames = sql.substring(index2 + 1, index3).replaceAll("[ \\t]+", "").split(",");
 			int[] paraDataTypes = new int[columnNames.length];
@@ -414,7 +414,7 @@ public class SqlParser {
 			int index2 = sql.indexOf(" set ");
 			int index3 = sql.indexOf(" where ");
 
-			String tableName = originalSql.substring(index1 + 7, index2).trim();
+			String tableName = sql.substring(index1 + 7, index2).trim();
 
 			// 对于set后面的表达式，这里假设形式都为：column = exp(?)，并且一个表达式中最多包含一个待输入参数
 			// set表达式也可能不包含任何输入参数，如：c=c+1
@@ -795,10 +795,10 @@ public class SqlParser {
 		// 数据表名一般区分大小写，同时可能含有多数据表
 		String[] tableNames = null;
 		if(index3 == -1){
-			tableNames = commaPattern.split(originalSql.substring(index2 + 6).replaceAll("[ \\t]+|`", ""));
+			tableNames = commaPattern.split(sql.substring(index2 + 6).replaceAll("[ \\t]+|`", ""));
 		}
 		else{
-			tableNames = commaPattern.split(originalSql.substring(index2 + 6, index3).replaceAll("[ \\t]+|`", ""));
+			tableNames = commaPattern.split(sql.substring(index2 + 6, index3).replaceAll("[ \\t]+|`", ""));
 		}
 		// 目前默认返回项都是简单的形式（仅属性），若不是简单形式需添加"##data_type"针对返回数据类型进行补充说明
 		String[] returnItems = commaPattern.split(originalSql.substring(index1 + 7, index2));
@@ -975,7 +975,7 @@ public class SqlParser {
 
 			int index3 = sql.indexOf(")");
 
-			String tableName = originalSql.substring(index1 + 6, index2).trim();
+			String tableName = sql.substring(index1 + 6, index2).trim();
 
 			String[] columnNames = commaPattern.split(sql.substring(index2 + 1, index3).replaceAll("[ \\t]+", ""));
 
@@ -1026,7 +1026,7 @@ public class SqlParser {
 
 			int index3 = sql.indexOf(" where ");
 
-			String tableName = originalSql.substring(index1 + 7, index2).trim();
+			String tableName = sql.substring(index1 + 7, index2).trim();
 
 			// 对于set后面的表达式，这里假设形式都为：column = exp(?)，并且一个表达式中最多包含一个待输入参数
 
@@ -1036,11 +1036,11 @@ public class SqlParser {
 
 			List<String> tmp = new ArrayList<>();
 
-			for (int i = 0; i < setStatements.length; i++) {
+			for (String setStatement : setStatements) {
 
-				if (setStatements[i].contains("?")) {
+				if (setStatement.contains("?")) {
 
-					tmp.add(setStatements[i]);
+					tmp.add(setStatement);
 
 				}
 
@@ -1058,11 +1058,11 @@ public class SqlParser {
 
 			tmp.clear();
 
-			for (int i = 0; i < predicates.length; i++) {
+			for (String predicate : predicates) {
 
-				if (predicates[i].contains("?")) {
+				if (predicate.contains("?")) {
 
-					tmp.add(predicates[i]);
+					tmp.add(predicate);
 
 				}
 
@@ -1129,7 +1129,7 @@ public class SqlParser {
 
 			int index2 = sql.indexOf(" where ");
 
-			String tableName = originalSql.substring(index1 + 6, index2).trim();
+			String tableName = sql.substring(index1 + 6, index2).trim();
 
 			String[] predicates = sql.substring(index2 + 7).split("and");
 
@@ -1185,7 +1185,7 @@ public class SqlParser {
 
 		}else if(sql.startsWith("call")){
 			int index1 = sql.indexOf("(");
-			String procedureName = originalSql.substring(5, index1).trim();
+			String procedureName = sql.substring(5, index1).trim();
 //			System.out.println("SqlParsr:"+procedureName);
 			StoredProcedure storedProcedure = searchStoredProcedure(procedureName);
 //			System.out.println("SqlParser: "+storedProcedure.getColumn()[0].getName());
@@ -1271,10 +1271,10 @@ public class SqlParser {
 	}
 	
 	private StoredProcedure searchStoredProcedure(String storedProceduredName) {
-		for (int i = 0; i < storedProcedures.size(); i++) {
-				if (storedProcedures.get(i).getName().equals(storedProceduredName)) {
-					return storedProcedures.get(i);
-				}
+		for (StoredProcedure storedProcedure : storedProcedures) {
+			if (storedProcedure.getName().equals(storedProceduredName)) {
+				return storedProcedure;
+			}
 		}
 		return null;
 	}

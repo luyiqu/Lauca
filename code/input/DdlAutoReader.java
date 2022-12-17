@@ -55,8 +55,7 @@ public class DdlAutoReader {
             Statement laucaStmt = laucaConn.createStatement();
             //获取所有表的ddl
             String ddl = null;
-            for(int i=0;i<tables.size();i++){
-                Table table = tables.get(i);
+            for (Table table : tables) {
                 String anonymousTableName = table.getName();
                 String originalTableName = anonymity2Tables.get(anonymousTableName);
                 Set<String> cols = new HashSet<>();
@@ -105,7 +104,7 @@ public class DdlAutoReader {
                             strbuf.append(line + "\r\n");
 
                     }
-                }catch (IOException e){
+                } catch (IOException e) {
                     e.printStackTrace();
                 }
                 ddl = strbuf.toString();
@@ -115,7 +114,7 @@ public class DdlAutoReader {
                     if ((index2 = ddl.indexOf("\"", index1 + 1)) == -1) break;
                     String originalColumnName = ddl.substring(index1 + 1, index2).toLowerCase();
                     String anonymousColumnName = null;
-                    if(table2Columns2Anonymity.get(originalTableName).containsKey(originalColumnName))
+                    if (table2Columns2Anonymity.get(originalTableName).containsKey(originalColumnName))
                         anonymousColumnName = table2Columns2Anonymity.get(originalTableName).get(originalColumnName);
                     else anonymousColumnName = geneRandomName(originalColumnName.length());
                     cols.add(anonymousColumnName.trim());
@@ -126,21 +125,21 @@ public class DdlAutoReader {
                 index1 = ddl.lastIndexOf(",");
                 index2 = ddl.lastIndexOf(")");
                 Pattern p = Pattern.compile("\\w+");
-                Matcher m = p.matcher(ddl.substring(index1,index2));
-                if(!m.find()) ddl = ddl.substring(0,index1) + ')';
+                Matcher m = p.matcher(ddl.substring(index1, index2));
+                if (!m.find()) ddl = ddl.substring(0, index1) + ')';
                 //连接测试数据库，通过读取并修改的ddl语句建表
-                laucaStmt.addBatch("BEGIN EXECUTE IMMEDIATE 'DROP TABLE " +anonymousTableName
-                        +" CASCADE CONSTRAINTS PURGE'; EXCEPTION WHEN OTHERS THEN IF SQLCODE != -942 THEN RAISE; END IF; END;");
+                laucaStmt.addBatch("BEGIN EXECUTE IMMEDIATE 'DROP TABLE " + anonymousTableName
+                        + " CASCADE CONSTRAINTS PURGE'; EXCEPTION WHEN OTHERS THEN IF SQLCODE != -942 THEN RAISE; END IF; END;");
                 laucaStmt.addBatch(ddl);
 
                 //增加字段
                 Column[] columns = table.getColumns();
-                for(int j=0;j<columns.length;j++){//将真实数据库中的列与table中的列对比
-                    String addColumnSQL = "ALTER TABLE " + anonymousTableName +" ADD ";
-                    String colName = columns[j].getName();
-                    int dataType = columns[j].getDataType();
-                    if(!cols.contains(colName)){
-                        addColumnSQL += colName +" "+Int2dataType(dataType);
+                for (Column column : columns) {//将真实数据库中的列与table中的列对比
+                    String addColumnSQL = "ALTER TABLE " + anonymousTableName + " ADD ";
+                    String colName = column.getName();
+                    int dataType = column.getDataType();
+                    if (!cols.contains(colName)) {
+                        addColumnSQL += colName + " " + Int2dataType(dataType);
                         laucaStmt.addBatch(addColumnSQL);
                     }
                 }
@@ -149,7 +148,7 @@ public class DdlAutoReader {
                 sql = "SELECT DBMS_METADATA.GET_DDL('INDEX',u.index_name) FROM USER_INDEXES u WHERE TABLE_NAME = '"
                         + originalTableName + "'";
                 rs = oriStmt.executeQuery(sql);
-                while(rs.next()) {
+                while (rs.next()) {
                     String indexSQL = rs.getString(1);
                     indexSQL = indexSQL.replaceAll("[ \\t]+", " ");
                     //“USER_NAME”."INDEX_NAME"——去除用户名
@@ -182,8 +181,7 @@ public class DdlAutoReader {
                 }
             }
             //创建外键
-            for(int i=0;i<tables.size();i++) {
-                Table table = tables.get(i);
+            for (Table table : tables) {
                 String tableName = table.getName();
                 ForeignKey[] foreignKeys = table.getForeignKeys();
                 for (ForeignKey fk : foreignKeys) {

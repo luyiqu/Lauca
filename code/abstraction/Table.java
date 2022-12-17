@@ -101,7 +101,12 @@ public class Table implements Serializable, Cloneable {
 		for (int i = 0; i < foreignKeys.length; i++) {
 			foreignKeys[i] = this.foreignKeys[i].clone();
 		}
-		Partition partition = new Partition(this.partition);
+
+		Partition partition = null;
+		if (this.partition != null){
+			partition = new Partition(this.partition);
+		}
+
 
 		long[] pkColumnRanges = Arrays.copyOf(this.pkColumnRanges, this.pkColumnRanges.length);
 		long[] pkColumnGeneCounts = Arrays.copyOf(this.pkColumnGeneCounts, this.pkColumnGeneCounts.length);
