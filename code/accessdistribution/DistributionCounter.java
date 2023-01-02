@@ -223,7 +223,7 @@ public class DistributionCounter {
 
 //		System.out.println(data);
 		// 没有分区键或者不是数值类型的情况下，不建分区的分布
-		if (partition == null || distTypeInfo.dataType >= 3){
+		if (!Configurations.isUsePartitionRule() || partition == null || distTypeInfo.dataType >= 3){
 			DataAccessDistribution distribution = countDistribution(txName, paraIdentifier, distTypeInfo, data);
 			distribution.setTime(windowTime);
 			txName2ParaId2DistributionList.get(txName).get(paraIdentifier).add(distribution);
@@ -263,7 +263,7 @@ public class DistributionCounter {
 	 * @param data
 	 * @return
 	 */
-	private static DataAccessDistribution countMultiDistribution(Partition<Long> partition,String txName, String paraIdentifier, DistributionTypeInfo distTypeInfo, List<String> data) {
+	private static DataAccessDistribution countMultiDistribution(Partition<Long> partition,String txName, String paraIdentifier, DistributionTypeInfo distTypeInfo,List<String> data) {
 		int length = partition.getLength();
 
 		List<DataAccessDistribution> distributions = new ArrayList<>();
@@ -294,8 +294,20 @@ public class DistributionCounter {
 				sum += value.getValue();
 			}
 			intervalFrequencies[i] = sum;
+			if (sum == 0){
+				distributions.add(null);
+			}
+			else{
+				distributions.add(countDistribution(txName, paraIdentifier, distTypeInfo, values));
+			}
 
-			distributions.add(countDistribution(txName, paraIdentifier, distTypeInfo, values));
+		}
+		int tot = 0;
+		for (int i = 0; i < length; i++) {
+			tot += intervalFrequencies[i];
+		}
+		for (int i = 0; i < length; i++) {
+			intervalFrequencies[i] /= tot;
 		}
 
 		return new MultiPartitionDistribution<>(hFItemFrequencies, intervalCardinalities, intervalFrequencies, partition, distributions);
@@ -307,7 +319,7 @@ public class DistributionCounter {
 			Map<String, List<String>> paraId2SamplingData = entry1.getValue();
 			for (Entry<String, List<String>> entry2 : paraId2SamplingData.entrySet()) {
 				String paraIdentifier = entry2.getKey();
-				List<String> data = entry2.getValue();
+				List<String> data = new ArrayList<>(entry2.getValue());
 				DistributionTypeInfo distTypeInfo = txName2ParaId2DistributionType.get(txName).get(paraIdentifier);
 
 				// bug fix: 有些事务模板可能没有实例数据，故distTypeInfo可能为空
@@ -427,7 +439,7 @@ public class DistributionCounter {
 
 		// priorData是之前一段时间窗口的参数数据，用来统计intervalParaRepeatRatios
 		ArrayList<Object> priorData = (ArrayList<Object>)txName2ParaId2Data.get(txName).get(paraIdentifier);
-		int k = Configurations.getMergeWeight();
+		int k = Configurations.getBackwardLength();
 		if (priorData == null) priorData = new ArrayList<>();
 
 		Object[] result = getIntervalCardiFrequInfo(valueNumEntryList, maxValue, minValue, values.size(), priorData);
@@ -474,7 +486,7 @@ public class DistributionCounter {
 //
 		// priorData是之前一段时间窗口的参数数据，用来统计intervalParaRepeatRatios
 		ArrayList<Object> priorData = (ArrayList<Object>)txName2ParaId2Data.get(txName).get(paraIdentifier);
-		int k = Configurations.getMergeWeight();
+		int k = Configurations.getBackwardLength();
 		if (priorData == null) priorData = new ArrayList<>();
 
 		Object[] result = getIntervalCardiFrequInfo(valueNumEntryList, windowMaxValue, windowMinValue, values.size(), priorData);
@@ -717,7 +729,7 @@ public class DistributionCounter {
 
 		int intervalNum = Configurations.getIntervalNum();
 		double avgIntervalLength = (maxValue.doubleValue() - minValue.doubleValue() + 0.000000001) / intervalNum;
-		int k = Configurations.getMergeWeight();
+		int k = Configurations.getBackwardLength();
 
 		double[][] intervalParaRepeatRatios = null;
 
@@ -1032,7 +1044,7 @@ public class DistributionCounter {
 																					  List<Map<String, Map<String, DataAccessDistribution>>> mergeDistributionList
 																					  ) {
 		Map<String, Map<String, DataAccessDistribution>> trueDistribution = new HashMap<>();
-		int k = Configurations.getMergeWeight();
+		int k = Configurations.getBackwardLength();
 		// 当前的分布集合
 		Map<String, Map<String, DataAccessDistribution>> baseDistribution = mergeDistributionList.get(baseDistributionPos);
 
@@ -1095,8 +1107,9 @@ public class DistributionCounter {
 		for (Transaction transaction : transactions) {
 			Map<String,String> paraId2Name = transaction.getParaId2Name();
 			for (String paraId : paraId2Name.keySet()){
-				String tableName = paraId2Name.get(paraId).split("_")[0];
-				String columnName = paraId2Name.get(paraId).split("_")[1];
+				int idx = paraId2Name.get(paraId).indexOf("_");
+				String tableName = paraId2Name.get(paraId).substring(0,idx);
+				String columnName = paraId2Name.get(paraId).substring(idx+1);
 
 				if (tableName2PartitionRule.get(tableName) != null &&
 						tableName2PartitionRule.get(tableName).getPartitionKey().equals(columnName)){

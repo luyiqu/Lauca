@@ -7,10 +7,7 @@ import java.sql.SQLException;
 import java.sql.Statement;
 import java.sql.Timestamp;
 import java.text.SimpleDateFormat;
-import java.util.Arrays;
-import java.util.List;
-import java.util.Map;
-import java.util.Set;
+import java.util.*;
 
 import accessdistribution.DataAccessDistribution;
 import accessdistribution.DistributionTypeInfo;
@@ -161,8 +158,7 @@ public abstract class SqlStatement extends TransactionBlock {
 
 				List<ParameterDependency> linearDependencies = parameterNode.getLinearDependencies();
 				// 可能其中多个线性依赖关系本质上是一样的，依赖项是相等的 && 线性系数也一致，但这不影响程序的正确性，随便选择其中一个生成参数即可
-				for (int i = 0; i < linearDependencies.size(); i++) {
-					ParameterDependency linearDependency = linearDependencies.get(i);
+				for (ParameterDependency linearDependency : linearDependencies) {
 					if (intermediateState.containsKey(linearDependency.getIdentifier())) {
 //						System.out.println("通过线性依赖关系来生成的 ");
 						TxRunningValue txRunningValue = intermediateState.get(linearDependency.getIdentifier());
@@ -174,16 +170,16 @@ public abstract class SqlStatement extends TransactionBlock {
 						}
 						// 将value转化成当前参数的数据类型
 						switch (paraDataTypes[paraIndex]) {
-						case 0:
-						case 3:
-							parameter = new Long(value.longValue());
-							break;
-						case 1:
-							parameter = value;
-							break;
-						case 2:
-							parameter = new BigDecimal(value);
-							break;
+							case 0:
+							case 3:
+								parameter = value.longValue();
+								break;
+							case 1:
+								parameter = value;
+								break;
+							case 2:
+								parameter = new BigDecimal(value);
+								break;
 						}
 						break;
 					}
@@ -382,6 +378,54 @@ public abstract class SqlStatement extends TransactionBlock {
 		return parameter;
 	}
 
+	protected Object checkParaOutOfCardinality(int idx , String paraSchemaInfo,
+											   Map<String, Integer> cardinality4paraInSchema, Map<String, Set<Object>> paraUsed){
+		Object parameter = geneParameter(idx);
+		if (cardinality4paraInSchema.containsKey(paraSchemaInfo)){
+			// 如果已经填满基数，不再重新构造，直接从已知的参数里找一个
+			if (cardinality4paraInSchema.get(paraSchemaInfo) == paraUsed.get(paraSchemaInfo).size()){
+//				if (cardinality4paraInSchema.get(paraSchemaInfo) > 1){
+//					System.out.println("full of para with size = "+cardinality4paraInSchema.get(paraSchemaInfo));
+//				}
+
+				parameter = new ArrayList<>(paraUsed.get(paraSchemaInfo)).get(
+						new Random().nextInt(cardinality4paraInSchema.get(paraSchemaInfo)));
+			}
+			else{
+				// 如果还没填满就重复了，重新生成
+				while (Configurations.isUsePartitionRule() && paraUsed.get(paraSchemaInfo).contains(parameter) && new Random().nextDouble() < 0.7){
+					parameter = geneParameter(idx);
+				}
+				paraUsed.get(paraSchemaInfo).add(parameter);
+			}
+		}
+		return parameter;
+	}
+
+	protected Object checkParaOutOfCardinality(Object para , String paraSchemaInfo,
+											   Map<String, Integer> cardinality4paraInSchema, Map<String, Set<Object>> paraUsed){
+		Object parameter = para;
+		if (cardinality4paraInSchema.containsKey(paraSchemaInfo)){
+			// 如果已经填满基数，不再重新构造，直接从已知的参数里找一个
+			if (cardinality4paraInSchema.get(paraSchemaInfo) == paraUsed.get(paraSchemaInfo).size()){
+//				if (cardinality4paraInSchema.get(paraSchemaInfo) > 1){
+//					System.out.println("full of para with size = "+cardinality4paraInSchema.get(paraSchemaInfo));
+//				}
+
+				parameter = new ArrayList<>(paraUsed.get(paraSchemaInfo)).get(
+						new Random().nextInt(cardinality4paraInSchema.get(paraSchemaInfo)));
+			}
+			else{
+				// 如果还没填满就重复了，打回重新生成
+				if (Configurations.isUsePartitionRule() && paraUsed.get(paraSchemaInfo).contains(parameter) && new Random().nextDouble() < 0.7){
+					return null;
+				}
+				paraUsed.get(paraSchemaInfo).add(parameter);
+			}
+		}
+		return parameter;
+	}
+
 
 
 	protected Object geneParameterByMultipleLogic(int paraIndex, Map<String, Double> multipleLogicMap, int round) {
@@ -419,8 +463,8 @@ public abstract class SqlStatement extends TransactionBlock {
 		for(;i < this.windowParaGenerators.length;i++){
 			windowParaGeneratorsModified[i] = windowParaGenerators[i];
 		}
-		for(int j = 0;j < fakeColumn.length;j++){
-			windowParaGeneratorsModified[i] = generateFakeColumnParaDistribution(fakeColumn[j]);
+		for (Column column : fakeColumn) {
+			windowParaGeneratorsModified[i] = generateFakeColumnParaDistribution(column);
 			i++;
 		}
 		this.windowParaGenerators = windowParaGeneratorsModified;

@@ -65,7 +65,7 @@ public class WriteOperation extends SqlStatement {
 //				}
 
 				Object parameter = checkParaOutOfCardinality(
-						geneParameter(i),
+						i,
 						this.paraSchemaInfos.get(i),
 						cardinality4paraInSchema,
 						paraUsed
@@ -131,7 +131,7 @@ public class WriteOperation extends SqlStatement {
 			for (int i = 0; i < paraDataTypes.length; i++) {
 
 				Object parameter = checkParaOutOfCardinality(
-						geneParameter(i),
+						i,
 						this.paraSchemaInfos.get(i),
 						cardinality4paraInSchema,
 						paraUsed
@@ -172,21 +172,28 @@ public class WriteOperation extends SqlStatement {
 					   Map<String, Double> multipleLogicMap, int round) {
 		try {
 			for (int i = 0; i < paraDataTypes.length; i++) {
+
 				Object parameter = checkParaOutOfCardinality(
 						geneParameterByMultipleLogic(i, multipleLogicMap, round),
 						this.paraSchemaInfos.get(i),
 						cardinality4paraInSchema,
 						paraUsed
 				);
+				while (parameter == null){
+					parameter = checkParaOutOfCardinality(
+							geneParameterByMultipleLogic(i, multipleLogicMap, round),
+							this.paraSchemaInfos.get(i),
+							cardinality4paraInSchema,
+							paraUsed
+					);
+				}
 
 				setParameter(i + 1, paraDataTypes[i], parameter);
 			}
 			if (batchExecute) {
 				pstmt.addBatch();
 			} else {
-
 				pstmt.executeUpdate();
-
 			}
 			return 1;
 		} catch (SQLException e) {
@@ -209,12 +216,21 @@ public class WriteOperation extends SqlStatement {
 		try {
 			String tmp = sql;
 			for (int i = 0; i < paraDataTypes.length; i++) {
+
 				Object parameter = checkParaOutOfCardinality(
 						geneParameterByMultipleLogic(i, multipleLogicMap, round),
 						this.paraSchemaInfos.get(i),
 						cardinality4paraInSchema,
 						paraUsed
 				);
+				while (parameter == null){
+					parameter = checkParaOutOfCardinality(
+							geneParameterByMultipleLogic(i, multipleLogicMap, round),
+							this.paraSchemaInfos.get(i),
+							cardinality4paraInSchema,
+							paraUsed
+					);
+				}
 				if (paraDataTypes[i] == 3) {
 					tmp = tmp.replaceFirst("\\?", " '" + sdf.format(new Date((Long)parameter)) + "' ");
 				} else if (paraDataTypes[i] == 4) {

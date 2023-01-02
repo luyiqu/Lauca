@@ -58,19 +58,17 @@ public class SequentialVcharParaDistribution extends SequentialParaDistribution 
 		this.minLength = minLength;
 		this.maxLength = maxLength;
 		this.seedStrings = new String[seedStrings.length];
-		for (int i = 0; i < seedStrings.length; i++) {
-			this.seedStrings[i] = seedStrings[i];
-		}
+		System.arraycopy(seedStrings, 0, this.seedStrings, 0, seedStrings.length);
 	}
 
 	public void geneHighFrequencyItems(String[] priorHighFrequencyItems) {
 		List<String> priorHighFrequencyItemList = new ArrayList<>();
 		if (priorHighFrequencyItems != null) {
-			for (int i = 0; i < priorHighFrequencyItems.length; i++) {
-				if (priorHighFrequencyItems[i] == null) {
+			for (String priorHighFrequencyItem : priorHighFrequencyItems) {
+				if (priorHighFrequencyItem == null) {
 					break;
 				}
-				priorHighFrequencyItemList.add(priorHighFrequencyItems[i]);
+				priorHighFrequencyItemList.add(priorHighFrequencyItem);
 			}
 			Collections.shuffle(priorHighFrequencyItemList);
 		}
@@ -83,7 +81,7 @@ public class SequentialVcharParaDistribution extends SequentialParaDistribution 
 			highFrequencyItemSet.add(priorHighFrequencyItemList.get(i));
 		}
 
-		if (columnCardinality > highFrequencyItemNum * 2) {
+		if (columnCardinality > highFrequencyItemNum * 2L) {
 			while (highFrequencyItemSet.size() < highFrequencyItems.length) {
 				long randomParaIndex = (long)(Math.random() * columnCardinality);
 				String randomParameter = getVarcharValue(randomParaIndex);
@@ -107,9 +105,7 @@ public class SequentialVcharParaDistribution extends SequentialParaDistribution 
 		List<String> priorParaCandidateList = new ArrayList<>();
 		if (priorParaCandidates != null) {
 			for (String[] tmpArr : priorParaCandidates) {
-				for (String tmpItem : tmpArr) {
-					priorParaCandidateList.add(tmpItem);
-				}
+				Collections.addAll(priorParaCandidateList, tmpArr);
 			}
 			Collections.shuffle(priorParaCandidateList);
 		}
@@ -142,15 +138,11 @@ public class SequentialVcharParaDistribution extends SequentialParaDistribution 
 		// System.out.println("SequentialVcharParaDistribution.geneCandidates - repeatedParaNumsCopy: \n\t" + 
 		// 		Arrays.toString(repeatedParaNumsCopy));
 
-		Set<String> priorParameterSet = new HashSet<>();
-		priorParameterSet.addAll(priorParaCandidateList);
+		Set<String> priorParameterSet = new HashSet<>(priorParaCandidateList);
 
 		for (int i = 0; i < intervalNum; i++) {
 			int idx = repeatedParaNums[i] - repeatedParaNumsCopy[i];
-			Set<String> existedParameterSet = new HashSet<>();
-			for (int j = 0; j < idx; j++) {
-				existedParameterSet.add(currentParaCandidates[i][j]);
-			}
+			Set<String> existedParameterSet = new HashSet<>(Arrays.asList(currentParaCandidates[i]).subList(0, idx));
 
 			while (idx < currentParaCandidates[i].length) {
 				long randomParaIndex = (long)((Math.random() + i) * avgIntervalIndexSize);

@@ -79,7 +79,7 @@ public class AccessDistributionAnalyzer {
 //			System.out.println(entry.getKey());
 
 			TxLogicAnalyzer txLogicAnalyzer = new TxLogicAnalyzer();
-			txLogicAnalyzer.obtainTxLogic(entry.getValue(), txName2OpId2paraSchema.get(entry.getKey()));
+			txLogicAnalyzer.obtainTxLogic(entry.getValue(), txName2OpId2paraSchema.get(entry.getKey()),tables);
 
 			Map<Integer, OperationData> operationDataTemplates = txName2OperationId2Template.get(entry.getKey());
 			Map<Integer, OperationData> sortedOperationDataTemplates = new TreeMap<>(operationDataTemplates);
@@ -268,7 +268,7 @@ public class AccessDistributionAnalyzer {
 //			System.out.println(entry.getKey());
 
 			TxLogicAnalyzer txLogicAnalyzer = new TxLogicAnalyzer();
-			txLogicAnalyzer.obtainTxLogic(entry.getValue(), txName2OpId2paraSchema.get(entry.getKey()));
+			txLogicAnalyzer.obtainTxLogic(entry.getValue(), txName2OpId2paraSchema.get(entry.getKey()),tables);
 
 
 			// wsy 获取当前操作所有需要统计的参数（位置），按key升序排列（话说为什么要升序排列？

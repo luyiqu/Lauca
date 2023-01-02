@@ -77,14 +77,19 @@ public class Transaction{
 			this.cardinality4paraInSchema = new HashMap<>(transaction.cardinality4paraInSchema);
 
 		for (TransactionBlock txBlock : transaction.transactionBlocks) {
-			if (txBlock.getClass().getSimpleName().equals("Multiple")) {
-				this.transactionBlocks.add(new Multiple((Multiple) txBlock));
-			} else if (txBlock.getClass().getSimpleName().equals("Branch")) {
-				this.transactionBlocks.add(new Branch((Branch) txBlock));
-			} else if (txBlock.getClass().getSimpleName().equals("ReadOperation")) {
-				this.transactionBlocks.add(new ReadOperation((ReadOperation) txBlock));
-			} else if (txBlock.getClass().getSimpleName().equals("WriteOperation")) {
-				this.transactionBlocks.add(new WriteOperation((WriteOperation) txBlock));
+			switch (txBlock.getClass().getSimpleName()) {
+				case "Multiple":
+					this.transactionBlocks.add(new Multiple((Multiple) txBlock));
+					break;
+				case "Branch":
+					this.transactionBlocks.add(new Branch((Branch) txBlock));
+					break;
+				case "ReadOperation":
+					this.transactionBlocks.add(new ReadOperation((ReadOperation) txBlock));
+					break;
+				case "WriteOperation":
+					this.transactionBlocks.add(new WriteOperation((WriteOperation) txBlock));
+					break;
 			}
 		}
 

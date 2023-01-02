@@ -11,6 +11,9 @@ public class MultiPartitionDistribution<T extends Number> extends DataAccessDist
 
     private final List<DataAccessDistribution> partitionDistribution;
 
+    private int partitionCount = 0;
+    private int lastPartition = 0;
+
     public MultiPartitionDistribution(double[] hFItemFrequencies, long[] intervalCardinalities, double[] intervalFrequencies,
                                       Partition<T> partition, List<DataAccessDistribution> partitionDistribution) {
         super(hFItemFrequencies, intervalCardinalities, intervalFrequencies);
@@ -27,6 +30,22 @@ public class MultiPartitionDistribution<T extends Number> extends DataAccessDist
     @Override
     public Object geneValue() {
         int idx = binarySearch();
+        while (partitionDistribution.get(idx) == null) {
+            idx = (idx+1) % partitionDistribution.size();
+        }
+        if (partitionCount > 1) {
+            lastPartition = (lastPartition + 1) % partitionDistribution.size();
+        }
+
+        if (lastPartition == idx){
+            partitionCount ++;
+        }
+        else{
+            lastPartition = idx;
+            partitionCount = 1;
+        }
+
+
         return partitionDistribution.get(idx).geneValue();
     }
 
@@ -38,7 +57,7 @@ public class MultiPartitionDistribution<T extends Number> extends DataAccessDist
     @Override
     public boolean inDomain(Object parameter) {
         for (DataAccessDistribution d : partitionDistribution) {
-            if (d.inDomain(parameter)) {
+            if (d !=null && d.inDomain(parameter)) {
                 return true;
             }
         }

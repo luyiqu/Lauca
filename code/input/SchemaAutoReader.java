@@ -156,13 +156,8 @@ public class SchemaAutoReader {
                 String tableName = entry.getKey();
                 List<String> referencedTN = entry.getValue();
                 if(referencedTN.size() == 0) continue;
-                Iterator<String> iterator = referencedTN.iterator();
-                while (iterator.hasNext()) {
-                    String s = iterator.next();
-                    if (name.equals(s)) {
-                        iterator.remove();//使用迭代器的删除方法删除
-                    }
-                }
+                //使用迭代器的删除方法删除
+                referencedTN.removeIf(name::equals);
                 if(referencedTN.size() == 0){
                     tables.add(tmp.get(tableName));
                     queue.offer(tableName);

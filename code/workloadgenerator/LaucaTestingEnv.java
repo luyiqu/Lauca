@@ -159,7 +159,7 @@ public class LaucaTestingEnv {
 					case "mysql":
 					case "tidb":
 						stmt.execute("LOAD DATA  INFILE '" + tableDataFile.getCanonicalPath() + "' INTO TABLE "
-								+ tableName + " FIELDS TERMINATED BY ',' LINES TERMINATED BY '\\n'");
+								+ tableName + " FIELDS TERMINATED BY ',' LINES TERMINATED BY '\r\n'");
 						break;
 					case "postgresql":
 						CopyManager copyManager = new CopyManager((BaseConnection) laucaConn);

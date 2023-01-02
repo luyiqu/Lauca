@@ -95,7 +95,8 @@ public abstract class DataAccessDistribution implements Comparable<DataAccessDis
 				-1;
 
 		cumulativeFrequencies = new double[highFrequencyItemNum + intervalNum];
-		cumulativeFrequencies[0] = hFItemFrequencies[0]; // 默认是有高频项的
+
+		cumulativeFrequencies[0] = highFrequencyItemNum == 0 ? intervalFrequencies[0] : hFItemFrequencies[0]; // 默认是有高频项的
 		for (int i = 1; i < cumulativeFrequencies.length; i++) {
 			if (i < highFrequencyItemNum) {
 				cumulativeFrequencies[i] = cumulativeFrequencies[i - 1] + hFItemFrequencies[i];

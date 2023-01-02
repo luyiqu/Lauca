@@ -81,6 +81,7 @@ public class RunningLogReader {
 							.add(txName2OperationId2Template.get(txName).get(operationId).newInstance(oneTrace));
 					operationIdSet.add(operationId);
 				}catch (Exception e){
+					e.printStackTrace();
 					System.out.println(txName);
 					System.out.println(txName2OperationId2Template.get(txName).get(operationId));
 					System.out.println("*************");

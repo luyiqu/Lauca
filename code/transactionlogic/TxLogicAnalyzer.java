@@ -28,6 +28,7 @@ public class TxLogicAnalyzer {
 	// 操作ID -> 平均执行次数，用于表示：if/else分支执行比例，multiple内操作平均执行次数（也算事务逻辑的一部分）
 	private Map<Integer, Double> operationId2AvgRunTimes = null;
 
+	// 统计每个列在该事务的参数中的基数，如果这个列有分区键，统计其分区的基数
 	private Map<String, Integer> cardinality4paraInSchema = null;
 
 	// 线性依赖关系分析时的配置参数，见LinearRelationAnalyzer
@@ -42,7 +43,7 @@ public class TxLogicAnalyzer {
 		this.randomPairs = randomPairs;
 	}
 
-	public void obtainTxLogic(List<TransactionData> txDataList, Map<Integer, List<String>> opId2paraSchema) {
+	public void obtainTxLogic(List<TransactionData> txDataList, Map<Integer, List<String>> opId2paraSchema, List<Table> tables) {
 		Map<Integer, Integer> operationId2ExecutionNum = countOperationExecutionNum(txDataList);
 		parameterNodeMap = new HashMap<>();
 		operationId2AvgRunTimes = new HashMap<>();
@@ -82,9 +83,8 @@ public class TxLogicAnalyzer {
 		}
 
 		// 初始化ParameterNode中的累计概率和数组~
-		Iterator<Entry<String, ParameterNode>> iter = parameterNodeMap.entrySet().iterator();
-		while (iter.hasNext()) {
-			iter.next().getValue().initCumulativeProbabilities();
+		for (Entry<String, ParameterNode> stringParameterNodeEntry : parameterNodeMap.entrySet()) {
+			stringParameterNodeEntry.getValue().initCumulativeProbabilities();
 		}
 
 		// multiple逻辑
@@ -96,7 +96,7 @@ public class TxLogicAnalyzer {
 		}
 
 		// 统计基数约束
-		cardinality4paraInSchema = obtainCardinality(txDataList, opId2paraSchema);
+		cardinality4paraInSchema = obtainCardinality(tables, txDataList, opId2paraSchema);
 
 		// between and 逻辑
 		// TODO
@@ -109,8 +109,9 @@ public class TxLogicAnalyzer {
 
 	}
 
-	private Map<String, Integer> obtainCardinality(List<TransactionData> txDataList, Map<Integer, List<String>> opId2paraSchema) {
-		Map<String, Integer> cardinality4paraInSchema = new HashMap<>();
+	// 如果有分区键，基于分区键进行基数统计；否则直接统计
+	private Map<String, Integer> obtainCardinality(List<Table> tables, List<TransactionData> txDataList, Map<Integer, List<String>> opId2paraSchema) {
+		Map<String, List<Integer>> cardinality4paraInSchema = new HashMap<>();
 
 		// 所有可能被用到的列
 		Set<String> paraSchemaInfo = new HashSet<>();
@@ -118,7 +119,7 @@ public class TxLogicAnalyzer {
 			paraSchemaInfo.addAll(para);
 		}
 		for (String para : paraSchemaInfo){
-			cardinality4paraInSchema.put(para,0);
+			cardinality4paraInSchema.put(para,new ArrayList<>());
 		}
 
 
@@ -137,39 +138,61 @@ public class TxLogicAnalyzer {
 					for (OperationData operationData : ((ArrayList<OperationData>) operationDatas[i])){
 						int operationId = operationData.getOperationId();
 						if (opId2paraSchema.containsKey(operationId)){
-							addParaCardinality(operationData, opId2paraSchema.get(operationId), para4paraInSchema);
+							addParaCardinality(tables, operationData, opId2paraSchema.get(operationId), para4paraInSchema);
 						}
 					}
 				} else if (operationTypes[i] == 0) {// 不是循环中的操作或者只执行了一次
 					OperationData operationData = (OperationData) operationDatas[i];
 					int operationId = operationData.getOperationId();
 					if (opId2paraSchema.containsKey(operationId)){
-						addParaCardinality(operationData, opId2paraSchema.get(operationId), para4paraInSchema);
+						addParaCardinality(tables, operationData, opId2paraSchema.get(operationId), para4paraInSchema);
 					}
 				}
 			}
 
 			for (String para : paraSchemaInfo){
-				cardinality4paraInSchema.put(para, cardinality4paraInSchema.get(para) +  para4paraInSchema.get(para).size());
+				cardinality4paraInSchema.get(para).add(para4paraInSchema.get(para).size());
 			}
 		}
 
 		// 获得平均的基数
+		Map<String, Integer> ret = new HashMap<>();
 		for (String para : paraSchemaInfo){
-			cardinality4paraInSchema.put(para, cardinality4paraInSchema.get(para) / txDataList.size());
+//			System.out.println(para+": "+ (cardinality4paraInSchema.get(para) ));
+			double sum = cardinality4paraInSchema.get(para).stream().mapToInt(e->e).sum();
+			ret.put(para, (int) (sum / txDataList.size()));
 		}
-
-		return cardinality4paraInSchema;
+//		System.out.println();
+		return ret;
 	}
 
-	private void addParaCardinality(OperationData operationData, List<String> strings,
+	private void addParaCardinality(List<Table> tables, OperationData operationData, List<String> strings,
 									Map<String, Set<Object>> para4paraInSchema) {
 		int[] paraDataTypes = operationData.getParaDataTypes();
 
 		assert (paraDataTypes.length != strings.size());
 
 		for (int i = 0; i < paraDataTypes.length; i++){
-			para4paraInSchema.get(strings.get(i)).add(operationData.getParameters()[i]);
+			String para = strings.get(i);
+			int idx = para.indexOf("_");
+			String tableName = para.substring(0,idx);
+			String columnName = para.substring(idx + 1);
+
+			boolean isAdd = false;
+			for (Table table : tables){
+				if (table.getName().equals(tableName)){
+					if (table.getPartition() != null && table.getPartition().getPartitionKey().equals(columnName)){
+						String partitionName = table.getPartition().getPartition((Number) operationData.getParameters()[i]);
+						para4paraInSchema.get(para).add(partitionName);
+						isAdd = true;
+					}
+					break;
+				}
+			}
+
+			if (!isAdd){
+				para4paraInSchema.get(para).add(operationData.getParameters()[i]);
+			}
 		}
 	}
 
@@ -365,19 +388,15 @@ public class TxLogicAnalyzer {
 
 		TxLogicAnalyzer txLogicAnalyzer = new TxLogicAnalyzer();
 
-		Iterator<Entry<String, List<TransactionData>>> iter = runningLogReader.getTxName2TxDataList().entrySet()
-				.iterator();
-		while (iter.hasNext()) {
-			Entry<String, List<TransactionData>> entry = iter.next();
+		for (Entry<String, List<TransactionData>> entry : runningLogReader.getTxName2TxDataList().entrySet()) {
 			System.out.println("###########################");
 			System.out.println(entry.getKey() + ": " + entry.getValue().size());
 			System.out.println("###########################");
-			txLogicAnalyzer.obtainTxLogic(entry.getValue(), txName2OpId2paraSchema.get(entry.getKey()));
+			txLogicAnalyzer.obtainTxLogic(entry.getValue(), txName2OpId2paraSchema.get(entry.getKey()), tables);
 			System.out.println("---------------------------");
 
 			Map<Integer, OperationData> operationDataTemplates = txName2OperationId2Template.get(entry.getKey());
-			Map<Integer, OperationData> sortedOperationDataTemplates = new TreeMap<>();
-			sortedOperationDataTemplates.putAll(operationDataTemplates);
+			Map<Integer, OperationData> sortedOperationDataTemplates = new TreeMap<>(operationDataTemplates);
 			txLogicAnalyzer.getStatParameters(sortedOperationDataTemplates.entrySet().iterator());
 			System.out.println("###########################");
 			System.out.println();

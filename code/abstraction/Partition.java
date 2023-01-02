@@ -61,7 +61,7 @@ public class Partition<T extends Number>implements Serializable {
         List<T> params = partitionParam.get(i);
         switch (partitionRule){
             case HASH:
-                return key.intValue() % getLength() == params.get(0).intValue();
+                return (key.intValue() % getLength()) == params.get(0).intValue();
             case LIST:
                 for (T para:params ) {
                     if (Objects.equals(key, para)){
