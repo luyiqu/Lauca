@@ -396,6 +396,8 @@ public abstract class SqlStatement extends TransactionBlock {
 		Object parameter = geneParameter(idx);
 		Object paraPartition = getParameterPartition(parameter, idx);
 
+		boolean hasPartition = !paraPartition.equals(parameter);
+
 
 		Map<Object, List<Object>> partitionUsedPara = partitionUsed.get(paraSchemaInfo);
 
@@ -406,15 +408,19 @@ public abstract class SqlStatement extends TransactionBlock {
 		if (Configurations.isUsePartitionRule()){
 			Random random = new Random();
 			if (cardinality4paraInSchema.get(paraSchemaInfo) == partitionUsedPara.size()){
+				if (paraSchemaInfo.contains("s_w_id") ){
+					System.out.println(partitionUsedPara.size()+" "+partitionUsedPara.get(paraPartition) + " " + paraPartition + " " + parameter);
+				}
 				if (!partitionUsedPara.containsKey(paraPartition)){// 如果已经填满基数，不再重新构造，直接从已知的参数里找一个
-					int partitionIdx = random.nextInt(partitionUsedPara.size());
-					Object partitionKey = new ArrayList<>(partitionUsedPara.keySet()).get(partitionIdx);
 
-					if (parameter.equals(paraPartition)) { //非分区键的参数就是它的key
-						parameter = partitionKey;
+					int partitionIdx = random.nextInt(partitionUsedPara.size());
+					paraPartition = new ArrayList<>(partitionUsedPara.keySet()).get(partitionIdx);
+
+					if (!hasPartition) { //非分区键的参数就是它的key
+						parameter = paraPartition;
 					}else{ // 分区键的参数是value
-						partitionIdx = new Random().nextInt(partitionUsedPara.get(partitionKey).size());
-						parameter = partitionUsedPara.get(partitionKey).get(partitionIdx);
+						partitionIdx = new Random().nextInt(partitionUsedPara.get(paraPartition).size());
+						parameter = partitionUsedPara.get(paraPartition).get(partitionIdx);
 					}
 				}
 			}
@@ -431,7 +437,7 @@ public abstract class SqlStatement extends TransactionBlock {
 		if (!partitionUsedPara.containsKey(paraPartition)) {
 			partitionUsedPara.put(paraPartition, new ArrayList<>());
 		}
-		if (!partitionUsedPara.get(paraPartition).contains(paraPartition)){
+		if (hasPartition){
 			partitionUsedPara.get(paraPartition).add(parameter);
 		}
 
@@ -444,30 +450,40 @@ public abstract class SqlStatement extends TransactionBlock {
 		Object parameter = para;
 		Object paraPartition = getParameterPartition(parameter, idx);
 
+		boolean hasPartition = !paraPartition.equals(parameter);
+
 
 		Map<Object, List<Object>> partitionUsedPara = partitionUsed.get(paraSchemaInfo);
+
 		if (!cardinality4paraInSchema.containsKey(paraSchemaInfo)){
 			return parameter;
 		}
 
-		Random random = new Random();
-		if (cardinality4paraInSchema.get(paraSchemaInfo) == partitionUsedPara.size()){
-			if (!partitionUsedPara.containsKey(paraPartition)){// 如果已经填满基数，不再重新构造，直接从已知的参数里找一个
-				int partitionIdx = random.nextInt(partitionUsedPara.size());
-				Object partitionKey = new ArrayList<>(partitionUsedPara.keySet()).get(partitionIdx);
+		if (Configurations.isUsePartitionRule()){
+			Random random = new Random();
+			if (cardinality4paraInSchema.get(paraSchemaInfo) == partitionUsedPara.size()){
+				if (paraSchemaInfo.contains("s_w_id") ){
+					System.out.println(partitionUsedPara.size()+" "+partitionUsedPara.get(paraPartition) + " " + paraPartition + " " + parameter);
+				}
+				if (!partitionUsedPara.containsKey(paraPartition)){// 如果已经填满基数，不再重新构造，直接从已知的参数里找一个
 
-				if (parameter.equals(paraPartition)) { //非分区键的参数就是它的key
-					parameter = partitionKey;
-				}else{ // 分区键的参数是value
-					partitionIdx = new Random().nextInt(partitionUsedPara.get(partitionKey).size());
-					parameter = partitionUsedPara.get(partitionKey).get(partitionIdx);
+
+					int partitionIdx = random.nextInt(partitionUsedPara.size());
+					paraPartition = new ArrayList<>(partitionUsedPara.keySet()).get(partitionIdx);
+
+					if (!hasPartition) { //非分区键的参数就是它的key
+						parameter = paraPartition;
+					}else{ // 分区键的参数是value
+						partitionIdx = new Random().nextInt(partitionUsedPara.get(paraPartition).size());
+						parameter = partitionUsedPara.get(paraPartition).get(partitionIdx);
+					}
 				}
 			}
-		}
-		else{
-			// 如果还没填满就重复了，重新生成
-			if (Configurations.isUsePartitionRule() && partitionUsedPara.containsKey(paraPartition) && random.nextDouble() < 0.7){
-				return null;
+			else{
+				// 如果还没填满就重复了，重新生成
+				if (Configurations.isUsePartitionRule() && partitionUsedPara.containsKey(paraPartition) && random.nextDouble() < 0.7){
+					return null;
+				}
 			}
 		}
 
@@ -475,9 +491,11 @@ public abstract class SqlStatement extends TransactionBlock {
 		if (!partitionUsedPara.containsKey(paraPartition)) {
 			partitionUsedPara.put(paraPartition, new ArrayList<>());
 		}
-		if (!partitionUsedPara.get(paraPartition).contains(paraPartition)){
+		if (hasPartition){
 			partitionUsedPara.get(paraPartition).add(parameter);
 		}
+
+
 		return parameter;
 	}
 

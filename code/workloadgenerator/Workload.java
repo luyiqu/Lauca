@@ -1,7 +1,6 @@
 package workloadgenerator;
 
 import java.sql.Connection;
-import java.sql.SQLException;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Iterator;
@@ -100,7 +99,7 @@ public class Workload {
 		float responceTime = -Float.MAX_VALUE;
 		for (int i = 0; i < cumulativeProbabilities.length; i++) {
 			if (randomValue < cumulativeProbabilities[i]) {
-				responceTime = transactions.get(i).exectue();
+				responceTime = transactions.get(i).execute();
 				break;
 			}
 		}

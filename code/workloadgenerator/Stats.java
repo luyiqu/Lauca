@@ -24,7 +24,7 @@ public class Stats {
     public static void printPartitionStats(){
         System.out.println("Partition Per Txn");
         for (Integer num: partitionPerTxn.keySet() ) {
-            System.out.println("The number of txn overlapped " + num + "partition(s) is " + partitionPerTxn.get(num));
+            System.out.println("The number of txn overlapped " + num + " partition(s) is " + partitionPerTxn.get(num));
         }
     }
 }

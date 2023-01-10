@@ -113,7 +113,6 @@ public class Monitor implements Runnable {
 				}
 			}
 		}, 1000, statWindowSize * 1000L);
-		Stats.printPartitionStats();
 	}
 
 	private List<Vector<Float>> newResponceTimeInfo() {

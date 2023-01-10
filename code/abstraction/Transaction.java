@@ -8,7 +8,6 @@ import java.util.*;
 
 import accessdistribution.DataAccessDistribution;
 import transactionlogic.ParameterNode;
-import workloadgenerator.LaucaTestingEnv;
 import workloadgenerator.Stats;
 
 public class Transaction{
@@ -168,7 +167,7 @@ public class Transaction{
 		}
 	}
 
-	public float exectue(){
+	public float execute(){
 		intermediateState.clear();
 
 		long startTime = System.nanoTime();
@@ -224,14 +223,13 @@ public class Transaction{
 					}
 
 					int cnt = 1;
-					if (paraList4partition.get(0).size() > 0){// 只统计带分区的基数
+					Object key = new ArrayList<>(paraList4partition.keySet()).get(0);
+					if (paraList4partition.get(key).size() > 0){// 只统计带分区的基数
 						cnt = paraList4partition.size();
 					}
 					partitionCnt = Math.max(partitionCnt, cnt);
-
-					Stats.addPartitionCnt(partitionCnt);
 				}
-
+				Stats.addPartitionCnt(partitionCnt);
 			} else {
 				this.cleanBatch(transactionBlocks);
 				conn.rollback();

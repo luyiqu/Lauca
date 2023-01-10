@@ -17,6 +17,7 @@ public class MultiPartitionDistribution<T extends Number> extends DataAccessDist
     public MultiPartitionDistribution(double[] hFItemFrequencies, long[] intervalCardinalities, double[] intervalFrequencies,
                                       Partition<T> partition, List<DataAccessDistribution> partitionDistribution) {
         super(hFItemFrequencies, intervalCardinalities, intervalFrequencies);
+        System.out.println(partition.getPartitionKey());
         this.partition = partition;
         this.partitionDistribution = partitionDistribution;
     }

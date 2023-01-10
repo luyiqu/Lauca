@@ -319,7 +319,7 @@ public class LaucaTestingEnv {
 
 
 
-
+		Stats.printPartitionStats();
 		System.exit(0);
 	}
 

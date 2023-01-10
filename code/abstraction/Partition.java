@@ -51,7 +51,7 @@ public class Partition<T extends Number>implements Serializable {
         int length = getLength();
         for (int i = 0; i < length; i++) {
             if (keyInPartition(key, i)){
-                return partitionNameList.get(i);
+                return "Partition_" + partitionNameList.get(i);
             }
         }
         return null;

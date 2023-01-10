@@ -286,6 +286,10 @@ public class DistributionCounter {
 		}
 		for (String d: data) {
 			String partitionName = partition.getPartition(Long.parseLong(d));
+			int prefixLength = "Partition_".length();
+			if (partitionName.contains("Partition_")){
+				partitionName = partitionName.substring(prefixLength);
+			}
 			dataInPartition.get(partitionName).add(d);
 		}
 
