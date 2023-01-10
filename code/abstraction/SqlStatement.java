@@ -15,9 +15,6 @@ import accessdistribution.IntegerParaDistribution;
 import config.Configurations;
 import transactionlogic.ParameterDependency;
 import transactionlogic.ParameterNode;
-import accessdistribution.DistributionCounter;
-
-import javax.swing.plaf.synth.SynthOptionPaneUI;
 
 public abstract class SqlStatement extends TransactionBlock {
 
@@ -378,50 +375,108 @@ public abstract class SqlStatement extends TransactionBlock {
 		return parameter;
 	}
 
-	protected Object checkParaOutOfCardinality(int idx , String paraSchemaInfo,
-											   Map<String, Integer> cardinality4paraInSchema, Map<String, Set<Object>> paraUsed){
-		Object parameter = geneParameter(idx);
-		if (cardinality4paraInSchema.containsKey(paraSchemaInfo)){
-			// 如果已经填满基数，不再重新构造，直接从已知的参数里找一个
-			if (cardinality4paraInSchema.get(paraSchemaInfo) == paraUsed.get(paraSchemaInfo).size()){
-//				if (cardinality4paraInSchema.get(paraSchemaInfo) > 1){
-//					System.out.println("full of para with size = "+cardinality4paraInSchema.get(paraSchemaInfo));
-//				}
+	private Object getParameterPartition(Object parameter, int idx){
+		Object paraPartition = parameter;
+		String paraIdentifier = operationId + "_para_" + idx;
+		ParameterNode parameterNode = parameterNodeMap.get(paraIdentifier);
+		if (parameterNode == null){
+			if (windowParaGenerators[idx] != null){
+				paraPartition = windowParaGenerators[idx].getParaPartition(parameter);
+			}
+			else{
+				paraPartition = fullLifeCycleParaGenerators[idx].getParaPartition(paraPartition);
+			}
+		}
 
-				parameter = new ArrayList<>(paraUsed.get(paraSchemaInfo)).get(
-						new Random().nextInt(cardinality4paraInSchema.get(paraSchemaInfo)));
+		return paraPartition;
+	}
+
+	protected Object checkParaOutOfCardinality(int idx , String paraSchemaInfo,
+											   Map<String, Integer> cardinality4paraInSchema, Map<String, Map<Object, List<Object>>> partitionUsed){
+		Object parameter = geneParameter(idx);
+		Object paraPartition = getParameterPartition(parameter, idx);
+
+
+		Map<Object, List<Object>> partitionUsedPara = partitionUsed.get(paraSchemaInfo);
+
+		if (!cardinality4paraInSchema.containsKey(paraSchemaInfo)){
+			return parameter;
+		}
+
+		if (Configurations.isUsePartitionRule()){
+			Random random = new Random();
+			if (cardinality4paraInSchema.get(paraSchemaInfo) == partitionUsedPara.size()){
+				if (!partitionUsedPara.containsKey(paraPartition)){// 如果已经填满基数，不再重新构造，直接从已知的参数里找一个
+					int partitionIdx = random.nextInt(partitionUsedPara.size());
+					Object partitionKey = new ArrayList<>(partitionUsedPara.keySet()).get(partitionIdx);
+
+					if (parameter.equals(paraPartition)) { //非分区键的参数就是它的key
+						parameter = partitionKey;
+					}else{ // 分区键的参数是value
+						partitionIdx = new Random().nextInt(partitionUsedPara.get(partitionKey).size());
+						parameter = partitionUsedPara.get(partitionKey).get(partitionIdx);
+					}
+				}
 			}
 			else{
 				// 如果还没填满就重复了，重新生成
-				while (Configurations.isUsePartitionRule() && paraUsed.get(paraSchemaInfo).contains(parameter) && new Random().nextDouble() < 0.7){
+				while (Configurations.isUsePartitionRule() && partitionUsedPara.containsKey(paraPartition) && random.nextDouble() < 0.7){
 					parameter = geneParameter(idx);
+					paraPartition = getParameterPartition(parameter, idx);
 				}
-				paraUsed.get(paraSchemaInfo).add(parameter);
 			}
 		}
+
+
+		if (!partitionUsedPara.containsKey(paraPartition)) {
+			partitionUsedPara.put(paraPartition, new ArrayList<>());
+		}
+		if (!partitionUsedPara.get(paraPartition).contains(paraPartition)){
+			partitionUsedPara.get(paraPartition).add(parameter);
+		}
+
+
 		return parameter;
 	}
 
-	protected Object checkParaOutOfCardinality(Object para , String paraSchemaInfo,
-											   Map<String, Integer> cardinality4paraInSchema, Map<String, Set<Object>> paraUsed){
+	protected Object checkParaOutOfCardinality(int idx, Object para , String paraSchemaInfo,
+											   Map<String, Integer> cardinality4paraInSchema, Map<String, Map<Object, List<Object>>> partitionUsed){
 		Object parameter = para;
-		if (cardinality4paraInSchema.containsKey(paraSchemaInfo)){
-			// 如果已经填满基数，不再重新构造，直接从已知的参数里找一个
-			if (cardinality4paraInSchema.get(paraSchemaInfo) == paraUsed.get(paraSchemaInfo).size()){
-//				if (cardinality4paraInSchema.get(paraSchemaInfo) > 1){
-//					System.out.println("full of para with size = "+cardinality4paraInSchema.get(paraSchemaInfo));
-//				}
+		Object paraPartition = getParameterPartition(parameter, idx);
 
-				parameter = new ArrayList<>(paraUsed.get(paraSchemaInfo)).get(
-						new Random().nextInt(cardinality4paraInSchema.get(paraSchemaInfo)));
-			}
-			else{
-				// 如果还没填满就重复了，打回重新生成
-				if (Configurations.isUsePartitionRule() && paraUsed.get(paraSchemaInfo).contains(parameter) && new Random().nextDouble() < 0.7){
-					return null;
+
+		Map<Object, List<Object>> partitionUsedPara = partitionUsed.get(paraSchemaInfo);
+		if (!cardinality4paraInSchema.containsKey(paraSchemaInfo)){
+			return parameter;
+		}
+
+		Random random = new Random();
+		if (cardinality4paraInSchema.get(paraSchemaInfo) == partitionUsedPara.size()){
+			if (!partitionUsedPara.containsKey(paraPartition)){// 如果已经填满基数，不再重新构造，直接从已知的参数里找一个
+				int partitionIdx = random.nextInt(partitionUsedPara.size());
+				Object partitionKey = new ArrayList<>(partitionUsedPara.keySet()).get(partitionIdx);
+
+				if (parameter.equals(paraPartition)) { //非分区键的参数就是它的key
+					parameter = partitionKey;
+				}else{ // 分区键的参数是value
+					partitionIdx = new Random().nextInt(partitionUsedPara.get(partitionKey).size());
+					parameter = partitionUsedPara.get(partitionKey).get(partitionIdx);
 				}
-				paraUsed.get(paraSchemaInfo).add(parameter);
 			}
+		}
+		else{
+			// 如果还没填满就重复了，重新生成
+			if (Configurations.isUsePartitionRule() && partitionUsedPara.containsKey(paraPartition) && random.nextDouble() < 0.7){
+				return null;
+			}
+		}
+
+
+		if (!partitionUsedPara.containsKey(paraPartition)) {
+			partitionUsedPara.put(paraPartition, new ArrayList<>());
+		}
+		if (!partitionUsedPara.get(paraPartition).contains(paraPartition)){
+			partitionUsedPara.get(paraPartition).add(parameter);
 		}
 		return parameter;
 	}
@@ -517,10 +572,10 @@ public abstract class SqlStatement extends TransactionBlock {
 	// 服务于Multiple块内操作的执行（非第一次执行）
 //	public abstract int execute(Map<String, Double> multipleLogicMap, int round);
 
-	public abstract int execute(Map<String, Integer> cardinality4paraInSchema, Map<String, Set<Object>> paraUsed,
+	public abstract int execute(Map<String, Integer> cardinality4paraInSchema, Map<String, Map<Object, List<Object>>> partitionUsed,
 								Map<String, Double> multipleLogicMap, int round);
 
-	public abstract int execute(Map<String, Integer> cardinality4paraInSchema, Map<String, Set<Object>> paraUsed,
+	public abstract int execute(Map<String, Integer> cardinality4paraInSchema, Map<String, Map<Object, List<Object>>> partitionUsed,
 								Statement stmt, Map<String, Double> multipleLogicMap, int round);
 
 //	public abstract int execute(Statement stmt, Map<String, Double> multipleLogicMap, int round);

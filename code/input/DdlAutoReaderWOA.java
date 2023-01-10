@@ -218,8 +218,8 @@ public class DdlAutoReaderWOA {
             //获取所有表的ddl
             String ddl = null;
             List<String> createFK = new ArrayList<>();
-//            laucaStmt.addBatch("SET @OLD_UNIQUE_CHECKS=@@UNIQUE_CHECKS, UNIQUE_CHECKS=0");
-//            laucaStmt.addBatch("SET @OLD_FOREIGN_KEY_CHECKS=@@FOREIGN_KEY_CHECKS, FOREIGN_KEY_CHECKS=0");
+            laucaStmt.addBatch("SET @OLD_UNIQUE_CHECKS=@@UNIQUE_CHECKS, UNIQUE_CHECKS=0");
+            laucaStmt.addBatch("SET @OLD_FOREIGN_KEY_CHECKS=@@FOREIGN_KEY_CHECKS, FOREIGN_KEY_CHECKS=0");
             for (Table value : tables) {
                 Set<String> cols = new HashSet<>();
                 String originalTableName = value.getName();
@@ -285,12 +285,13 @@ public class DdlAutoReaderWOA {
                 Matcher m = p.matcher(ddl.substring(index1, index2));
                 if (!m.find()) ddl = ddl.substring(0, index1) + ')';
                 //连接测试数据库，通过读取并修改的ddl语句建表
-                laucaStmt.execute("DROP TABLE IF EXISTS " + originalTableName);
+                laucaStmt.addBatch("DROP TABLE IF EXISTS " + originalTableName);
                 if (partitionRule != null){
                     ddl = ddl + partitionRule;
                 }
-                laucaStmt.execute(ddl  );
-                //System.out.println(ddl);
+                System.out.println(ddl);
+
+                laucaStmt.addBatch(ddl  );
 
                 //增加字段
                 Column[] columns = value.getColumns();
@@ -337,14 +338,15 @@ public class DdlAutoReaderWOA {
 //                    laucaStmt.addBatch(fkSQL);
 //                }
 //            }
-//            laucaStmt.addBatch("SET FOREIGN_KEY_CHECKS=@OLD_FOREIGN_KEY_CHECKS");
-//            laucaStmt.addBatch("SET UNIQUE_CHECKS=@OLD_UNIQUE_CHECKS");
-//            laucaStmt.executeBatch();
+            laucaStmt.addBatch("SET FOREIGN_KEY_CHECKS=@OLD_FOREIGN_KEY_CHECKS");
+            laucaStmt.addBatch("SET UNIQUE_CHECKS=@OLD_UNIQUE_CHECKS");
+            laucaStmt.executeBatch();
             System.out.println("建表成功！");
             oriStmt.close();
             laucaStmt.close();
         }catch (SQLException e ) {
             e.printStackTrace();
+            System.exit(0);
         }
         return FKs_Indexes;
     }

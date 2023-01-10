@@ -115,12 +115,8 @@ public class TxLogicAnalyzer {
 
 		// 所有可能被用到的列
 		Set<String> paraSchemaInfo = new HashSet<>();
-		for (List<String> para : opId2paraSchema.values()){
-			paraSchemaInfo.addAll(para);
-		}
-		for (String para : paraSchemaInfo){
-			cardinality4paraInSchema.put(para,new ArrayList<>());
-		}
+		opId2paraSchema.values().forEach(paraSchemaInfo::addAll);
+		paraSchemaInfo.forEach(para -> cardinality4paraInSchema.put(para,new ArrayList<>()));
 
 
 		for (TransactionData txData : txDataList){
@@ -129,9 +125,9 @@ public class TxLogicAnalyzer {
 
 
 			Map<String, Set<Object>> para4paraInSchema = new HashMap<>();
-			for (String para : paraSchemaInfo){
-				para4paraInSchema.put(para, new HashSet<>());
-			}
+
+			paraSchemaInfo.forEach(para -> para4paraInSchema.put(para, new HashSet<>()));
+
 
 			for (int i = 0; i < operationDatas.length; i++) {
 				if (operationTypes[i] == 1) {// 是循环中的操作并执行了多次
@@ -161,6 +157,7 @@ public class TxLogicAnalyzer {
 //			System.out.println(para+": "+ (cardinality4paraInSchema.get(para) ));
 			double sum = cardinality4paraInSchema.get(para).stream().mapToInt(e->e).sum();
 			ret.put(para, (int) (sum / txDataList.size()));
+
 		}
 //		System.out.println();
 		return ret;
@@ -174,7 +171,7 @@ public class TxLogicAnalyzer {
 
 		for (int i = 0; i < paraDataTypes.length; i++){
 			String para = strings.get(i);
-			int idx = para.indexOf("_");
+			int idx = para.indexOf("@");
 			String tableName = para.substring(0,idx);
 			String columnName = para.substring(idx + 1);
 

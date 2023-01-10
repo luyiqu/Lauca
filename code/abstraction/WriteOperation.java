@@ -52,7 +52,7 @@ public class WriteOperation extends SqlStatement {
 	}
 
 	@Override
-	public int execute(Map<String, Integer> cardinality4paraInSchema, Map<String, Set<Object>> paraUsed) {
+	public int execute(Map<String, Integer> cardinality4paraInSchema, Map<String, Map<Object, List<Object>>> partitionUsed) {
 //		long startTime = System.currentTimeMillis();
 //		long para = -1; //lyqu: 照理说不应该为long类型，而是int主键类型
 //		LaucaTestingEnv.writeOperationTimes.getAndIncrement();
@@ -68,7 +68,7 @@ public class WriteOperation extends SqlStatement {
 						i,
 						this.paraSchemaInfos.get(i),
 						cardinality4paraInSchema,
-						paraUsed
+						partitionUsed
 				);
 
 				setParameter(i + 1, paraDataTypes[i], parameter);
@@ -122,7 +122,7 @@ public class WriteOperation extends SqlStatement {
 	}
 
 	@Override
-	public int execute(Map<String, Integer> cardinality4paraInSchema, Map<String, Set<Object>> paraUsed, Statement stmt) {
+	public int execute(Map<String, Integer> cardinality4paraInSchema, Map<String, Map<Object, List<Object>>> partitionUsed, Statement stmt) {
 		
 		String tmp = sql; // 方便程序调试
 		
@@ -134,7 +134,7 @@ public class WriteOperation extends SqlStatement {
 						i,
 						this.paraSchemaInfos.get(i),
 						cardinality4paraInSchema,
-						paraUsed
+						partitionUsed
 				);
 
 				if (paraDataTypes[i] == 3) {
@@ -168,23 +168,23 @@ public class WriteOperation extends SqlStatement {
 	}
 
 	@Override
-	public int execute(Map<String, Integer> cardinality4paraInSchema, Map<String, Set<Object>> paraUsed,
+	public int execute(Map<String, Integer> cardinality4paraInSchema, Map<String, Map<Object, List<Object>>> partitionUsed,
 					   Map<String, Double> multipleLogicMap, int round) {
 		try {
 			for (int i = 0; i < paraDataTypes.length; i++) {
 
-				Object parameter = checkParaOutOfCardinality(
+				Object parameter = checkParaOutOfCardinality(i,
 						geneParameterByMultipleLogic(i, multipleLogicMap, round),
 						this.paraSchemaInfos.get(i),
 						cardinality4paraInSchema,
-						paraUsed
+						partitionUsed
 				);
 				while (parameter == null){
-					parameter = checkParaOutOfCardinality(
+					parameter = checkParaOutOfCardinality(i,
 							geneParameterByMultipleLogic(i, multipleLogicMap, round),
 							this.paraSchemaInfos.get(i),
 							cardinality4paraInSchema,
-							paraUsed
+							partitionUsed
 					);
 				}
 
@@ -211,24 +211,24 @@ public class WriteOperation extends SqlStatement {
 	}
 
 	@Override
-	public int execute(Map<String, Integer> cardinality4paraInSchema, Map<String, Set<Object>> paraUsed,
+	public int execute(Map<String, Integer> cardinality4paraInSchema, Map<String, Map<Object, List<Object>>> partitionUsed,
 					   Statement stmt, Map<String, Double> multipleLogicMap, int round) {
 		try {
 			String tmp = sql;
 			for (int i = 0; i < paraDataTypes.length; i++) {
 
-				Object parameter = checkParaOutOfCardinality(
+				Object parameter = checkParaOutOfCardinality(i,
 						geneParameterByMultipleLogic(i, multipleLogicMap, round),
 						this.paraSchemaInfos.get(i),
 						cardinality4paraInSchema,
-						paraUsed
+						partitionUsed
 				);
 				while (parameter == null){
-					parameter = checkParaOutOfCardinality(
+					parameter = checkParaOutOfCardinality(i,
 							geneParameterByMultipleLogic(i, multipleLogicMap, round),
 							this.paraSchemaInfos.get(i),
 							cardinality4paraInSchema,
-							paraUsed
+							partitionUsed
 					);
 				}
 				if (paraDataTypes[i] == 3) {

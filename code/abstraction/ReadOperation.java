@@ -4,13 +4,10 @@ import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.sql.Statement;
 import java.sql.Timestamp;
-import java.text.SimpleDateFormat;
 import java.util.*;
 
 import accessdistribution.DataAccessDistribution;
 import accessdistribution.DistributionTypeInfo;
-import com.mysql.jdbc.exceptions.MySQLSyntaxErrorException;
-import workloadgenerator.LaucaTestingEnv;
 
 public class ReadOperation extends SqlStatement {
 
@@ -18,7 +15,7 @@ public class ReadOperation extends SqlStatement {
 	private int[] returnDataTypes = null;
 	private boolean filterPrimaryKey;
 
-	// tableName_columnName
+	// tableName@columnName
 	private List<String> paraSchemaInfos = new ArrayList<>();
 
 	public ReadOperation(int operationId, String sql, int[] paraDataTypes, DistributionTypeInfo[] paraDistTypeInfos,List<String> paraSchemaInfos,
@@ -80,7 +77,7 @@ public class ReadOperation extends SqlStatement {
 	}
 
 	@Override
-	public int execute(Map<String, Integer> cardinality4paraInSchema, Map<String, Set<Object>> paraUsed) {
+	public int execute(Map<String, Integer> cardinality4paraInSchema, Map<String, Map<Object, List<Object>>> partitionUsed) {
 //		long startTime = System.currentTimeMillis();
 		try {
 			for (int i = 0; i < paraDataTypes.length; i++) {
@@ -89,7 +86,15 @@ public class ReadOperation extends SqlStatement {
 //				System.out.println(para+" "+para.getClass());
 //				System.out.println(paraDataTypes[i]);
 //				System.out.println("**************");
-				setParameter(i + 1, paraDataTypes[i], geneParameter(i));
+				Object parameter = checkParaOutOfCardinality(
+						i,
+						this.paraSchemaInfos.get(i),
+						cardinality4paraInSchema,
+						partitionUsed
+				);
+
+
+				setParameter(i + 1, paraDataTypes[i], parameter);
 			}
 //			long endTime = System.currentTimeMillis();
 //			LaucaTestingEnv.geneTime += endTime - startTime;
@@ -104,15 +109,14 @@ public class ReadOperation extends SqlStatement {
 				return -1;
 			}
 			System.out.println("bbbbbbb"+pstmt.toString());
-			System.out.println(this.getClass().getName());
-			System.out.println(sql);
 			e.printStackTrace();
+			System.out.println(sql);
 			return 0;
 		}
 	}
 
 	@Override
-	public int execute(Map<String, Integer> cardinality4paraInSchema, Map<String, Set<Object>> paraUsed, Statement stmt) {
+	public int execute(Map<String, Integer> cardinality4paraInSchema, Map<String, Map<Object, List<Object>>> partitionUsed, Statement stmt) {
 		try {
 			String tmp = sql;
 			for (int i = 0; i < paraDataTypes.length; i++) {
@@ -139,13 +143,28 @@ public class ReadOperation extends SqlStatement {
 	}
 
 	@Override
-	public int execute(Map<String, Integer> cardinality4paraInSchema, Map<String, Set<Object>> paraUsed,
+	public int execute(Map<String, Integer> cardinality4paraInSchema, Map<String, Map<Object, List<Object>>> partitionUsed,
 					   Map<String, Double> multipleLogicMap, int round) {
 //		long startTime = System.currentTimeMillis();
 //		System.out.println("照例说Read操作肯定会走这里，但这里是指multiple的事务逻辑");
 		try {
 			for (int i = 0; i < paraDataTypes.length; i++) {
-				setParameter(i + 1, paraDataTypes[i], geneParameterByMultipleLogic(i, multipleLogicMap, round));
+				Object parameter = checkParaOutOfCardinality(i,
+						geneParameterByMultipleLogic(i, multipleLogicMap, round),
+						this.paraSchemaInfos.get(i),
+						cardinality4paraInSchema,
+						partitionUsed
+				);
+				while (parameter == null){
+					parameter = checkParaOutOfCardinality(i,
+							geneParameterByMultipleLogic(i, multipleLogicMap, round),
+							this.paraSchemaInfos.get(i),
+							cardinality4paraInSchema,
+							partitionUsed
+					);
+				}
+
+				setParameter(i + 1, paraDataTypes[i], parameter);
 			}
 
 //			long endTime = System.currentTimeMillis();
@@ -168,7 +187,7 @@ public class ReadOperation extends SqlStatement {
 	}
 
 	@Override
-	public int execute(Map<String, Integer> cardinality4paraInSchema, Map<String, Set<Object>> paraUsed,
+	public int execute(Map<String, Integer> cardinality4paraInSchema, Map<String, Map<Object, List<Object>>> partitionUsed,
 					   Statement stmt, Map<String, Double> multipleLogicMap, int round) {
 		try {
 			String tmp = sql;

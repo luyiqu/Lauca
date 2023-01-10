@@ -15,6 +15,7 @@ import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.atomic.AtomicInteger;
 
 import abstraction.*;
+import com.mysql.jdbc.log.Log;
 import input.DdlAutoReaderWOA;
 import org.apache.log4j.PropertyConfigurator;
 import org.postgresql.copy.CopyManager;
@@ -153,34 +154,68 @@ public class LaucaTestingEnv {
             //将Table中的数据全部导入数据库中
 			File laucaTablesDir = new File(Configurations.getLaucaTablesDir());
 			File[] tableDataFiles = laucaTablesDir.listFiles();
-			for (File tableDataFile : tableDataFiles) {
-				String tableName = tableDataFile.getName().substring(0, tableDataFile.getName().length() - 6);
-				switch (databaseType) {
-					case "mysql":
-					case "tidb":
-						stmt.execute("LOAD DATA  INFILE '" + tableDataFile.getCanonicalPath() + "' INTO TABLE "
-								+ tableName + " FIELDS TERMINATED BY ',' LINES TERMINATED BY '\r\n'");
-						break;
-					case "postgresql":
-						CopyManager copyManager = new CopyManager((BaseConnection) laucaConn);
-						copyManager.copyIn("COPY " + tableName + " FROM stdin DELIMITER as ',';", new FileReader(new File(
-								String.valueOf(tableDataFile.getCanonicalPath()))));
-						break;
-					case "oracle":
-						File ctldir = new File(".//testdata//ctl");
-						if (!ctldir.exists()) {
-							ctldir.mkdirs();
-						}
-						TableInfoSerializer serializer = new TableInfoSerializer();
-						List<Table> tables = serializer.read(new File(Configurations.getDataCharacteristicSaveFile()));
-						Map<String, Table> name2table = new HashMap<String, Table>();
-						for (Table table : tables) {
-							name2table.put(table.getName(), table);
-						}
-						LaucaTestingEnv.oracleLoader(tableDataFile, name2table.get(tableName));
-						break;
+			try {
+				CountDownLatch countDownLatch = new CountDownLatch(tableDataFiles.length);
+				long startTime = System.currentTimeMillis();
+				for (File tableDataFile : tableDataFiles) {
+					Connection finalLaucaConn = laucaConn;
+					new Thread(() -> {
+						String tableName = tableDataFile.getName().substring(0, tableDataFile.getName().length() - 6);
+						System.out.println(tableDataFile.getName()+" loading...");
+						switch (databaseType) {
+							case "mysql":
+							case "tidb":
+								try {
+									stmt.execute("LOAD DATA  INFILE '" + tableDataFile.getCanonicalPath() + "' INTO TABLE "
+											+ tableName + " FIELDS TERMINATED BY ',' LINES TERMINATED BY '\r\n'");
+								} catch (SQLException | IOException e) {
+									throw new RuntimeException(e);
+								}
+								break;
+							case "postgresql":
+								CopyManager copyManager = null;
+								try {
+									copyManager = new CopyManager((BaseConnection) finalLaucaConn);
+								} catch (SQLException e) {
+									throw new RuntimeException(e);
+								}
+								try {
+									copyManager.copyIn("COPY " + tableName + " FROM stdin DELIMITER as ',';", new FileReader(new File(
+											String.valueOf(tableDataFile.getCanonicalPath()))));
+								} catch (SQLException | IOException e) {
+									throw new RuntimeException(e);
+								}
+								break;
+							case "oracle":
+								File ctldir = new File(".//testdata//ctl");
+								if (!ctldir.exists()) {
+									ctldir.mkdirs();
+								}
+								TableInfoSerializer serializer = new TableInfoSerializer();
+								List<Table> tables = serializer.read(new File(Configurations.getDataCharacteristicSaveFile()));
+								Map<String, Table> name2table = new HashMap<String, Table>();
+								for (Table table : tables) {
+									name2table.put(table.getName(), table);
+								}
+								try {
+									LaucaTestingEnv.oracleLoader(tableDataFile, name2table.get(tableName));
+								} catch (IOException e) {
+									throw new RuntimeException(e);
+								}
+								break;
+						};
+
+						System.out.println(tableDataFile.getName()+" loaded at" +( System.currentTimeMillis() - startTime));
+						countDownLatch.countDown();
+					}).start();
+
 				}
+				countDownLatch.await();
 			}
+			catch (Exception e){
+				e.printStackTrace();
+			}
+
 			System.out.println("数据导入成功！");
 			//建外键，UNIQUE，索引等
 			stmt.execute("SET @OLD_UNIQUE_CHECKS=@@UNIQUE_CHECKS, UNIQUE_CHECKS=0");
@@ -195,7 +230,7 @@ public class LaucaTestingEnv {
 			stmt.close();
 			oriConn.close();
 			laucaConn.close();
-		} catch (SQLException | IOException e) {
+		} catch (SQLException e) {
 			e.printStackTrace();
 		}
 	}

@@ -5,6 +5,8 @@ import java.io.File;
 import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.OutputStreamWriter;
+import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
 import java.text.SimpleDateFormat;
 import java.util.List;
 import java.util.concurrent.CountDownLatch;
@@ -36,12 +38,12 @@ public class DataGenerator {
 	public void setUp() {
 		int threadId = machineId * singleMachineThreadNum;
 		int threadNum = machineNum * singleMachineThreadNum;
-		
-		for (int i = 0; i < tables.size(); i++) {
+
+		for (Table table : tables) {
 			CountDownLatch cdl = new CountDownLatch(singleMachineThreadNum);
 			for (int j = 0; j < singleMachineThreadNum; j++) { //qly： 一个table的一个线程进行调用
-				new Thread(new DataGenerationThread(threadId + j, threadNum, tables.get(i).clone(), 
-						new File(outputDir + "//" + tables.get(i).getName() + "_" + (threadId + j) + ".txt"), 
+				new Thread(new DataGenerationThread(threadId + j, threadNum, table.clone(),
+						new File(outputDir + "//" + table.getName() + "_" + (threadId + j) + ".txt"),
 						cdl)).start();
 			}
 			try {
@@ -98,7 +100,7 @@ class DataGenerationThread implements Runnable {
 		table.setThreadNum(threadNum);
 		table.setThreadId(threadId);
 		try  {
-			BufferedWriter bw = new BufferedWriter(new OutputStreamWriter(new FileOutputStream(outputFile), "utf-8"));
+			BufferedWriter bw = new BufferedWriter(new OutputStreamWriter(Files.newOutputStream(outputFile.toPath()), StandardCharsets.UTF_8));
 			StringBuilder sb = new StringBuilder();
 			while (true) {
 				Object[] tuple = table.geneTuple(sdf);

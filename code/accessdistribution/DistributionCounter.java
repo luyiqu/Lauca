@@ -223,7 +223,7 @@ public class DistributionCounter {
 
 //		System.out.println(data);
 		// 没有分区键或者不是数值类型的情况下，不建分区的分布
-		if (!Configurations.isUsePartitionRule() || partition == null || distTypeInfo.dataType >= 3){
+		if (partition == null || distTypeInfo.dataType >= 3){
 			DataAccessDistribution distribution = countDistribution(txName, paraIdentifier, distTypeInfo, data);
 			distribution.setTime(windowTime);
 			txName2ParaId2DistributionList.get(txName).get(paraIdentifier).add(distribution);
@@ -270,6 +270,14 @@ public class DistributionCounter {
 		double[] hFItemFrequencies = new double[0];
 		long[] intervalCardinalities = new long[length];
 		double[] intervalFrequencies = new double[length];
+
+		// 如果不使用分区规则的话，全部放在第一个分区对应的直方图里
+		if (!Configurations.isUsePartitionRule()){
+			distributions.add(countDistribution(txName, paraIdentifier, distTypeInfo, data));
+			intervalCardinalities[0] = getValueNumEntryList(data).size();
+			intervalFrequencies[0] = 1;
+			return new MultiPartitionDistribution<>(hFItemFrequencies, intervalCardinalities, intervalFrequencies, partition, distributions);
+		}
 
 		// 分到不同分区
 		Map<String, List<String>> dataInPartition = new HashMap<>();
@@ -596,12 +604,7 @@ public class DistributionCounter {
 	private static <T> List<Entry<T, Integer>> getValueNumEntryList(List<T> values) {
 		Map<T, Integer> value2Num = new HashMap<>();
 		for (T value : values) {
-			if (value2Num.containsKey(value)) {
-				int num = value2Num.get(value) + 1;
-				value2Num.put(value, num);
-			} else {
-				value2Num.put(value, 1);
-			}
+			value2Num.put(value, value2Num.get(value) == null ? 1 : value2Num.get(value) + 1);
 		}
 
 		Iterator<Entry<T, Integer>> iter = value2Num.entrySet().iterator();
@@ -645,7 +648,7 @@ public class DistributionCounter {
 		for (int i = 0;i < intervalNum; ++i){
 			intervalFreqLength[i] = (intervalFrequencies[i] / binNum);
 			cdfPerInterval[i] = 0;
-			quantilePerInterval.add(new ArrayList<Double>());
+			quantilePerInterval.add(new ArrayList<>());
 			quantilePerInterval.get(i).add(0.0);
 		}
 		// 按键值升序排列
@@ -1107,7 +1110,7 @@ public class DistributionCounter {
 		for (Transaction transaction : transactions) {
 			Map<String,String> paraId2Name = transaction.getParaId2Name();
 			for (String paraId : paraId2Name.keySet()){
-				int idx = paraId2Name.get(paraId).indexOf("_");
+				int idx = paraId2Name.get(paraId).indexOf("@");
 				String tableName = paraId2Name.get(paraId).substring(0,idx);
 				String columnName = paraId2Name.get(paraId).substring(idx+1);
 

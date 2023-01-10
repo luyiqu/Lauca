@@ -225,4 +225,8 @@ public abstract class DataAccessDistribution implements Comparable<DataAccessDis
 	public double getSimilarity(DataAccessDistribution dataAccessDistribution){
 		return -1.0;
 	};
+
+	public Object getParaPartition(Object para){
+		return para;
+	}
 }

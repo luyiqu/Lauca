@@ -9,6 +9,7 @@ import java.util.*;
 import accessdistribution.DataAccessDistribution;
 import transactionlogic.ParameterNode;
 import workloadgenerator.LaucaTestingEnv;
+import workloadgenerator.Stats;
 
 public class Transaction{
 
@@ -173,9 +174,9 @@ public class Transaction{
 		long startTime = System.nanoTime();
 		int flag = 1;
 
-		Map<String, Set<Object>> paraUsed = new HashMap<>();
+		Map<String, Map<Object, List<Object>>>  partitionUsed = new HashMap<>();
 		for (String para : cardinality4paraInSchema.keySet()){
-			paraUsed.put(para, new HashSet<>());
+			partitionUsed.put(para, new HashMap<>());
 		}
 
 
@@ -188,14 +189,14 @@ public class Transaction{
 //		}
 		for (int i = 0; i < transactionBlocks.size(); i++) {
 			if (prepared) {
-				flag = transactionBlocks.get(i).execute(cardinality4paraInSchema, paraUsed);
+				flag = transactionBlocks.get(i).execute(cardinality4paraInSchema, partitionUsed);
 				if (flag != 1) {
 //					System.out.println("prepared"+this.name+" "+i);
 					break;
 				}
 			} else {
 
-				flag = transactionBlocks.get(i).execute(cardinality4paraInSchema, paraUsed, stmt);
+				flag = transactionBlocks.get(i).execute(cardinality4paraInSchema, partitionUsed, stmt);
 //				System.out.println("NoPrepared: "+transactionBlocks.get(i));
 				if (flag != 1) {
 					break;
@@ -214,6 +215,23 @@ public class Transaction{
 			if (flag == 1) {
 				this.cleanBatch(transactionBlocks);
 				conn.commit();
+
+				// wsy 统计该事务访问的分区数
+				int partitionCnt = 0;
+				for (Map<Object, List<Object>> paraList4partition: partitionUsed.values()){
+					if (paraList4partition.size() == 0){
+						continue;
+					}
+
+					int cnt = 1;
+					if (paraList4partition.get(0).size() > 0){// 只统计带分区的基数
+						cnt = paraList4partition.size();
+					}
+					partitionCnt = Math.max(partitionCnt, cnt);
+
+					Stats.addPartitionCnt(partitionCnt);
+				}
+
 			} else {
 				this.cleanBatch(transactionBlocks);
 				conn.rollback();

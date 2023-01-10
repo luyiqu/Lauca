@@ -33,17 +33,17 @@ public class MultiPartitionDistribution<T extends Number> extends DataAccessDist
         while (partitionDistribution.get(idx) == null) {
             idx = (idx+1) % partitionDistribution.size();
         }
-        if (partitionCount > 1) {
-            lastPartition = (lastPartition + 1) % partitionDistribution.size();
-        }
-
-        if (lastPartition == idx){
-            partitionCount ++;
-        }
-        else{
-            lastPartition = idx;
-            partitionCount = 1;
-        }
+//        if (partitionCount > 1) {
+//            lastPartition = (lastPartition + 1) % partitionDistribution.size();
+//        }
+//
+//        if (lastPartition == idx){
+//            partitionCount ++;
+//        }
+//        else{
+//            lastPartition = idx;
+//            partitionCount = 1;
+//        }
 
 
         return partitionDistribution.get(idx).geneValue();
@@ -62,6 +62,11 @@ public class MultiPartitionDistribution<T extends Number> extends DataAccessDist
             }
         }
         return false;
+    }
+
+    @Override
+    public Object getParaPartition(Object parameter){
+        return partition.getPartition((T) parameter);
     }
 
     @Override

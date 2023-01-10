@@ -1,9 +1,6 @@
 package abstraction;
 
-import workloadgenerator.LaucaTestingEnv;
-
 import java.sql.Connection;
-import java.sql.SQLException;
 import java.sql.Statement;
 import java.util.*;
 
@@ -54,7 +51,7 @@ public class Branch extends TransactionBlock {
 	}
 
 	@Override
-	public int execute(Map<String, Integer> cardinality4paraInSchema, Map<String, Set<Object>> paraUsed){
+	public int execute(Map<String, Integer> cardinality4paraInSchema, Map<String, Map<Object, List<Object>>> partitionUsed){
 		double randomValue = Math.random();
 		if (randomValue > 0.99999999) {
 			randomValue = randomValue - 0.000000001;
@@ -63,7 +60,7 @@ public class Branch extends TransactionBlock {
 		for (int i = 0; i < cumulativeRatios.length; i++) {
 			if (randomValue < cumulativeRatios[i]) {
 				for (int j = 0; j < branches.get(i).size(); j++) {
-					int flag = branches.get(i).get(j).execute(cardinality4paraInSchema, paraUsed);
+					int flag = branches.get(i).get(j).execute(cardinality4paraInSchema, partitionUsed);
 					if (flag != 1) {
 						return flag;
 					}
@@ -76,7 +73,7 @@ public class Branch extends TransactionBlock {
 	}
 
 	@Override
-	public int execute(Map<String, Integer> cardinality4paraInSchema, Map<String, Set<Object>> paraUsed, Statement stmt) {
+	public int execute(Map<String, Integer> cardinality4paraInSchema, Map<String, Map<Object, List<Object>>> partitionUsed, Statement stmt) {
 		double randomValue = Math.random();
 		if (randomValue > 0.99999999) {
 			randomValue = randomValue - 0.000000001;
@@ -85,7 +82,7 @@ public class Branch extends TransactionBlock {
 		for (int i = 0; i < cumulativeRatios.length; i++) {
 			if (randomValue < cumulativeRatios[i]) {
 				for (int j = 0; j < branches.get(i).size(); j++) {
-					int flag = branches.get(i).get(j).execute(cardinality4paraInSchema, paraUsed, stmt);
+					int flag = branches.get(i).get(j).execute(cardinality4paraInSchema, partitionUsed, stmt);
 					if (flag != 1) {
 						return flag;
 					}

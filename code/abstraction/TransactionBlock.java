@@ -1,14 +1,9 @@
 package abstraction;
 
 import java.sql.Connection;
-import java.sql.SQLException;
 import java.sql.Statement;
-import java.util.ArrayList;
-import java.util.Map;
-import java.util.Random;
-import java.util.Set;
+import java.util.*;
 
-import config.Configurations;
 import transactionlogic.ParameterNode;
 
 public abstract class TransactionBlock {
@@ -20,10 +15,16 @@ public abstract class TransactionBlock {
 
 //	public abstract int execute();
 //	public abstract int execute(Statement stmt);
-	public abstract int execute(Map<String, Integer> cardinality4paraInSchema, Map<String, Set<Object>> paraUsed);
-	public abstract int execute(Map<String, Integer> cardinality4paraInSchema, Map<String, Set<Object>> paraUsed,
+
+	/**
+	 * @param cardinality4paraInSchema 单个事务里每个参数的分区基数
+	 * @param partitionUsed paraId -> partitionName -> 每个分区里已经用了的参数，如果是没有分区键的属性，partitionName就是参数本身
+	 * @return
+	 */
+	public abstract int execute(Map<String, Integer> cardinality4paraInSchema, Map<String, Map<Object, List<Object>>> partitionUsed);
+	public abstract int execute(Map<String, Integer> cardinality4paraInSchema, Map<String, Map<Object, List<Object>>> partitionUsed,
 								Statement stmt);
-	// 返回paraid和对应的tableName_columnName
+	// 返回paraid和对应的tableName@columnName
 	public abstract Map<String, String> getParaId2Name();
 
 	// String: paraIdentifier = operationId + "_para_" + paraIndex;
