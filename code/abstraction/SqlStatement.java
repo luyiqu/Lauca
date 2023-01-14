@@ -48,29 +48,34 @@ public abstract class SqlStatement extends TransactionBlock {
 
 	// 注意这里的obj都是包装类型，index的起始位置是1
 	protected void setParameter(int index, int dataType, Object obj) throws SQLException {
-		switch (dataType) {
-		case 0:
-			pstmt.setLong(index, (Long) obj);
-			break;
-		case 1:
-			pstmt.setDouble(index, (Double) obj);
-			break;
-		case 2:
-			pstmt.setBigDecimal(index, new BigDecimal(obj.toString()));
-			break;
-		case 3:
-			// pstmt.setDate(index, new Date((Long)obj));
-			pstmt.setTimestamp(index, new Timestamp((Long) obj));
-			break;
-		case 4:
-			pstmt.setString(index, obj.toString());
-			break;
-		case 5:
-			pstmt.setBoolean(index, (Boolean) obj);
-			break;
-		default:
-			System.err.println("Unrecognized data type!");
+		try{
+			switch (dataType) {
+				case 0:
+					pstmt.setLong(index, (Long) obj);
+					break;
+				case 1:
+					pstmt.setDouble(index, (Double) obj);
+					break;
+				case 2:
+					pstmt.setBigDecimal(index, new BigDecimal(obj.toString()));
+					break;
+				case 3:
+					// pstmt.setDate(index, new Date((Long)obj));
+					pstmt.setTimestamp(index, new Timestamp((Long) obj));
+					break;
+				case 4:
+					pstmt.setString(index, obj.toString());
+					break;
+				case 5:
+					pstmt.setBoolean(index, (Boolean) obj);
+					break;
+				default:
+					System.err.println("Unrecognized data type!");
+			}
+		}catch (Exception e){
+			e.printStackTrace();
 		}
+
 	}
 //
 //	protected Object geneParameter(int paraIndex) {
@@ -379,14 +384,14 @@ public abstract class SqlStatement extends TransactionBlock {
 		Object paraPartition = parameter;
 		String paraIdentifier = operationId + "_para_" + idx;
 		ParameterNode parameterNode = parameterNodeMap.get(paraIdentifier);
-		if (parameterNode == null){
+//		if (parameterNode == null){
 			if (windowParaGenerators[idx] != null){
 				paraPartition = windowParaGenerators[idx].getParaPartition(parameter);
 			}
-			else{
+			else if(fullLifeCycleParaGenerators[idx] != null){
 				paraPartition = fullLifeCycleParaGenerators[idx].getParaPartition(paraPartition);
 			}
-		}
+//		}
 
 		return paraPartition;
 	}
@@ -394,9 +399,12 @@ public abstract class SqlStatement extends TransactionBlock {
 	protected Object checkParaOutOfCardinality(int idx , String paraSchemaInfo,
 											   Map<String, Integer> cardinality4paraInSchema, Map<String, Map<Object, List<Object>>> partitionUsed){
 		Object parameter = geneParameter(idx);
+//		if (paraSchemaInfo.contains("@w_id") ){
+//			System.out.println();
+//		}
 		Object paraPartition = getParameterPartition(parameter, idx);
 
-		boolean hasPartition = !paraPartition.equals(parameter);
+		boolean hasPartition =  paraPartition.toString().contains("p") && !parameter.equals(paraPartition);
 
 
 		Map<Object, List<Object>> partitionUsedPara = partitionUsed.get(paraSchemaInfo);
@@ -408,15 +416,15 @@ public abstract class SqlStatement extends TransactionBlock {
 		if (Configurations.isUsePartitionRule()){
 			Random random = new Random();
 			if (cardinality4paraInSchema.get(paraSchemaInfo) == partitionUsedPara.size()){
-				if (paraSchemaInfo.contains("s_w_id") ){
-					System.out.println(partitionUsedPara.size()+" "+partitionUsedPara.get(paraPartition) + " " + paraPartition + " " + parameter);
-				}
+//				if (paraSchemaInfo.contains("s_w_id") ){
+//					System.out.println(partitionUsedPara.size()+" "+partitionUsedPara.get(paraPartition) + " " + paraPartition + " " + parameter);
+//				}
 				if (!partitionUsedPara.containsKey(paraPartition)){// 如果已经填满基数，不再重新构造，直接从已知的参数里找一个
 
 					int partitionIdx = random.nextInt(partitionUsedPara.size());
 					paraPartition = new ArrayList<>(partitionUsedPara.keySet()).get(partitionIdx);
 
-					if (!hasPartition) { //非分区键的参数就是它的key
+					if (!paraPartition.toString().contains("p")) { //非分区键的参数就是它的key
 						parameter = paraPartition;
 					}else{ // 分区键的参数是value
 						partitionIdx = new Random().nextInt(partitionUsedPara.get(paraPartition).size());
@@ -426,10 +434,10 @@ public abstract class SqlStatement extends TransactionBlock {
 			}
 			else{
 				// 如果还没填满就重复了，重新生成
-				while (Configurations.isUsePartitionRule() && partitionUsedPara.containsKey(paraPartition) && random.nextDouble() < 0.7){
-					parameter = geneParameter(idx);
-					paraPartition = getParameterPartition(parameter, idx);
-				}
+//				while (Configurations.isUsePartitionRule() && partitionUsedPara.containsKey(paraPartition) && random.nextDouble() < 0.7){
+//					parameter = geneParameter(idx);
+//					paraPartition = getParameterPartition(parameter, idx);
+//				}
 			}
 		}
 
@@ -450,7 +458,7 @@ public abstract class SqlStatement extends TransactionBlock {
 		Object parameter = para;
 		Object paraPartition = getParameterPartition(parameter, idx);
 
-		boolean hasPartition = !paraPartition.equals(parameter);
+		boolean hasPartition = paraPartition.toString().contains("p") && !parameter.equals(paraPartition);
 
 
 		Map<Object, List<Object>> partitionUsedPara = partitionUsed.get(paraSchemaInfo);
@@ -462,16 +470,16 @@ public abstract class SqlStatement extends TransactionBlock {
 		if (Configurations.isUsePartitionRule()){
 			Random random = new Random();
 			if (cardinality4paraInSchema.get(paraSchemaInfo) == partitionUsedPara.size()){
-				if (paraSchemaInfo.contains("s_w_id") ){
-					System.out.println(partitionUsedPara.size()+" "+partitionUsedPara.get(paraPartition) + " " + paraPartition + " " + parameter);
-				}
+//				if (paraSchemaInfo.contains("s_w_id") ){
+//					System.out.println(partitionUsedPara.size()+" "+partitionUsedPara.get(paraPartition) + " " + paraPartition + " " + parameter);
+//				}
 				if (!partitionUsedPara.containsKey(paraPartition)){// 如果已经填满基数，不再重新构造，直接从已知的参数里找一个
 
 
 					int partitionIdx = random.nextInt(partitionUsedPara.size());
 					paraPartition = new ArrayList<>(partitionUsedPara.keySet()).get(partitionIdx);
 
-					if (!hasPartition) { //非分区键的参数就是它的key
+					if (hasPartition) { //非分区键的参数就是它的key
 						parameter = paraPartition;
 					}else{ // 分区键的参数是value
 						partitionIdx = new Random().nextInt(partitionUsedPara.get(paraPartition).size());
@@ -481,9 +489,9 @@ public abstract class SqlStatement extends TransactionBlock {
 			}
 			else{
 				// 如果还没填满就重复了，重新生成
-				if (Configurations.isUsePartitionRule() && partitionUsedPara.containsKey(paraPartition) && random.nextDouble() < 0.7){
-					return null;
-				}
+//				if (Configurations.isUsePartitionRule() && partitionUsedPara.containsKey(paraPartition) && random.nextDouble() < 0.7){
+//					return null;
+//				}
 			}
 		}
 

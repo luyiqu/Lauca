@@ -222,11 +222,13 @@ public class Transaction{
 						continue;
 					}
 
-					int cnt = 1;
-					Object key = new ArrayList<>(paraList4partition.keySet()).get(0);
-					if (paraList4partition.get(key).size() > 0){// 只统计带分区的基数
-						cnt = paraList4partition.size();
+					int cnt = 0;
+					for (Object key : paraList4partition.keySet()){
+						if (paraList4partition.get(key).size() > 0){// 只统计带分区的基数
+							cnt ++;
+						}
 					}
+					cnt = cnt == 0 ? 1 : cnt;
 					partitionCnt = Math.max(partitionCnt, cnt);
 				}
 				Stats.addPartitionCnt(partitionCnt);
