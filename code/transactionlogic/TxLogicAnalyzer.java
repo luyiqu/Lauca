@@ -11,6 +11,7 @@ import java.util.Map.Entry;
 import java.util.Set;
 import java.util.TreeMap;
 
+import abstraction.Partition;
 import org.apache.log4j.PropertyConfigurator;
 
 import abstraction.Table;
@@ -51,28 +52,41 @@ public class TxLogicAnalyzer {
 		// if/else分支执行比例，multiple内操作平均执行次数
 		countIfElseMultipleExecutionInfo(txDataList);
 
+		// 构造每个参数和对应的分区规则的映射联系，如果没有对应的分区规则则置为null
+		Map<Integer, List<Partition>> opId2Partition = constructOpId2Partition(tables,opId2paraSchema);
+
 		// 等于依赖关系
 		EqualRelationAnalyzer equalRelationAnalyzer = new EqualRelationAnalyzer();
 		Map<String, Map<String, Integer>> para2ParaOrResult2EqualCounter = equalRelationAnalyzer
 				.countEqualInfo(txDataList);
-		List<Entry<String, List<Entry<String, Double>>>> formatedEqualCounter = Util
+		List<Entry<String, List<Entry<String, Double>>>> formattedEqualCounter = Util
 				.convertCounter(para2ParaOrResult2EqualCounter, operationId2ExecutionNum);
-//		System.out.println("ER\n"+formatedEqualCounter);
+//		System.out.println("ER\n"+formattedEqualCounter);
 
-		List<Set<String>> identicalSets = equalRelationAnalyzer.obtainIdenticalSets(formatedEqualCounter);
+		List<Set<String>> identicalSets = equalRelationAnalyzer.obtainIdenticalSets(formattedEqualCounter);
 
 		if (Configurations.isEqualRelationFlag()) {
-			equalRelationAnalyzer.constructDependency(parameterNodeMap, formatedEqualCounter, identicalSets);
+			equalRelationAnalyzer.constructDependency(parameterNodeMap, formattedEqualCounter, identicalSets);
+		}
+
+		// 分区等于依赖关系
+		PartitionEqualRelationAnalyzer partitionEqualRelationAnalyzer = new PartitionEqualRelationAnalyzer();
+		Map<String, Map<String, Integer>> para2Para2PartitionEqualCounter = partitionEqualRelationAnalyzer.countPartitionEqualInfo(txDataList, opId2Partition, opId2paraSchema);
+		List<Entry<String, List<Entry<String, Double>>>> formattedPartitionEqualCounter = Util
+				.convertCounter(para2Para2PartitionEqualCounter, operationId2ExecutionNum);
+
+		if (Configurations.isUsePartitionRule()){
+
 		}
 
 		// 包含依赖关系
 		IncludeRelationAnalyzer includeRelationAnalyzer = new IncludeRelationAnalyzer();
 		Map<String, Map<String, Integer>> para2Result2IncludeCounter = includeRelationAnalyzer
 				.countIncludeInfo(txDataList);
-		List<Entry<String, List<Entry<String, Double>>>> formatedIncludeCounter = Util
+		List<Entry<String, List<Entry<String, Double>>>> formattedIncludeCounter = Util
 				.convertCounter(para2Result2IncludeCounter, operationId2ExecutionNum);
 		if (Configurations.isIncludeRelationFlag()) {
-			includeRelationAnalyzer.constructDependency(parameterNodeMap, formatedIncludeCounter, identicalSets);
+			includeRelationAnalyzer.constructDependency(parameterNodeMap, formattedIncludeCounter, identicalSets);
 		}
 
 		// 线性依赖关系
@@ -96,7 +110,7 @@ public class TxLogicAnalyzer {
 		}
 
 		// 统计基数约束
-//		cardinality4paraInSchema = obtainCardinality(tables, txDataList, opId2paraSchema);
+		cardinality4paraInSchema = obtainCardinality(tables, txDataList, opId2paraSchema);
 
 		// between and 逻辑
 		// TODO
@@ -107,6 +121,45 @@ public class TxLogicAnalyzer {
 
 
 
+	}
+
+	/**
+	 * 构建op id->每个op的参数与分区规则的映射，如果没有对应规则则置空
+	 * @param tables
+	 * @param opId2paraSchema
+	 * @return
+	 */
+	private Map<Integer, List<Partition>> constructOpId2Partition(List<Table> tables, Map<Integer, List<String>> opId2paraSchema) {
+		// 表名和表本身的映射
+		Map<String, Table> tableMap = new HashMap<>();
+		for (Table table : tables){
+			tableMap.put(table.getName(),table);
+		}
+
+		Map<Integer, List<Partition>> ret = new HashMap<>();
+
+		for (int opId : opId2paraSchema.keySet()){
+			List<Partition> partitions = new ArrayList<>();
+
+			for (String paraSchema : opId2paraSchema.get(opId)){
+				// 切割表名和列名
+				int idx = paraSchema.indexOf(Partition.PARA_SCHEMA_SEPARATOR);
+				String tableName = paraSchema.substring(0,idx);
+				String columnName = paraSchema.substring(idx + 1);
+
+				Table table = tableMap.get(tableName);
+				if (table == null || table.getPartition() == null || !table.getPartition().getPartitionKey().equals(columnName)){
+					partitions.add(null);
+				}
+				else{
+					partitions.add(table.getPartition());
+				}
+			}
+
+			ret.put(opId, partitions);
+		}
+
+		return ret;
 	}
 
 	// 如果有分区键，基于分区键进行基数统计；否则直接统计
@@ -163,31 +216,39 @@ public class TxLogicAnalyzer {
 		return ret;
 	}
 
-	private void addParaCardinality(List<Table> tables, OperationData operationData, List<String> strings,
+	/**
+	 * 记录参数对应的分区
+	 *
+	 * @param tables            数据库表的列表
+	 * @param operationData     需要统计的数据
+	 * @param columnNames 本操作中各参数对应的列名
+	 * @param para4paraInSchema 每个参数访问了哪些分区，也是该方法所增加的内容
+	 */
+	private void addParaCardinality(List<Table> tables, OperationData operationData, List<String> columnNames,
 									Map<String, Set<Object>> para4paraInSchema) {
 		int[] paraDataTypes = operationData.getParaDataTypes();
 
-		assert (paraDataTypes.length != strings.size());
+		assert (paraDataTypes.length != columnNames.size());
+
+		// 表名和表本身的映射
+		Map<String, Table> tableMap = new HashMap<>();
+		for (Table table : tables){
+			tableMap.put(table.getName(),table);
+		}
 
 		for (int i = 0; i < paraDataTypes.length; i++){
-			String para = strings.get(i);
-			int idx = para.indexOf("@");
+			String para = columnNames.get(i);
+			int idx = para.indexOf(Partition.PARA_SCHEMA_SEPARATOR);
 			String tableName = para.substring(0,idx);
 			String columnName = para.substring(idx + 1);
 
-			boolean isAdd = false;
-			for (Table table : tables){
-				if (table.getName().equals(tableName)){
-					if (table.getPartition() != null && table.getPartition().getPartitionKey().equals(columnName)){
-						String partitionName = table.getPartition().getPartition((Number) operationData.getParameters()[i]);
-						para4paraInSchema.get(para).add(partitionName);
-						isAdd = true;
-					}
-					break;
-				}
-			}
+			Table table = tableMap.get(tableName);
 
-			if (!isAdd){
+			if (table != null && table.getPartition() != null && table.getPartition().getPartitionKey().equals(columnName)){
+				String partitionName = table.getPartition().getPartition((Number) operationData.getParameters()[i]);
+				para4paraInSchema.get(para).add(partitionName);
+			}
+			else {
 				para4paraInSchema.get(para).add(operationData.getParameters()[i]);
 			}
 		}

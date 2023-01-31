@@ -117,7 +117,7 @@ public class LinearRelationAnalyzer {
 						// 同样，前面两个操作的 operationId & returnDataTypes 也必然相同
 						int frontOperationId = frontOperationData1.getOperationId();
 						int[] frontReturnDataTypes = frontOperationData1.getReturnDataTypes();
-						if (frontOperationData1.isFilterPrimaryKey()) { // 若返回结果集是一个集合，则无需判断线性关系 qly： 为啥？存疑 ~
+						if (frontOperationData1.isFilterPrimaryKey()) { // 若返回结果集是一个集合，则无需判断线性关系 qly： 为啥？存疑 ~ wsy: 集合只考虑include
 							Object[] returnItems1 = frontOperationData1.getReturnItems();
 							Object[] returnItems2 = frontOperationData2.getReturnItems();
 							if (returnItems1 == null || returnItems2 == null) {
@@ -203,8 +203,8 @@ public class LinearRelationAnalyzer {
 		}
 
 		// 将参数的线性依赖关系添加到 ParameterNode中
-		for (int i = 0; i < validLinearRelations.size(); i++) {
-			String identifierPair = validLinearRelations.get(i).getKey();
+		for (Entry<String, Coefficient> validLinearRelation : validLinearRelations) {
+			String identifierPair = validLinearRelation.getKey();
 			String paraIdentifier = identifierPair.split("&")[0];
 
 			ParameterNode node = parameterNodeMap.get(paraIdentifier);
@@ -223,16 +223,16 @@ public class LinearRelationAnalyzer {
 			}
 
 			boolean flag = true; // 当前线性依赖关系是否需要维护
-			for (int j = 0; j < dependencies.size(); j++) {
+			for (ParameterDependency dependency : dependencies) {
 				// 不需要维护的情况：原ParameterNode中存在依赖概率大于等于0.7的等于依赖关系（我们更重视等于依赖关系）
-				if (dependencies.get(j).getDependencyType() == 0 && dependencies.get(j).getProbability() >= 0.7) {
+				if (dependency.getDependencyType() == 0 && dependency.getProbability() >= 0.7) {
 					flag = false;
 					break;
 				}
 			}
 			if (flag) {
 				String priorIdentifier = identifierPair.split("&")[1];
-				Coefficient coefficient = validLinearRelations.get(i).getValue();
+				Coefficient coefficient = validLinearRelation.getValue();
 				if (node.getLinearDependencies() == null) {
 					node.setLinearDependencies(new ArrayList<>());
 				}

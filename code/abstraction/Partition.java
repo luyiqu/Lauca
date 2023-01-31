@@ -6,6 +6,8 @@ import java.util.List;
 import java.util.Objects;
 
 public class Partition<T extends Number>implements Serializable {
+
+    public static final String PARA_SCHEMA_SEPARATOR = "@";
     public List<String> getPartitionNameList() {
         return partitionNameList;
     }

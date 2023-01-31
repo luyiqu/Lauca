@@ -59,8 +59,7 @@ public class AccessDistributionAnalyzer {
 
 		RunningLogReader runningLogReader = new RunningLogReader(txName2OperationId2Template);
 		runningLogReader.read(new File(".//testdata//log4txlogic"));
-		Iterator<Entry<String, List<TransactionData>>> txDataIter = runningLogReader.getTxName2TxDataList().entrySet()
-				.iterator();
+
 
 		int timeWindowSize = Configurations.getTimeWindowSize();
 		int statThreadNum = Configurations.getStatThreadNum();
@@ -73,13 +72,11 @@ public class AccessDistributionAnalyzer {
 			windowDataBlockingQueues.add(windowDataBlockingQueue);
 		}
 		CountDownLatch cdl = new CountDownLatch(transactions.size());
-		while (txDataIter.hasNext()) {
-			Entry<String, List<TransactionData>> entry = txDataIter.next();
-
-//			System.out.println(entry.getKey());
+		for (Entry<String, List<TransactionData>> entry : runningLogReader.getTxName2TxDataList().entrySet()) {
+			//			System.out.println(entry.getKey());
 
 			TxLogicAnalyzer txLogicAnalyzer = new TxLogicAnalyzer();
-			txLogicAnalyzer.obtainTxLogic(entry.getValue(), txName2OpId2paraSchema.get(entry.getKey()),tables);
+			txLogicAnalyzer.obtainTxLogic(entry.getValue(), txName2OpId2paraSchema.get(entry.getKey()), tables);
 
 			Map<Integer, OperationData> operationDataTemplates = txName2OperationId2Template.get(entry.getKey());
 			Map<Integer, OperationData> sortedOperationDataTemplates = new TreeMap<>(operationDataTemplates);

@@ -1110,7 +1110,7 @@ public class DistributionCounter {
 		for (Transaction transaction : transactions) {
 			Map<String,String> paraId2Name = transaction.getParaId2Name();
 			for (String paraId : paraId2Name.keySet()){
-				int idx = paraId2Name.get(paraId).indexOf("@");
+				int idx = paraId2Name.get(paraId).indexOf(Partition.PARA_SCHEMA_SEPARATOR);
 				String tableName = paraId2Name.get(paraId).substring(0,idx);
 				String columnName = paraId2Name.get(paraId).substring(idx+1);
 

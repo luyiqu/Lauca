@@ -5,11 +5,7 @@ import java.sql.Timestamp;
 import java.util.*;
 import java.util.regex.Pattern;
 
-import abstraction.Column;
-import abstraction.StoredProcedure;
-import abstraction.ReadOperation;
-import abstraction.Table;
-import abstraction.WriteOperation;
+import abstraction.*;
 import accessdistribution.DistributionTypeInfo;
 import config.Configurations;
 
@@ -276,7 +272,7 @@ public class SqlParser {
 			if (column != null) {
 				paraDataTypes.add(column.getDataType());
 				paraDistTypeInfos.add(getParaDistTypeInfo(tableName, columnName));
-				paraSchemaInfos.add(tableName + "@" + columnName);
+				paraSchemaInfos.add(tableName + Partition.PARA_SCHEMA_SEPARATOR + columnName);
 			} else {
 				System.err.println("Unrecognized column: " + columnName);
 			}
@@ -376,7 +372,7 @@ public class SqlParser {
 				if (column != null) {
 					paraDataTypes[i] = column.getDataType();
 					paraDistTypeInfos[i] = getParaDistTypeInfo(tableName, columnNames[i]);
-					paraSchemaInfos.add(tableName + "@" + columnNames[i]);
+					paraSchemaInfos.add(tableName + Partition.PARA_SCHEMA_SEPARATOR + columnNames[i]);
 				} else {
 					System.err.println("Unrecognized column: " + columnNames[i]);
 				}
@@ -521,7 +517,7 @@ public class SqlParser {
 				if (column != null) {
 					paraDataTypes.add(column.getDataType());
 					paraDistTypeInfos.add(getParaDistTypeInfo(tableName, columnName));
-					paraSchemaInfos.add(tableName + "@" + columnName);
+					paraSchemaInfos.add(tableName + Partition.PARA_SCHEMA_SEPARATOR + columnName);
 				} else {
 					System.err.println("Unrecognized column: " + columnName);
 				}
@@ -605,7 +601,7 @@ public class SqlParser {
 				if (column != null) {
 					paraDataTypes.add(column.getDataType());
 					paraDistTypeInfos.add(getParaDistTypeInfo(tableName, columnName));
-					paraSchemaInfos.add(tableName + "@" + columnName);
+					paraSchemaInfos.add(tableName + Partition.PARA_SCHEMA_SEPARATOR + columnName);
 				} else {
 					System.err.println("Unrecognized column: " + columnName);
 				}
@@ -723,7 +719,7 @@ public class SqlParser {
 				if (column != null) {
 					paraDataTypes.add(column.getDataType());
 					paraDistTypeInfos.add(getParaDistTypeInfo(tableName, columnName));
-					paraSchemaInfos.add(tableName + "@" + columnName);
+					paraSchemaInfos.add(tableName + Partition.PARA_SCHEMA_SEPARATOR + columnName);
 				} else {
 					System.out.println(sql);
 					System.err.println("Unrecognized column: " + columnName);
@@ -923,7 +919,7 @@ public class SqlParser {
 			if (column != null) {
 				paraDataTypes[i] = column.getDataType();
 				paraDistTypeInfos[i] = getParaDistTypeInfo(tableName, columnName);
-				paraSchemaInfos.add(tableName + "@" + columnName);
+				paraSchemaInfos.add(tableName + Partition.PARA_SCHEMA_SEPARATOR + columnName);
 			} else {
 				System.err.println("Unrecognized column: " + columnName);
 			}
@@ -1006,7 +1002,7 @@ public class SqlParser {
 					paraDataTypes[i] = column.getDataType();
 
 					paraDistTypeInfos[i] = getParaDistTypeInfo(tableName, columnNames[i]);
-					paraSchemaInfos.add(tableName + "@" + columnNames[i]);
+					paraSchemaInfos.add(tableName + Partition.PARA_SCHEMA_SEPARATOR + columnNames[i]);
 
 				} else {
 					System.err.println("1Unrecognized column: " + columnNames[i]);
@@ -1091,7 +1087,7 @@ public class SqlParser {
 					paraDataTypes[i] = column.getDataType();
 
 					paraDistTypeInfos[i] = getParaDistTypeInfo(tableName, columnName);
-					paraSchemaInfos.add(tableName + "@" + columnName);
+					paraSchemaInfos.add(tableName + Partition.PARA_SCHEMA_SEPARATOR + columnName);
 				} else {
 
 					System.err.println("2Unrecognized column: " + columnName);
@@ -1111,7 +1107,7 @@ public class SqlParser {
 					paraDataTypes[setStatements.length + i] = column.getDataType();
 
 					paraDistTypeInfos[setStatements.length + i] = getParaDistTypeInfo(tableName, columnName);
-					paraSchemaInfos.add(tableName + "@" + columnName);
+					paraSchemaInfos.add(tableName + Partition.PARA_SCHEMA_SEPARATOR + columnName);
 
 				} else {
 
@@ -1170,7 +1166,7 @@ public class SqlParser {
 					paraDataTypes[i] = column.getDataType();
 
 					paraDistTypeInfos[i] = getParaDistTypeInfo(tableName, columnName);
-					paraSchemaInfos.add(tableName + "@" + columnName);
+					paraSchemaInfos.add(tableName + Partition.PARA_SCHEMA_SEPARATOR + columnName);
 
 				} else {
 

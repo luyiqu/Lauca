@@ -1,7 +1,6 @@
 package transactionlogic;
 
 import java.util.ArrayList;
-import java.util.Collections;
 import java.util.Comparator;
 import java.util.HashMap;
 import java.util.HashSet;
@@ -81,15 +80,9 @@ public class EqualRelationAnalyzer {
 								// 针对返回结果tuple中的每一个属性依次进行判断是否相等
 								int[] frontReturnDataTypes = frontOperationData.getReturnDataTypes();
 								for (int m = 0; m < returnItems.length; m++) {
-									if (Util.isEqual(returnItems[m], frontReturnDataTypes[m], parameter, dataType)) {
-										String frontResultIdentifier = frontOperationId + "_result_" + m;
-										if (!para2ParaOrResult2EqualCounter.get(paraIdentifier).containsKey(frontResultIdentifier)) {
-											para2ParaOrResult2EqualCounter.get(paraIdentifier).put(frontResultIdentifier, 1);
-										} else {
-											int tmp = para2ParaOrResult2EqualCounter.get(paraIdentifier).get(frontResultIdentifier);
-											para2ParaOrResult2EqualCounter.get(paraIdentifier).put(frontResultIdentifier, tmp + 1);
-										}
-									}
+									String frontResultIdentifier = frontOperationId + "_result_" + m;
+
+									addParaIfEqual(para2ParaOrResult2EqualCounter, parameter, dataType, paraIdentifier, returnItems[m], frontReturnDataTypes[m], frontResultIdentifier);
 								} // for returnItems
 							} // returnItems != null
 						} // only one tuple
@@ -98,30 +91,18 @@ public class EqualRelationAnalyzer {
 						int[] frontParaDataTypes = frontOperationData.getParaDataTypes();
 						Object[] frontParameters = frontOperationData.getParameters();
 						for (int m = 0; m < frontParameters.length; m++) {
-							if (Util.isEqual(frontParameters[m], frontParaDataTypes[m], parameter, dataType)) {
-								String frontParaIdentifier = frontOperationId + "_para_" + m;
-								if (!para2ParaOrResult2EqualCounter.get(paraIdentifier).containsKey(frontParaIdentifier)) {
-									para2ParaOrResult2EqualCounter.get(paraIdentifier).put(frontParaIdentifier, 1);
-								} else {
-									int tmp = para2ParaOrResult2EqualCounter.get(paraIdentifier).get(frontParaIdentifier);
-									para2ParaOrResult2EqualCounter.get(paraIdentifier).put(frontParaIdentifier, tmp + 1);
-								}
-							}
+							String frontParaIdentifier = frontOperationId + "_para_" + m;
+
+							addParaIfEqual(para2ParaOrResult2EqualCounter, parameter, dataType, paraIdentifier, frontParameters[m], frontParaDataTypes[m], frontParaIdentifier);
 						}
 
 					} // 针对当前参数前面操作数据的遍历
 
 					// ------ 统计当前参数与当前操作中前面输入参数（位于同一个SQL中）之间的等于关联关系 ------
 					for (int k = 0; k < j; k++) {
-						if (Util.isEqual(parameters[k], paraDataTypes[k], parameter, dataType)) {
-							String frontParaIdentifier = operationId + "_para_" + k;
-							if (!para2ParaOrResult2EqualCounter.get(paraIdentifier).containsKey(frontParaIdentifier)) {
-								para2ParaOrResult2EqualCounter.get(paraIdentifier).put(frontParaIdentifier, 1);
-							} else {
-								int tmp = para2ParaOrResult2EqualCounter.get(paraIdentifier).get(frontParaIdentifier);
-								para2ParaOrResult2EqualCounter.get(paraIdentifier).put(frontParaIdentifier, tmp + 1);
-							}
-						}
+						String frontParaIdentifier = operationId + "_para_" + k;
+
+						addParaIfEqual(para2ParaOrResult2EqualCounter, parameter, dataType, paraIdentifier, parameters[k], paraDataTypes[k], frontParaIdentifier);
 					}
 
 				} // 针对当前操作中所有输入参数的遍历
@@ -134,6 +115,30 @@ public class EqualRelationAnalyzer {
 	}
 
 	/**
+	 * 检查当前参数与之前的参数是否相等，如果是，更新对应的计数器
+	 *
+	 * @param para2ParaOrResult2EqualCounter 参数相等的计数器
+	 * @param parameter                      参数
+	 * @param dataType                       参数的数据类型
+	 * @param paraIdentifier                 参数的标识符
+	 * @param frontItem                      之前的参数/返回值
+	 * @param frontDataType                  之前参数的数据类型
+	 * @param frontIdentifier 之前参数的标识符
+	 */
+	private void addParaIfEqual(Map<String, Map<String, Integer>> para2ParaOrResult2EqualCounter, Object parameter, int dataType,
+								String paraIdentifier, Object frontItem, int frontDataType, String frontIdentifier) {
+		if (Util.isEqual(frontItem, frontDataType, parameter, dataType)) {
+
+			if (!para2ParaOrResult2EqualCounter.get(paraIdentifier).containsKey(frontIdentifier)) {
+				para2ParaOrResult2EqualCounter.get(paraIdentifier).put(frontIdentifier, 1);
+			} else {
+				int tmp = para2ParaOrResult2EqualCounter.get(paraIdentifier).get(frontIdentifier);
+				para2ParaOrResult2EqualCounter.get(paraIdentifier).put(frontIdentifier, tmp + 1);
+			}
+		}
+	}
+
+	/**
 	 * @param formatedCounter：经格式化后的等于依赖关系的计数器（新计数器的特征：事务实例个数转化成相应比例 & 按照一定规则进行了排序）
 	 * @return identicalSets：数值大小完全相等的输入参数和返回结果集元素的集合，即等于依赖关系的比例为1。可能存在多个这样的集合。
 	 */
@@ -142,10 +147,10 @@ public class EqualRelationAnalyzer {
 		List<Set<String>> identicalSets = new ArrayList<>();
 
 		List<String> tmpIdenticalSet = new ArrayList<>();
-		for (int i = 0; i < formatedCounter.size(); i++) {
+		for (Entry<String, List<Entry<String, Double>>> stringListEntry : formatedCounter) {
 			tmpIdenticalSet.clear();
-			tmpIdenticalSet.add(formatedCounter.get(i).getKey());
-			for (Entry<String, Double> entry : formatedCounter.get(i).getValue()) {
+			tmpIdenticalSet.add(stringListEntry.getKey());
+			for (Entry<String, Double> entry : stringListEntry.getValue()) {
 				if (entry.getValue() >= 1) { //== 1? >= 0.9999999999?
 					tmpIdenticalSet.add(entry.getKey());
 				}
@@ -155,8 +160,9 @@ public class EqualRelationAnalyzer {
 				continue;
 			} else {
 				// 标示tmpIdenticalSet这个集合中的元素是否已属于之前某个已添加的集合
-				boolean flag = false; 
-				loop : for (Set<String> tmpSet : identicalSets) {
+				boolean flag = false;
+				loop:
+				for (Set<String> tmpSet : identicalSets) {
 					for (String item : tmpIdenticalSet) {
 						if (tmpSet.contains(item)) {
 							tmpSet.addAll(tmpIdenticalSet);
@@ -167,8 +173,7 @@ public class EqualRelationAnalyzer {
 				}
 
 				if (!flag) {
-					Set<String> identicalSet = new HashSet<>();
-					identicalSet.addAll(tmpIdenticalSet);
+					Set<String> identicalSet = new HashSet<>(tmpIdenticalSet);
 					identicalSets.add(identicalSet);
 				}
 			}
@@ -180,17 +185,16 @@ public class EqualRelationAnalyzer {
 
 	/**
 	 * @param parameterNodeMap：该参数必须已实例化（等于、包含和线性依赖关系都会维护在ParameterNode中）
-	 * @param formatedCounter：经格式化后的等于依赖关系的计数器（新计数器的特征：事务实例个数转化成相应比例 & 按照一定规则进行了排序）
+	 * @param formattedCounter：经格式化后的等于依赖关系的计数器（新计数器的特征：事务实例个数转化成相应比例 & 按照一定规则进行了排序）
 	 * @param identicalSets：数值大小完全相等的输入参数和返回结果集元素的集合
 	 * @function：依据formatedCounter中的统计信息 以及 identicalSets，构建参数与 参数以及返回结果集元素 之间的等于依赖关系。
 	 */
 	public void constructDependency(Map<String, ParameterNode> parameterNodeMap, 
-			List<Entry<String, List<Entry<String, Double>>>> formatedCounter, List<Set<String>> identicalSets) {
+			List<Entry<String, List<Entry<String, Double>>>> formattedCounter, List<Set<String>> identicalSets) {
 
-		// 因为formatedCounter中的输入参数（即entry.key）是有序的，所以下面的顺序遍历相当于从事务中的前面参数向后面参数依次处理
-		for (int i = 0; i < formatedCounter.size(); i++) {
+		// 因为formattedCounter中的输入参数（即entry.key）是有序的，所以下面的顺序遍历相当于从事务中的前面参数向后面参数依次处理
+		for (Entry<String, List<Entry<String, Double>>> paraEqualInfo : formattedCounter) {
 
-			Entry<String, List<Entry<String, Double>>> paraEqualInfo = formatedCounter.get(i);
 			if (parameterNodeMap.containsKey(paraEqualInfo.getKey())) {
 				// 这个参数必然与前面某个参数的值完全相同，故可直接pass过去
 				continue;
@@ -199,10 +203,10 @@ public class EqualRelationAnalyzer {
 			// 为当前参数构建一个ParameterNode。在构建ParameterNode之前，我们需要查看当前参数是否属于某个完全值相等的参数集合中（集合中
 			//     可能含返回结果集元素），若属于则将整个集合看成一个整体，构建成一个节点。
 			boolean flag = false; // 标示当前参数是否属于某个值完全相等的集合中
-			for (int j = 0; j < identicalSets.size(); j++) {
+			for (Set<String> identicalSet : identicalSets) {
 
-				if (identicalSets.get(j).contains(paraEqualInfo.getKey())) {
-					Iterator<String> iter = identicalSets.get(j).iterator();
+				if (identicalSet.contains(paraEqualInfo.getKey())) {
+					Iterator<String> iter = identicalSet.iterator();
 					// 提取出集合中的所有参数标识符
 					List<String> paraIdentifierList = new ArrayList<>();
 					while (iter.hasNext()) {
@@ -212,12 +216,25 @@ public class EqualRelationAnalyzer {
 						}
 					}
 
-					Collections.sort(paraIdentifierList, new ParaIdentifierComparator2()); // 这个排序在参数生成时会利用到~
+					paraIdentifierList.sort((o1, o2) -> {
+						int operationId1 = Integer.parseInt(o1.split("_")[0]);
+						int operationId2 = Integer.parseInt(o2.split("_")[0]);
+						int paraIndex1 = Integer.parseInt(o1.split("_")[2]);
+						int paraIndex2 = Integer.parseInt(o2.split("_")[2]);
+
+						if (operationId1 < operationId2) {
+							return -1;
+						} else if (operationId1 > operationId2) {
+							return 1;
+						} else {
+							return Integer.compare(paraIndex1, paraIndex2);
+						}
+					}); // 这个排序在参数生成时会利用到~
 					ParameterNode parameterNode = new ParameterNode(paraIdentifierList);
 
 					// 对于集合中的所有参数标识符都构建相应的映射关系，以便后续可根据任一参数标识符寻找相应的ParameterNode
-					for (int k = 0; k < paraIdentifierList.size(); k++) {
-						parameterNodeMap.put(paraIdentifierList.get(k), parameterNode);
+					for (String s : paraIdentifierList) {
+						parameterNodeMap.put(s, parameterNode);
 					}
 
 					flag = true;
@@ -232,7 +249,7 @@ public class EqualRelationAnalyzer {
 				parameterNodeMap.put(paraEqualInfo.getKey(), parameterNode);
 			}
 			// ------ 至此，已为当前参数构建好ParameterNode，并存放在parameterNodeMap中
-			
+
 			// ------ 后面将为当前参数构建其等于依赖关系，即设置parameterNode中的dependencies
 			List<ParameterDependency> dependencies = new ArrayList<>();
 			// paraDependencyInfo中的关联概率大小是倒序存放的
@@ -242,8 +259,7 @@ public class EqualRelationAnalyzer {
 			// 所以我们需要对paraDependencyInfo的依赖对象进行过滤。若多个依赖对象属于某个值完全相等的集合，则仅需保留其中一个
 			List<Entry<String, Double>> filteredParaDependencyInfo = new ArrayList<>();
 			Set<String> identicalItems = new HashSet<>();
-			for (int j = 0; j < paraDependencyInfo.size(); j++) {
-				Entry<String, Double> entry = paraDependencyInfo.get(j);
+			for (Entry<String, Double> entry : paraDependencyInfo) {
 				if (identicalItems.contains(entry.getKey())) {
 					continue;
 				}
@@ -259,15 +275,15 @@ public class EqualRelationAnalyzer {
 			// 寻找一个概率和最大的依赖关系组合，总依赖概率之和需小于等于1。目前这里采用的是贪心解法，并不是最优解~ TODO
 			// maxGroup中的依赖概率也是逆序的
 			List<Entry<String, Double>> maxGroup = findOptimalGroup(filteredParaDependencyInfo);
-			for (int j = 0; j < maxGroup.size(); j++) {
-				ParameterDependency dependency = new ParameterDependency(maxGroup.get(j).getKey(), 
-						maxGroup.get(j).getValue(), 0);
+			for (Entry<String, Double> stringDoubleEntry : maxGroup) {
+				ParameterDependency dependency = new ParameterDependency(stringDoubleEntry.getKey(),
+						stringDoubleEntry.getValue(), 0);
 				dependencies.add(dependency);
 			}
 
 			parameterNodeMap.get(paraEqualInfo.getKey()).setDependencies(dependencies);
 
-		} //  for all paraEqualInfo in formatedCounter
+		} //  for all paraEqualInfo in formattedCounter
 
 //		System.out.println("EqualRelationAnalyzer.constructDependency -> parameterNodeMap: \n\t" + parameterNodeMap);
 	}
@@ -302,30 +318,4 @@ public class EqualRelationAnalyzer {
 		return maxGroup;
 	}
 
-}
-
-
-class ParaIdentifierComparator2 implements Comparator<String> {
-
-	@Override
-	public int compare(String o1, String o2) {
-		int operationId1 = Integer.parseInt(o1.split("_")[0]);
-		int operationId2 = Integer.parseInt(o2.split("_")[0]);
-		int paraIndex1 = Integer.parseInt(o1.split("_")[2]);
-		int paraIndex2 = Integer.parseInt(o2.split("_")[2]);
-
-		if (operationId1 < operationId2) {
-			return -1;
-		} else if (operationId1 > operationId2) {
-			return 1;
-		} else {
-			if (paraIndex1 < paraIndex2) {
-				return -1;
-			} else if (paraIndex1 > paraIndex2) {
-				return 1;
-			} else {
-				return 0;
-			}
-		}
-	}
 }

@@ -39,6 +39,7 @@ public class Preprocessor {
 						txName2OperationId2Template.get(tx.getName()).put(operationId, new OperationData(operationId,
 								op.getReturnDataTypes(), op.isFilterPrimaryKey(), op.getParaDataTypes()));
 						txName2OperationId2paraDistTypeInfos.get(tx.getName()).put(operationId, op.getParaDistTypeInfos());
+						txName2OperationId2paraSchema.get(tx.getName()).put(operationId, op.getParaSchemaInfos());
 						operationId++;
 
 						break;
@@ -53,54 +54,54 @@ public class Preprocessor {
 
 						break;
 					}
-					case "abstraction.Multiple":
+					case "abstraction.Multiple": {
 						Multiple multiple = (Multiple) tx.getTransactionBlocks().get(j);
-
 						for (SqlStatement sql : multiple.getSqls()) {
-							String className2 = sql.getClass().getName();
-							if (className2.equals("abstraction.ReadOperation")) {
-								ReadOperation op = (ReadOperation) sql;
-								txName2OperationId2Template.get(tx.getName()).put(operationId, new OperationData(operationId,
-										op.getReturnDataTypes(), op.isFilterPrimaryKey(), op.getParaDataTypes()));
-								txName2OperationId2paraDistTypeInfos.get(tx.getName()).put(operationId, op.getParaDistTypeInfos());
-								operationId++;
-							} else if (className2.equals("abstraction.WriteOperation")) {
-								WriteOperation op = (WriteOperation) sql;
-								txName2OperationId2Template.get(tx.getName()).put(operationId, new OperationData(operationId,
-										null, false, op.getParaDataTypes()));
-								txName2OperationId2paraDistTypeInfos.get(tx.getName()).put(operationId, op.getParaDistTypeInfos());
-								txName2OperationId2paraSchema.get(tx.getName()).put(operationId, op.getParaSchemaInfos());
-								operationId++;
-							}
+							operationId = constructSingleOp(tx, operationId, sql);
 						}
 						break;
-					case "abstraction.Branch":
+					}
+					case "abstraction.Branch": {
 						Branch branch = (Branch) tx.getTransactionBlocks().get(j);
 						List<List<SqlStatement>> branches = branch.getBranches();
 
 						for (List<SqlStatement> sqls : branches) {
 							for (SqlStatement sql : sqls) {
-								String className2 = sql.getClass().getName();
-								if (className2.equals("abstraction.ReadOperation")) {
-									ReadOperation op = (ReadOperation) sql;
-									txName2OperationId2Template.get(tx.getName()).put(operationId, new OperationData(operationId,
-											op.getReturnDataTypes(), op.isFilterPrimaryKey(), op.getParaDataTypes()));
-									txName2OperationId2paraDistTypeInfos.get(tx.getName()).put(operationId, op.getParaDistTypeInfos());
-									operationId++;
-								} else if (className2.equals("abstraction.WriteOperation")) {
-									WriteOperation op = (WriteOperation) sql;
-									txName2OperationId2Template.get(tx.getName()).put(operationId, new OperationData(operationId,
-											null, false, op.getParaDataTypes()));
-									txName2OperationId2paraDistTypeInfos.get(tx.getName()).put(operationId, op.getParaDistTypeInfos());
-									txName2OperationId2paraSchema.get(tx.getName()).put(operationId, op.getParaSchemaInfos());
-									operationId++;
-								}
+								operationId = constructSingleOp(tx, operationId, sql);
 							}
 						}
 						break;
+					}
 				}
 			}
 		}
+	}
+
+	/**
+	 * 构建单个sql的模板，可处理write op 或 read op
+	 * @param tx sql从属的事务
+	 * @param operationId 当前操作的id，这是一个递增序列
+	 * @param sql 需要构建模板的sql
+	 * @return 更新后的operationId
+	 */
+	private int constructSingleOp(Transaction tx, int operationId, SqlStatement sql) {
+		String className = sql.getClass().getName();
+		if (className.equals("abstraction.ReadOperation")) {
+			ReadOperation op = (ReadOperation) sql;
+			txName2OperationId2Template.get(tx.getName()).put(operationId, new OperationData(operationId,
+					op.getReturnDataTypes(), op.isFilterPrimaryKey(), op.getParaDataTypes()));
+			txName2OperationId2paraDistTypeInfos.get(tx.getName()).put(operationId, op.getParaDistTypeInfos());
+			txName2OperationId2paraSchema.get(tx.getName()).put(operationId, op.getParaSchemaInfos());
+			operationId++;
+		} else if (className.equals("abstraction.WriteOperation")) {
+			WriteOperation op = (WriteOperation) sql;
+			txName2OperationId2Template.get(tx.getName()).put(operationId, new OperationData(operationId,
+					null, false, op.getParaDataTypes()));
+			txName2OperationId2paraDistTypeInfos.get(tx.getName()).put(operationId, op.getParaDistTypeInfos());
+			txName2OperationId2paraSchema.get(tx.getName()).put(operationId, op.getParaSchemaInfos());
+			operationId++;
+		}
+		return operationId;
 	}
 
 	public Map<String, Map<Integer, OperationData>> getTxName2OperationId2Template() {

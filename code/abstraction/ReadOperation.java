@@ -289,6 +289,10 @@ public class ReadOperation extends SqlStatement {
 		return returnDataTypes;
 	}
 
+	public List<String> getParaSchemaInfos() {
+		return paraSchemaInfos;
+	}
+
 	public boolean isFilterPrimaryKey() {
 		return filterPrimaryKey;
 	}
