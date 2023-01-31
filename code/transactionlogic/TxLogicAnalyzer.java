@@ -96,7 +96,7 @@ public class TxLogicAnalyzer {
 		}
 
 		// 统计基数约束
-		cardinality4paraInSchema = obtainCardinality(tables, txDataList, opId2paraSchema);
+//		cardinality4paraInSchema = obtainCardinality(tables, txDataList, opId2paraSchema);
 
 		// between and 逻辑
 		// TODO
