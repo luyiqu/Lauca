@@ -398,110 +398,112 @@ public abstract class SqlStatement extends TransactionBlock {
 
 	protected Object checkParaOutOfCardinality(int idx , String paraSchemaInfo,
 											   Map<String, Integer> cardinality4paraInSchema, Map<String, Map<Object, List<Object>>> partitionUsed){
-		Object parameter = geneParameter(idx);
-//		if (paraSchemaInfo.contains("@w_id") ){
-//			System.out.println();
+		return geneParameter(idx);
+
+//		Object parameter = geneParameter(idx);
+////		if (paraSchemaInfo.contains("@w_id") ){
+////			System.out.println();
+////		}
+//		Object paraPartition = getParameterPartition(parameter, idx);
+//
+//		boolean hasPartition =  paraPartition.toString().contains("p") && !parameter.equals(paraPartition);
+//
+//
+//		Map<Object, List<Object>> partitionUsedPara = partitionUsed.get(paraSchemaInfo);
+//
+//		if (!cardinality4paraInSchema.containsKey(paraSchemaInfo)){
+//			return parameter;
 //		}
-		Object paraPartition = getParameterPartition(parameter, idx);
-
-		boolean hasPartition =  paraPartition.toString().contains("p") && !parameter.equals(paraPartition);
-
-
-		Map<Object, List<Object>> partitionUsedPara = partitionUsed.get(paraSchemaInfo);
-
-		if (!cardinality4paraInSchema.containsKey(paraSchemaInfo)){
-			return parameter;
-		}
-
-		if (Configurations.isUsePartitionRule()){
-			Random random = new Random();
-			if (cardinality4paraInSchema.get(paraSchemaInfo) == partitionUsedPara.size()){
-//				if (paraSchemaInfo.contains("s_w_id") ){
-//					System.out.println(partitionUsedPara.size()+" "+partitionUsedPara.get(paraPartition) + " " + paraPartition + " " + parameter);
+//
+//		if (Configurations.isUsePartitionRule()){
+//			Random random = new Random();
+//			if (cardinality4paraInSchema.get(paraSchemaInfo) == partitionUsedPara.size()){
+////				if (paraSchemaInfo.contains("s_w_id") ){
+////					System.out.println(partitionUsedPara.size()+" "+partitionUsedPara.get(paraPartition) + " " + paraPartition + " " + parameter);
+////				}
+//				if (!partitionUsedPara.containsKey(paraPartition)){// 如果已经填满基数，不再重新构造，直接从已知的参数里找一个
+//
+//					int partitionIdx = random.nextInt(partitionUsedPara.size());
+//					paraPartition = new ArrayList<>(partitionUsedPara.keySet()).get(partitionIdx);
+//
+//					if (!paraPartition.toString().contains("p")) { //非分区键的参数就是它的key
+//						parameter = paraPartition;
+//					}else{ // 分区键的参数是value
+//						partitionIdx = new Random().nextInt(partitionUsedPara.get(paraPartition).size());
+//						parameter = partitionUsedPara.get(paraPartition).get(partitionIdx);
+//					}
 //				}
-				if (!partitionUsedPara.containsKey(paraPartition)){// 如果已经填满基数，不再重新构造，直接从已知的参数里找一个
-
-					int partitionIdx = random.nextInt(partitionUsedPara.size());
-					paraPartition = new ArrayList<>(partitionUsedPara.keySet()).get(partitionIdx);
-
-					if (!paraPartition.toString().contains("p")) { //非分区键的参数就是它的key
-						parameter = paraPartition;
-					}else{ // 分区键的参数是value
-						partitionIdx = new Random().nextInt(partitionUsedPara.get(paraPartition).size());
-						parameter = partitionUsedPara.get(paraPartition).get(partitionIdx);
-					}
-				}
-			}
-			else{
-				// 如果还没填满就重复了，重新生成
-//				while (Configurations.isUsePartitionRule() && partitionUsedPara.containsKey(paraPartition) && random.nextDouble() < 0.7){
-//					parameter = geneParameter(idx);
-//					paraPartition = getParameterPartition(parameter, idx);
-//				}
-			}
-		}
-
-
-		if (!partitionUsedPara.containsKey(paraPartition)) {
-			partitionUsedPara.put(paraPartition, new ArrayList<>());
-		}
-		if (hasPartition){
-			partitionUsedPara.get(paraPartition).add(parameter);
-		}
-
-
-		return parameter;
+//			}
+//			else{
+//				// 如果还没填满就重复了，重新生成
+////				while (Configurations.isUsePartitionRule() && partitionUsedPara.containsKey(paraPartition) && random.nextDouble() < 0.7){
+////					parameter = geneParameter(idx);
+////					paraPartition = getParameterPartition(parameter, idx);
+////				}
+//			}
+//		}
+//
+//
+//		if (!partitionUsedPara.containsKey(paraPartition)) {
+//			partitionUsedPara.put(paraPartition, new ArrayList<>());
+//		}
+//		if (hasPartition){
+//			partitionUsedPara.get(paraPartition).add(parameter);
+//		}
+//
+//
+//		return parameter;
 	}
 
 	protected Object checkParaOutOfCardinality(int idx, Object para , String paraSchemaInfo,
 											   Map<String, Integer> cardinality4paraInSchema, Map<String, Map<Object, List<Object>>> partitionUsed){
 		Object parameter = para;
-		Object paraPartition = getParameterPartition(parameter, idx);
-
-		boolean hasPartition = paraPartition.toString().contains("p") && !parameter.equals(paraPartition);
-
-
-		Map<Object, List<Object>> partitionUsedPara = partitionUsed.get(paraSchemaInfo);
-
-		if (!cardinality4paraInSchema.containsKey(paraSchemaInfo)){
-			return parameter;
-		}
-
-		if (Configurations.isUsePartitionRule()){
-			Random random = new Random();
-			if (cardinality4paraInSchema.get(paraSchemaInfo) == partitionUsedPara.size()){
-//				if (paraSchemaInfo.contains("s_w_id") ){
-//					System.out.println(partitionUsedPara.size()+" "+partitionUsedPara.get(paraPartition) + " " + paraPartition + " " + parameter);
+//		Object paraPartition = getParameterPartition(parameter, idx);
+//
+//		boolean hasPartition = paraPartition.toString().contains("p") && !parameter.equals(paraPartition);
+//
+//
+//		Map<Object, List<Object>> partitionUsedPara = partitionUsed.get(paraSchemaInfo);
+//
+//		if (!cardinality4paraInSchema.containsKey(paraSchemaInfo)){
+//			return parameter;
+//		}
+//
+//		if (Configurations.isUsePartitionRule()){
+//			Random random = new Random();
+//			if (cardinality4paraInSchema.get(paraSchemaInfo) == partitionUsedPara.size()){
+////				if (paraSchemaInfo.contains("s_w_id") ){
+////					System.out.println(partitionUsedPara.size()+" "+partitionUsedPara.get(paraPartition) + " " + paraPartition + " " + parameter);
+////				}
+//				if (!partitionUsedPara.containsKey(paraPartition)){// 如果已经填满基数，不再重新构造，直接从已知的参数里找一个
+//
+//
+//					int partitionIdx = random.nextInt(partitionUsedPara.size());
+//					paraPartition = new ArrayList<>(partitionUsedPara.keySet()).get(partitionIdx);
+//
+//					if (hasPartition) { //非分区键的参数就是它的key
+//						parameter = paraPartition;
+//					}else{ // 分区键的参数是value
+//						partitionIdx = new Random().nextInt(partitionUsedPara.get(paraPartition).size());
+//						parameter = partitionUsedPara.get(paraPartition).get(partitionIdx);
+//					}
 //				}
-				if (!partitionUsedPara.containsKey(paraPartition)){// 如果已经填满基数，不再重新构造，直接从已知的参数里找一个
-
-
-					int partitionIdx = random.nextInt(partitionUsedPara.size());
-					paraPartition = new ArrayList<>(partitionUsedPara.keySet()).get(partitionIdx);
-
-					if (hasPartition) { //非分区键的参数就是它的key
-						parameter = paraPartition;
-					}else{ // 分区键的参数是value
-						partitionIdx = new Random().nextInt(partitionUsedPara.get(paraPartition).size());
-						parameter = partitionUsedPara.get(paraPartition).get(partitionIdx);
-					}
-				}
-			}
-			else{
-				// 如果还没填满就重复了，重新生成
-//				if (Configurations.isUsePartitionRule() && partitionUsedPara.containsKey(paraPartition) && random.nextDouble() < 0.7){
-//					return null;
-//				}
-			}
-		}
-
-
-		if (!partitionUsedPara.containsKey(paraPartition)) {
-			partitionUsedPara.put(paraPartition, new ArrayList<>());
-		}
-		if (hasPartition){
-			partitionUsedPara.get(paraPartition).add(parameter);
-		}
+//			}
+//			else{
+//				// 如果还没填满就重复了，重新生成
+////				if (Configurations.isUsePartitionRule() && partitionUsedPara.containsKey(paraPartition) && random.nextDouble() < 0.7){
+////					return null;
+////				}
+//			}
+//		}
+//
+//
+//		if (!partitionUsedPara.containsKey(paraPartition)) {
+//			partitionUsedPara.put(paraPartition, new ArrayList<>());
+//		}
+//		if (hasPartition){
+//			partitionUsedPara.get(paraPartition).add(parameter);
+//		}
 
 
 		return parameter;
