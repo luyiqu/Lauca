@@ -2,10 +2,7 @@ package transactionlogic;
 
 import abstraction.Partition;
 
-import java.util.ArrayList;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
+import java.util.*;
 
 public class PartitionEqualRelationAnalyzer {
 
@@ -156,5 +153,96 @@ public class PartitionEqualRelationAnalyzer {
                 para2Para2PartitionEqualCounter.get(paraIdentifier).put(frontIdentifier, tmp + 1);
             }
         }
+    }
+
+    /**
+     * @param parameterNodeMap：此时等于依赖关系必须已维护完成（等于、包含和线性依赖关系都会维护在ParameterNode中）
+     * @param formattedCounter：经格式化后的包含依赖关系的计数器（新计数器的特征：事务实例个数转化成相应比例 & 按照一定规则进行了排序）
+     * @param identicalSets：数值大小完全相等的输入参数和返回结果集元素的集合，该输入与
+     *     EqualRelationAnalyzer.constructDependency输入中的identicalSets完全相同。
+     * @function：依据formatedCounter中的统计信息 以及 identicalSets，构建参数与 返回结果集 之间的包含依赖关系。
+     */
+    public void constructDependency(Map<String, ParameterNode> parameterNodeMap,
+                                    List<Map.Entry<String, List<Map.Entry<String, Double>>>> formattedCounter, List<Set<String>> identicalSets) {
+        // 若两个参数完全相同，当前一个参数构建完包含依赖关系后，后一个参数无需再构建包含依赖关系（其值已完全确定）
+        Set<String> identicalItems = new HashSet<>();
+
+        for (Map.Entry<String, List<Map.Entry<String, Double>>> paraPartitionEqualInfo : formattedCounter) {
+            if (identicalItems.contains(paraPartitionEqualInfo.getKey())) {
+                // 前面有个参数与当前参数的值完全相同，当前参数的值已确定~ 无需维护包含依赖关系
+                continue;
+            }
+
+            // 每个参数的ParameterNode都必然已存在，在函数EqualRelationAnalyzer.constructDependency中构建的
+            // 下面获取之前已维护的等于依赖关系
+            // List<ParameterDependency> dependencies = parameterNodeMap.get(paraPartitionEqualInfo.getKey()).getDependencies();
+            // bug fix: 添加了事务逻辑统计项控制参数之后，一个参数的ParameterNode可能不存在（没有统计等于关联关系）
+            List<ParameterDependency> dependencies = null;
+            if (parameterNodeMap.containsKey(paraPartitionEqualInfo.getKey())) {
+                dependencies = parameterNodeMap.get(paraPartitionEqualInfo.getKey()).getDependencies();
+            } else {
+                List<String> identifiers = new ArrayList<String>();
+                identifiers.add(paraPartitionEqualInfo.getKey());
+                ParameterNode parameterNode = new ParameterNode(identifiers);
+                parameterNodeMap.put(paraPartitionEqualInfo.getKey(), parameterNode);
+                dependencies = new ArrayList<>();
+                parameterNode.setDependencies(dependencies);
+            }
+
+            // paraDependencyInfo为当前参数上统计得到的分区等于依赖关系
+            // 因为paraDependencyInfo上有更新操作，这样处理是不想破坏原有统计数据
+            List<Map.Entry<String, Double>> paraDependencyInfo = new ArrayList<>(paraPartitionEqualInfo.getValue());
+
+            double probabilitySum = 0; // 已维护依赖关系的概率之和
+            for (ParameterDependency dependency : dependencies) {
+                probabilitySum += dependency.getProbability();
+            }
+
+            List<ParameterDependency> appendedIncludeDependencies = new ArrayList<>();
+            // 先遍历一遍，将可以直接添加的分区等于依赖关系找出来，对于这些包含依赖关系的添加是不需要替换掉原来的等于依赖关系的
+            for (int j = 0; j < paraDependencyInfo.size(); j++) {
+                Map.Entry<String, Double> includeDependency = paraDependencyInfo.get(j);
+                if (probabilitySum + includeDependency.getValue() <= 1) {
+                    appendedIncludeDependencies.add(
+                            new ParameterDependency(includeDependency.getKey(), includeDependency.getValue(), ParameterDependency.DependencyType.PARTITION_EQUAL));
+                    probabilitySum += includeDependency.getValue();
+                    paraDependencyInfo.remove(j--);
+                }
+            }
+
+            // 对于剩下的分区相等依赖关系，根据其关联关系强弱选择性地替换掉原来的等于依赖关系
+            // 替换规则：关联概率probability大于原等于依赖关系的两倍，才可替换（前提是总依赖关系的概率和不超过1）
+            // 选择这样的替换规则的原因是我们认为等于依赖关系相比包含依赖关系更重要~
+            for (Map.Entry<String, Double> includeDependency : paraDependencyInfo) {
+                // 我们更看重等于依赖关系，替换时也从关联概率最小的等于关系替换
+                probabilitySum = getProbabilitySum(dependencies, probabilitySum, includeDependency);
+            }
+
+            dependencies.addAll(appendedIncludeDependencies); // 等于关联概率逆序，包含关联概率先升序后逆序（大致情况）
+
+            // 在上面的两个for循环中不作过滤的原因是我们不认为有两个返回结果集一直是完全相同的！
+            // 下面将所有和该参数完全相等的参数集合一并存储在identicalItems中，以便后续过滤之用
+            for (Set<String> tmpSet : identicalSets) {
+                if (tmpSet.contains(paraPartitionEqualInfo.getKey())) {
+                    identicalItems.addAll(tmpSet);
+                    break;
+                }
+            }
+        }  //  for all paraPartitionEqualInfo in formattedCounter
+
+//		System.out.println("IncludeRelationAnalyzer.constructDependency -> parameterNodeMap: \n\t" + parameterNodeMap);
+    }
+
+    static double getProbabilitySum(List<ParameterDependency> dependencies, double probabilitySum, Map.Entry<String, Double> includeDependency) {
+        for (int k = dependencies.size() - 1; k >= 0; k--) {
+            if (dependencies.get(k).getDependencyType() == ParameterDependency.DependencyType.EQUAL
+                    && includeDependency.getValue() >= dependencies.get(k).getProbability() * 2
+                    && probabilitySum - dependencies.get(k).getProbability() + includeDependency.getValue() <= 1.00000001) {
+                dependencies.set(k, new ParameterDependency(includeDependency.getKey(), includeDependency.getValue(), ParameterDependency.DependencyType.INCLUDE));
+                probabilitySum = probabilitySum - dependencies.get(k).getProbability() + includeDependency.getValue();
+                break;
+            }
+        }
+        return probabilitySum;
     }
 }

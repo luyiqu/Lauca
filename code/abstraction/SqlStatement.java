@@ -289,7 +289,7 @@ public abstract class SqlStatement extends TransactionBlock {
 				// bug fix: parameterDependency报空指针错误，原因是依赖的所有项都为空（相应的分支都未执行）
 				if (parameterDependency != null) {
 					// 根据 "等于" 依赖关系 或者 "包含" 依赖关系 生成参数
-					if (parameterDependency.getDependencyType() == 0) { // "等于" 依赖关系
+					if (parameterDependency.getDependencyType() == ParameterDependency.DependencyType.EQUAL) { // "等于" 依赖关系
 //						//modified by lyqu
 //						if(paraIdentifier.equals("2_para_0")){
 //							System.out.println("这里判别一下2_para_0的问题，明明就是包含依赖，怎么跑等于依赖来了");
@@ -308,7 +308,7 @@ public abstract class SqlStatement extends TransactionBlock {
 //							System.out.println("66666666666666666666666666666666666666666666");
 //						}
 
-					} else if (parameterDependency.getDependencyType() == 1) { // "包含" 依赖关系
+					} else if (parameterDependency.getDependencyType() == ParameterDependency.DependencyType.INCLUDE) { // "包含" 依赖关系
 //						System.out.println("进入包含依赖");
 						TxRunningValue txRunningValue = intermediateState.get(parameterDependency.getIdentifier());
 						parameter = txRunningValue.getIncludeRelationValue();

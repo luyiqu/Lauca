@@ -76,7 +76,7 @@ public class TxLogicAnalyzer {
 				.convertCounter(para2Para2PartitionEqualCounter, operationId2ExecutionNum);
 
 		if (Configurations.isUsePartitionRule()){
-
+			partitionEqualRelationAnalyzer.constructDependency(parameterNodeMap, formattedPartitionEqualCounter, identicalSets);
 		}
 
 		// 包含依赖关系

@@ -152,7 +152,7 @@ public class IncludeRelationAnalyzer {
 				Entry<String, Double> includeDependency = paraDependencyInfo.get(j);
 				if (probabilitySum + includeDependency.getValue() <= 1) {
 					appendedIncludeDependencies.add(
-							new ParameterDependency(includeDependency.getKey(), includeDependency.getValue(), 1));
+							new ParameterDependency(includeDependency.getKey(), includeDependency.getValue(), ParameterDependency.DependencyType.INCLUDE));
 					probabilitySum += includeDependency.getValue();
 					paraDependencyInfo.remove(j--);
 				}
@@ -163,15 +163,7 @@ public class IncludeRelationAnalyzer {
 			// 选择这样的替换规则的原因是我们认为等于依赖关系相比包含依赖关系更重要~
 			for (Entry<String, Double> includeDependency : paraDependencyInfo) {
 				// 我们更看重等于依赖关系，替换时也从关联概率最小的等于关系替换
-				for (int k = dependencies.size() - 1; k >= 0; k--) {
-					if (dependencies.get(k).getDependencyType() == 0
-							&& includeDependency.getValue() >= dependencies.get(k).getProbability() * 2
-							&& probabilitySum - dependencies.get(k).getProbability() + includeDependency.getValue() <= 1.00000001) {
-						dependencies.set(k, new ParameterDependency(includeDependency.getKey(), includeDependency.getValue(), 1));
-						probabilitySum = probabilitySum - dependencies.get(k).getProbability() + includeDependency.getValue();
-						break;
-					}
-				}
+				probabilitySum = getProbabilitySum(dependencies, probabilitySum, includeDependency);
 			}
 
 			dependencies.addAll(appendedIncludeDependencies); // 等于关联概率逆序，包含关联概率先升序后逆序（大致情况）
@@ -188,5 +180,18 @@ public class IncludeRelationAnalyzer {
 
 //		System.out.println("IncludeRelationAnalyzer.constructDependency -> parameterNodeMap: \n\t" + parameterNodeMap);
 	}
-	
+
+	static double getProbabilitySum(List<ParameterDependency> dependencies, double probabilitySum, Entry<String, Double> includeDependency) {
+		for (int k = dependencies.size() - 1; k >= 0; k--) {
+			if (dependencies.get(k).getDependencyType() == ParameterDependency.DependencyType.EQUAL
+					&& includeDependency.getValue() >= dependencies.get(k).getProbability() * 2
+					&& probabilitySum - dependencies.get(k).getProbability() + includeDependency.getValue() <= 1.00000001) {
+				dependencies.set(k, new ParameterDependency(includeDependency.getKey(), includeDependency.getValue(), ParameterDependency.DependencyType.INCLUDE));
+				probabilitySum = probabilitySum - dependencies.get(k).getProbability() + includeDependency.getValue();
+				break;
+			}
+		}
+		return probabilitySum;
+	}
+
 }

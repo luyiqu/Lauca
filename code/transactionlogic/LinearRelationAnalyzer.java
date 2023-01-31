@@ -225,7 +225,7 @@ public class LinearRelationAnalyzer {
 			boolean flag = true; // 当前线性依赖关系是否需要维护
 			for (ParameterDependency dependency : dependencies) {
 				// 不需要维护的情况：原ParameterNode中存在依赖概率大于等于0.7的等于依赖关系（我们更重视等于依赖关系）
-				if (dependency.getDependencyType() == 0 && dependency.getProbability() >= 0.7) {
+				if (dependency.getDependencyType() == ParameterDependency.DependencyType.EQUAL && dependency.getProbability() >= 0.7) {
 					flag = false;
 					break;
 				}
@@ -239,7 +239,7 @@ public class LinearRelationAnalyzer {
 				// 可能添加的多个线性依赖关系本质上是一样的（依赖项是相等的 && 线性系数也一致），但是不影响程序的正确性，后面生成参数时随机选一个便好
 				//qly: 也就是存在相同的 ~重复的多个线性依赖关系~ 但是在生成参数的时候线性依赖关系如何选择出来进去生成呢？ 存疑~
 				node.getLinearDependencies()
-						.add(new ParameterDependency(priorIdentifier, 1, 2, coefficient.a, coefficient.b));
+						.add(new ParameterDependency(priorIdentifier, 1, ParameterDependency.DependencyType.LINEAR, coefficient.a, coefficient.b));
 			}
 		}
 

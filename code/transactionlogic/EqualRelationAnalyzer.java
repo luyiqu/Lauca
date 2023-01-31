@@ -277,7 +277,7 @@ public class EqualRelationAnalyzer {
 			List<Entry<String, Double>> maxGroup = findOptimalGroup(filteredParaDependencyInfo);
 			for (Entry<String, Double> stringDoubleEntry : maxGroup) {
 				ParameterDependency dependency = new ParameterDependency(stringDoubleEntry.getKey(),
-						stringDoubleEntry.getValue(), 0);
+						stringDoubleEntry.getValue(), ParameterDependency.DependencyType.EQUAL);
 				dependencies.add(dependency);
 			}
 
