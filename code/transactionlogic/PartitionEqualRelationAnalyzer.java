@@ -26,100 +26,100 @@ public class PartitionEqualRelationAnalyzer {
             Object[] operationDatas = txData.getOperationDatas();
 
             for (int i = 0; i < operationDatas.length; i++) {
-
-                OperationData operationData = null;
                 if (operationTypes[i] == -1) {
                     continue;
-                } else if (operationTypes[i] == 1) {
+                }
+                ArrayList<OperationData> operationDataList = null;
+                 if (operationTypes[i] == 1) {
                     // 对于multiple中操作的多次运行数据，这里只取其第一次运行的数据作统计分析，同时假设multiple中操作至少运行一次
                     //TODO: 只取第一次运行的数据分析应该是没问题的，但是在生成中却不能如此，还是要讲究这是第几次循环。20210102
                     //TODO: 一般情况下，依赖只在本次循环中发生，这里不考虑第三次循环中某个参数依赖第二次循环中某个参数的情况，且这两个参数属于不同参数。
-                    operationData = ((ArrayList<OperationData>)operationDatas[i]).get(0);
+                     operationDataList = new ArrayList<>((ArrayList<OperationData>)operationDatas[i]);
                 } else if (operationTypes[i] == 0) {
-                    operationData = (OperationData)operationDatas[i];
+                     operationDataList = new ArrayList<>();
+                     operationDataList.add((OperationData)operationDatas[i]);
                 }
 
-                int operationId = operationData.getOperationId();
-                int[] paraDataTypes = operationData.getParaDataTypes();
-                Object[] parameters = operationData.getParameters();
+                 int cnt = 0;
+                 for (OperationData operationData : operationDataList){
+                     int operationId = operationData.getOperationId();
+                     int[] paraDataTypes = operationData.getParaDataTypes();
+                     Object[] parameters = operationData.getParameters();
 
-                // 针对每个参数进行分析，统计其与 前面操作中的参数和返回结果集元素 以及 当前操作中前面的参数 之间的等于关联关系
+                     // 针对每个参数进行分析，统计其与 前面操作中的参数和返回结果集元素 以及 当前操作中前面的参数 之间的等于关联关系
 
-                // ------ 统计当前参数与前面输入参数（位于不同SQL中）之间的等于关联关系 ------
-                for (int j = 0; j < parameters.length; j++) {
+                     // ------ 统计当前参数与前面输入参数（位于不同SQL中）之间的等于关联关系 ------
+                     for (int j = 0; j < parameters.length; j++) {
 
-                    // 当前操作的输入参数
-                    Object parameter = parameters[j];
-                    int dataType = paraDataTypes[j];
-                    String paraIdentifier = operationId + "_para_" + j; // 当前参数的标识符
-                    Partition partition = opId2Partition.get(operationId).get(j); // 当前参数的分区规则，可能为null
-                    String paraSchema = opId2paraSchema.get(operationId).get(j); // 当前参数的schema信息，表示为 tableName"PARA_SCHEMA_SEPARATOR"columnName
+                         // 当前操作的输入参数
+                         Object parameter = parameters[j];
+                         int dataType = paraDataTypes[j];
+                         String paraIdentifier = operationId + "_para_" + j; // 当前参数的标识符
+                         Partition partition = opId2Partition.get(operationId).get(j); // 当前参数的分区规则，可能为null
+                         String paraSchema = opId2paraSchema.get(operationId).get(j); // 当前参数的schema信息，表示为 tableName"PARA_SCHEMA_SEPARATOR"columnName
 
-                    if (!para2Para2PartitionEqualCounter.containsKey(paraIdentifier)) {
-                        para2Para2PartitionEqualCounter.put(paraIdentifier, new HashMap<>());
-                    }
+                         if (!para2Para2PartitionEqualCounter.containsKey(paraIdentifier)) {
+                             para2Para2PartitionEqualCounter.put(paraIdentifier, new HashMap<>());
+                         }
 
-                    if (partition == null){
-                        continue;
-                    }
+                         if (partition == null){
+                             continue;
+                         }
 
-                    String partitionKey = partition.getPartition((Number)parameter);
+                         String partitionKey = partition.getPartition((Number)parameter);
 
-                    // 针对当前参数 前面操作的数据 依次进行分析
-                    for (int k = 0; k < i; k++) {
-                        OperationData frontOperationData = null;
-                        if (operationTypes[k] == -1) {
-                            continue;
-                        } else if (operationTypes[k] == 1) {
-                            frontOperationData = ((ArrayList<OperationData>)operationDatas[k]).get(0);
-                        } else if (operationTypes[k] == 0) {
-                            frontOperationData = (OperationData)operationDatas[k];
-                        }
-                        int frontOperationId = frontOperationData.getOperationId();
+                         // 针对当前参数 前面操作的数据 依次进行分析
+                         for (int k = 0; k < i; k++) {
+                             if (operationTypes[k] == -1) {
+                                 continue;
+                             }
+                             OperationData frontOperationData = null;
 
-                        // 暂不考虑------ 统计与前面操作返回结果集元素之间的等于关联关系 ------
-//                        // 只有当返回结果集仅有一个tuple时，才需判断Equal关系。当返回结果集是多个tuple时，需判断的是Include关系
-//                        if (frontOperationData.isFilterPrimaryKey()) {
-//                            Object[] returnItems = frontOperationData.getReturnItems();
-//                            if (returnItems != null) {
-//                                // 针对返回结果tuple中的每一个属性依次进行判断是否相等
-//                                int[] frontReturnDataTypes = frontOperationData.getReturnDataTypes();
-//                                for (int m = 0; m < returnItems.length; m++) {
-//                                    String frontResultIdentifier = frontOperationId + "_result_" + m;
-//
-//                                    addParaIfEqual(para2Para2PartitionEqualCounter, parameter, dataType, paraIdentifier, returnItems[m], frontReturnDataTypes[m], frontResultIdentifier);
-//                                } // for returnItems
-//                            } // returnItems != null
-//                        } // only one tuple
 
-                        // ------ 统计与前面操作输入参数之间的等于关联关系 ------
-                        int[] frontParaDataTypes = frontOperationData.getParaDataTypes();
-                        Object[] frontParameters = frontOperationData.getParameters();
-                        for (int m = 0; m < frontParameters.length; m++) {
-                            String frontParaIdentifier = frontOperationId + "_para_" + m;
+                             if (operationTypes[k] == 1) {
+                                 frontOperationData = ((ArrayList<OperationData>)operationDatas[k]).get(0);
+                             } else if (operationTypes[k] == 0) {
+                                 frontOperationData = (OperationData)operationDatas[k];
+                             }
+                             int frontOperationId = frontOperationData.getOperationId();
 
-                            Partition frontPartition = opId2Partition.get(frontOperationId).get(m);
-                            if (frontPartition == null) continue;
-                            String frontPartitionKey = frontPartition.getPartition((Number)frontParameters[m]);
+                             // ------ 统计与前面操作输入参数之间的等于关联关系 ------
+                             Object[] frontParameters = frontOperationData.getParameters();
+                             for (int m = 0; m < frontParameters.length; m++) {
+                                 String frontParaIdentifier = frontOperationId + "_para_" + m;
 
-                            String frontParaSchema = opId2paraSchema.get(frontOperationId).get(m);
-                            addParaIfPartitionEqual(para2Para2PartitionEqualCounter, partitionKey, paraSchema, paraIdentifier, frontPartitionKey, frontParaSchema, frontParaIdentifier);
-                        }
+                                 Partition frontPartition = opId2Partition.get(frontOperationId).get(m);
+                                 if (frontPartition == null) continue;
+                                 String frontPartitionKey = frontPartition.getPartition((Number)frontParameters[m]);
 
-                    } // 针对当前参数前面操作数据(不同SQL)的遍历
+                                 String frontParaSchema = opId2paraSchema.get(frontOperationId).get(m);
+                                 addParaIfPartitionEqual(para2Para2PartitionEqualCounter, partitionKey, paraSchema, paraIdentifier, frontPartitionKey, frontParaSchema, frontParaIdentifier);
+                             }
 
-                    // ------ 统计当前参数与当前操作中前面输入参数（位于同一个SQL中）之间的等于关联关系 ------
-                    for (int k = 0; k < j; k++) {
-                        String frontParaIdentifier = operationId + "_para_" + k;
+                         } // 针对当前参数前面操作数据(不同SQL)的遍历
 
-                        Partition frontPartition = opId2Partition.get(operationId).get(k);
-                        if (frontPartition == null) continue;
-                        String frontPartitionKey = frontPartition.getPartition((Number)parameters[k]);
+                         // ----- 统计当前参数与自身操作（即之前循环的操作以及当前操作）的关联关系
+                         // 记录之前的参数的关系是否已经记录，如果记录过了就略过
+                         boolean[] isAdd = new boolean[parameters.length];
+                         for (int frontIdx = 0; frontIdx <= cnt ; ++ frontIdx) {
+                             OperationData frontOperationData = operationDataList.get(frontIdx);
+                             Object[] frontParameter = frontOperationData.getParameters();
+                             // 如果检查到当前操作，只探测和前面参数的关联，否则全部探测
+                             int usedIdx = frontIdx == cnt ? j : frontParameter.length;
 
-                        String frontParaSchema = opId2paraSchema.get(operationId).get(k);
-                        addParaIfPartitionEqual(para2Para2PartitionEqualCounter, partitionKey, paraSchema, paraIdentifier, frontPartitionKey, frontParaSchema, frontParaIdentifier);
-                    }
+                             for (int k = 0; k < usedIdx; k++){
+                                 String frontParaIdentifier = operationId + "_para_" + k;
 
+                                 Partition frontPartition = opId2Partition.get(operationId).get(k);
+                                 if (frontPartition == null || isAdd[k]) continue;
+                                 String frontPartitionKey = frontPartition.getPartition((Number)frontParameter[k]);
+
+                                 String frontParaSchema = opId2paraSchema.get(operationId).get(k);
+                                 isAdd[k] |= addParaIfPartitionEqual(para2Para2PartitionEqualCounter, partitionKey, paraSchema, paraIdentifier, frontPartitionKey, frontParaSchema, frontParaIdentifier);
+                             }
+                         }
+                 }
+                cnt ++;
                 } // 针对当前操作中所有输入参数的遍历
             } // 针对当前事务中所有操作的遍历
         } // 针对一类事务中所有事务实例数据 的遍历
@@ -140,10 +140,8 @@ public class PartitionEqualRelationAnalyzer {
      * @param frontParaSchema 之前的参数的schema
      * @param frontIdentifier                 之前参数的标识符
      */
-    private void addParaIfPartitionEqual(Map<String, Map<String, Integer>> para2Para2PartitionEqualCounter, String partitionKey,
+    private boolean addParaIfPartitionEqual(Map<String, Map<String, Integer>> para2Para2PartitionEqualCounter, String partitionKey,
                                          String paraSchema, String paraIdentifier, String frontPartitionKey, String frontParaSchema, String frontIdentifier) {
-
-
         if (paraSchema.equals(frontParaSchema) && partitionKey.equals(frontPartitionKey)) {
 
             if (!para2Para2PartitionEqualCounter.get(paraIdentifier).containsKey(frontIdentifier)) {
@@ -152,7 +150,10 @@ public class PartitionEqualRelationAnalyzer {
                 int tmp = para2Para2PartitionEqualCounter.get(paraIdentifier).get(frontIdentifier);
                 para2Para2PartitionEqualCounter.get(paraIdentifier).put(frontIdentifier, tmp + 1);
             }
+            return true;
         }
+
+        return false;
     }
 
     /**

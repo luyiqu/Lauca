@@ -70,29 +70,30 @@ public class TxLogicAnalyzer {
 		}
 
 		// 分区等于依赖关系
-		PartitionEqualRelationAnalyzer partitionEqualRelationAnalyzer = new PartitionEqualRelationAnalyzer();
-		Map<String, Map<String, Integer>> para2Para2PartitionEqualCounter = partitionEqualRelationAnalyzer.countPartitionEqualInfo(txDataList, opId2Partition, opId2paraSchema);
-		List<Entry<String, List<Entry<String, Double>>>> formattedPartitionEqualCounter = Util
-				.convertCounter(para2Para2PartitionEqualCounter, operationId2ExecutionNum);
-
 		if (Configurations.isUsePartitionRule()){
+			PartitionEqualRelationAnalyzer partitionEqualRelationAnalyzer = new PartitionEqualRelationAnalyzer();
+			Map<String, Map<String, Integer>> para2Para2PartitionEqualCounter = partitionEqualRelationAnalyzer.countPartitionEqualInfo(txDataList, opId2Partition, opId2paraSchema);
+			List<Entry<String, List<Entry<String, Double>>>> formattedPartitionEqualCounter = Util
+					.convertCounter(para2Para2PartitionEqualCounter, countOperationExecutionNumWithLoop(txDataList));
 			partitionEqualRelationAnalyzer.constructDependency(parameterNodeMap, formattedPartitionEqualCounter, identicalSets);
 		}
 
 		// 包含依赖关系
-		IncludeRelationAnalyzer includeRelationAnalyzer = new IncludeRelationAnalyzer();
-		Map<String, Map<String, Integer>> para2Result2IncludeCounter = includeRelationAnalyzer
-				.countIncludeInfo(txDataList);
-		List<Entry<String, List<Entry<String, Double>>>> formattedIncludeCounter = Util
-				.convertCounter(para2Result2IncludeCounter, operationId2ExecutionNum);
+
 		if (Configurations.isIncludeRelationFlag()) {
+			IncludeRelationAnalyzer includeRelationAnalyzer = new IncludeRelationAnalyzer();
+			Map<String, Map<String, Integer>> para2Result2IncludeCounter = includeRelationAnalyzer
+					.countIncludeInfo(txDataList);
+			List<Entry<String, List<Entry<String, Double>>>> formattedIncludeCounter = Util
+					.convertCounter(para2Result2IncludeCounter, operationId2ExecutionNum);
 			includeRelationAnalyzer.constructDependency(parameterNodeMap, formattedIncludeCounter, identicalSets);
 		}
 
 		// 线性依赖关系
-		LinearRelationAnalyzer linearRelationAnalyzer = new LinearRelationAnalyzer(minTxDataSize, randomPairs);
-		Map<String, Coefficient> coefficientMap = linearRelationAnalyzer.countLinearInfo(txDataList);
+
 		if (Configurations.isLinearRelationFlag()) {
+			LinearRelationAnalyzer linearRelationAnalyzer = new LinearRelationAnalyzer(minTxDataSize, randomPairs);
+			Map<String, Coefficient> coefficientMap = linearRelationAnalyzer.countLinearInfo(txDataList);
 			linearRelationAnalyzer.constructDependency(parameterNodeMap, coefficientMap);
 		}
 
@@ -275,6 +276,35 @@ public class TxLogicAnalyzer {
 					operationId2ExecutionNum.put(operationId, 1);
 				} else {
 					operationId2ExecutionNum.put(operationId, operationId2ExecutionNum.get(operationId) + 1);
+				}
+			}
+		}
+		return operationId2ExecutionNum;
+	}
+
+	// 统计每个操作的总执行次数，算比例用的，循环中的会反复统计
+	@SuppressWarnings("unchecked")
+	private Map<Integer, Integer> countOperationExecutionNumWithLoop(List<TransactionData> txDataList) {
+		Map<Integer, Integer> operationId2ExecutionNum = new HashMap<>();
+		for (TransactionData txData : txDataList) {
+			int[] operationTypes = txData.getOperationTypes();
+			Object[] operationDatas = txData.getOperationDatas();
+			for (int i = 0; i < operationDatas.length; i++) {
+				OperationData operationData = null;
+				int cnt = 1;
+				if (operationTypes[i] == -1) {// 可能是未执行的分支
+					continue;
+				} else if (operationTypes[i] == 1) {// 是循环中的操作并执行了多次
+					operationData = ((ArrayList<OperationData>) operationDatas[i]).get(0);
+					cnt = ((ArrayList<OperationData>) operationDatas[i]).size();
+				} else if (operationTypes[i] == 0) {// 不是循环中的操作或者只执行了一次
+					operationData = (OperationData) operationDatas[i];
+				}
+				int operationId = operationData.getOperationId();
+				if (!operationId2ExecutionNum.containsKey(operationId)) {
+					operationId2ExecutionNum.put(operationId, cnt);
+				} else {
+					operationId2ExecutionNum.put(operationId, operationId2ExecutionNum.get(operationId) + cnt);
 				}
 			}
 		}

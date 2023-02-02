@@ -141,15 +141,15 @@ public class Multiple extends TransactionBlock {
 
 		for (int i = 0; i < runTimes; i++) {
 			if (i == 0) {
-				for (int j = 0; j < sqls.size(); j++) {
-					int flag = sqls.get(j).execute(cardinality4paraInSchema, partitionUsed, stmt);
+				for (SqlStatement sql : sqls) {
+					int flag = sql.execute(cardinality4paraInSchema, partitionUsed, stmt);
 					if (flag != 1) {
 						return flag;
 					}
 				}
 			} else {
-				for (int j = 0; j < sqls.size(); j++) {
-					int flag = sqls.get(j).execute(cardinality4paraInSchema, partitionUsed, stmt, multipleLogicMap, i);
+				for (SqlStatement sql : sqls) {
+					int flag = sql.execute(cardinality4paraInSchema, partitionUsed, stmt, multipleLogicMap, i);
 					if (flag != 1) {
 						return flag;
 					}

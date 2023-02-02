@@ -120,6 +120,10 @@ public abstract class DataAccessDistribution implements Comparable<DataAccessDis
 	// bug fix: 添加一个新的功能，可生成均匀分布的参数，对比实验需求
 	// 随机生成一个参数数值，均匀分布
 	public abstract Object geneUniformValue();
+
+	public Object geneValueInSamePartition(Object parameter){
+		return geneValue();
+	}
 	
 	// 利用二分搜索，基于cumulativeFrequencies随机生成一个参数位置
 	protected int binarySearch() {
@@ -216,7 +220,8 @@ public abstract class DataAccessDistribution implements Comparable<DataAccessDis
 	public int compareTo(DataAccessDistribution o) {
 		return Long.compare(this.time, o.time);
 	}
-	
+
+
 	// bug fix：判断利用事务逻辑生成的参数是否在当前属性的阈值内
 	public abstract boolean inDomain(Object parameter);
 

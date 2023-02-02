@@ -103,15 +103,13 @@ public class MultipleLogicAnalyzer {
 
 		for (int i = 1; i < multipleLogicMapList.size(); i++) {
 			Map<String, Double> tmpMap = multipleLogicMapList.get(i);
-			Iterator<Entry<String, Double>> iter = tmpMap.entrySet().iterator();
-			while (iter.hasNext()) {
-				Entry<String, Double> entry = iter.next();
+			for (Entry<String, Double> entry : tmpMap.entrySet()) {
 				if (noMultipleLogicSet.contains(entry.getKey())) {
 					continue;
 				}
 				if (entry.getValue() != Double.MAX_VALUE) {
 					if (multipleLogicMapMerge.containsKey(entry.getKey())) {
-						if (multipleLogicMapMerge.get(entry.getKey()).doubleValue() != 
+						if (multipleLogicMapMerge.get(entry.getKey()).doubleValue() !=
 								entry.getValue().doubleValue()) {
 							noMultipleLogicSet.add(entry.getKey());
 							multipleLogicMapMerge.remove(entry.getKey());

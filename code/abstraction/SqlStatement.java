@@ -82,6 +82,22 @@ public abstract class SqlStatement extends TransactionBlock {
 //		return 1l;
 //	}
 
+	private Object getParameterByIdx(int idx){
+		if (windowParaGenerators[idx] != null && !Configurations.isExpFullLifeCycleDist()) {
+			return windowParaGenerators[idx].geneValue();
+		} else {
+			return fullLifeCycleParaGenerators[idx].geneValue();
+		}
+	}
+
+	private Object getParameterInSamePartitionByIdx(int idx, Object parameter){
+		if (windowParaGenerators[idx] != null && !Configurations.isExpFullLifeCycleDist()) {
+			return windowParaGenerators[idx].geneValueInSamePartition(parameter);
+		} else {
+			return fullLifeCycleParaGenerators[idx].geneValueInSamePartition(parameter);
+		}
+	}
+
 
 
 	// 返回值一定需和当前参数的数据类型一致（且为包装类型），paraIndex的起始位置为0
@@ -111,13 +127,7 @@ public abstract class SqlStatement extends TransactionBlock {
 		if (parameterNode == null) {
 //			System.out.println("parameterNode居然是空的，小概率出现这个现象");
 //			System.out.println("**** parameterNode == null ");
-			if (windowParaGenerators[paraIndex] != null && !Configurations.isExpFullLifeCycleDist()) {
-//				System.out.println("parameterNode居然是空的，小概率出现这个现象,windowParaGenerators生成");
-				parameter = windowParaGenerators[paraIndex].geneValue();
-			} else {
-//				System.out.println("parameterNode居然是空的，小概率出现这个现象,fullLifeCycleParaGenerators生成");
-				parameter = fullLifeCycleParaGenerators[paraIndex].geneValue();
-			}
+			parameter = getParameterByIdx(paraIndex);
 			intermediateState.put(paraIdentifier,
 					new TxRunningValue(paraIdentifier, parameter, paraDataTypes[paraIndex]));
 			//todo: 20210102这样的设计，照理说multiple不会有问题的！
@@ -206,41 +216,7 @@ public abstract class SqlStatement extends TransactionBlock {
 			if (randomValue >= parameterNode.getProbabilitySum()) {
 				// 根据数据访问分布生成SQL参数
 
-
-				if (windowParaGenerators[paraIndex] != null && !Configurations.isExpFullLifeCycleDist()) {
-
-//					if(sql.equals("SELECT C_DISCOUNT, C_LAST, C_CREDIT FROM CUSTOMER WHERE C_W_ID = ? AND C_D_ID = ? AND C_ID = ?")&&
-//							paraIndex == 2){
-//						System.out.println("访问分布类型："+this.paraDistTypeInfos[paraIndex]);
-//
-//					}
-					parameter = windowParaGenerators[paraIndex].geneValue();
-
-//					System.out.println("通过窗口访问分布来生成的 ");
-
-//					if (parameter != null && parameter instanceof Long && (Long) parameter == Long.MIN_VALUE) {
-//						System.out.println("4444444444444444444444444444444444444444444444"+" "+paraIdentifier+" "+sql);
-//					}
-//					if (sql.startsWith("UPDATE STOCK SET")&&paraIdentifier.equals("9_para_3")) {
-//						System.out.println("4444444444444444444444444444444444444444444444"+" "+paraIdentifier+" "+sql);
-//					}
-//					if (sql.startsWith("UPDATE STOCK SET")&&paraIdentifier.equals("9_para_3")) {
-//						System.out.println("4444444444444444444444444444444444444444444444"+" "+paraIdentifier+" "+parameter+" "+sql);
-//					}
-				} else {
-					// 程序走到这里的原因：当前时间窗口的分支执行比例与全负载周期有差异，直白点就是：当前时间窗口这个分支未被执行过
-					// 对于这个参数来说，当前时间窗口没有其数据分布，只能借用全负载周期的数据分布来生成参数
-					parameter = fullLifeCycleParaGenerators[paraIndex].geneValue();
-//					System.out.println("**** 全局访问分布 ");
-//					System.out.println("通过全局访问分布来生成的 ");
-
-//					if (parameter != null && parameter instanceof Long && (Long) parameter == Long.MIN_VALUE) {
-//						System.out.println("55555555555555555555555555555555555555555555");
-//					}
-//					if (sql.startsWith("UPDATE STOCK SET")&&paraIdentifier.equals("9_para_3")) {
-//						System.out.println("55555555555555555555555555555555555555555555"+" "+paraIdentifier+" "+sql);
-//					}
-				}
+				parameter = getParameterByIdx(paraIndex);
 			} else {
 				// 根据等于、包含事务依赖关系生成SQL参数
 				// dependencies中仅含有所有 等于、包含 事务依赖关系
@@ -308,7 +284,14 @@ public abstract class SqlStatement extends TransactionBlock {
 //							System.out.println("66666666666666666666666666666666666666666666");
 //						}
 
-					} else if (parameterDependency.getDependencyType() == ParameterDependency.DependencyType.INCLUDE) { // "包含" 依赖关系
+					} else if (parameterDependency.getDependencyType() == ParameterDependency.DependencyType.PARTITION_EQUAL){
+						parameter = intermediateState.get(parameterDependency.getIdentifier()).value;
+
+						Object para = getParameterInSamePartitionByIdx(paraIndex,parameter);
+//						System.out.println(parameter+" : "+para);
+						parameter = para;
+					}
+					else if (parameterDependency.getDependencyType() == ParameterDependency.DependencyType.INCLUDE) { // "包含" 依赖关系
 //						System.out.println("进入包含依赖");
 						TxRunningValue txRunningValue = intermediateState.get(parameterDependency.getIdentifier());
 						parameter = txRunningValue.getIncludeRelationValue();
@@ -326,23 +309,7 @@ public abstract class SqlStatement extends TransactionBlock {
 
 				// 搞了半天，依赖的数据项竟然都为空... 只能再一次进行补救了~
 				if (parameter == null) {
-					if (windowParaGenerators[paraIndex] != null && !Configurations.isExpFullLifeCycleDist()) {
-						parameter = windowParaGenerators[paraIndex].geneValue();
-//						if (sql.startsWith("UPDATE STOCK SET")&&paraIdentifier.equals("9_para_3")) {
-//							System.out.println("88888888888888888888888888888888888888888888"+" "+paraIdentifier+" "+sql);
-//						}
-//						if (parameter != null && parameter instanceof Long && (Long) parameter == Long.MIN_VALUE) {
-//							System.out.println("88888888888888888888888888888888888888888888");
-//						}
-					} else {
-						parameter = fullLifeCycleParaGenerators[paraIndex].geneValue();
-//						if (parameter != null && parameter instanceof Long && (Long) parameter == Long.MIN_VALUE) {
-//							System.out.println("999999999999999999999999999999999999999999999");
-//						}
-//						if (sql.startsWith("UPDATE STOCK SET")&&paraIdentifier.equals("9_para_3")) {
-//							System.out.println("999999999999999999999999999999999999999999999"+" "+paraIdentifier+" "+sql);
-//						}
-					}
+					parameter = getParameterByIdx(paraIndex);
 
 					// bug fix: parameterDependency可能为空
 					if (parameterDependency != null) {
@@ -398,22 +365,22 @@ public abstract class SqlStatement extends TransactionBlock {
 
 	protected Object checkParaOutOfCardinality(int idx , String paraSchemaInfo,
 											   Map<String, Integer> cardinality4paraInSchema, Map<String, Map<Object, List<Object>>> partitionUsed){
-		return geneParameter(idx);
+//		return geneParameter(idx);
 
-//		Object parameter = geneParameter(idx);
+		Object parameter = geneParameter(idx);
 ////		if (paraSchemaInfo.contains("@w_id") ){
 ////			System.out.println();
 ////		}
-//		Object paraPartition = getParameterPartition(parameter, idx);
-//
-//		boolean hasPartition =  paraPartition.toString().contains("p") && !parameter.equals(paraPartition);
-//
-//
-//		Map<Object, List<Object>> partitionUsedPara = partitionUsed.get(paraSchemaInfo);
-//
-//		if (!cardinality4paraInSchema.containsKey(paraSchemaInfo)){
-//			return parameter;
-//		}
+		Object paraPartition = getParameterPartition(parameter, idx);
+
+		boolean hasPartition =  paraPartition.toString().contains("p") && !parameter.equals(paraPartition);
+
+
+		Map<Object, List<Object>> partitionUsedPara = partitionUsed.get(paraSchemaInfo);
+
+		if (!cardinality4paraInSchema.containsKey(paraSchemaInfo)){
+			return parameter;
+		}
 //
 //		if (Configurations.isUsePartitionRule()){
 //			Random random = new Random();
@@ -444,30 +411,30 @@ public abstract class SqlStatement extends TransactionBlock {
 //		}
 //
 //
-//		if (!partitionUsedPara.containsKey(paraPartition)) {
-//			partitionUsedPara.put(paraPartition, new ArrayList<>());
-//		}
-//		if (hasPartition){
-//			partitionUsedPara.get(paraPartition).add(parameter);
-//		}
+		if (!partitionUsedPara.containsKey(paraPartition)) {
+			partitionUsedPara.put(paraPartition, new ArrayList<>());
+		}
+		if (hasPartition){
+			partitionUsedPara.get(paraPartition).add(parameter);
+		}
 //
 //
-//		return parameter;
+		return parameter;
 	}
 
 	protected Object checkParaOutOfCardinality(int idx, Object para , String paraSchemaInfo,
 											   Map<String, Integer> cardinality4paraInSchema, Map<String, Map<Object, List<Object>>> partitionUsed){
 		Object parameter = para;
-//		Object paraPartition = getParameterPartition(parameter, idx);
-//
-//		boolean hasPartition = paraPartition.toString().contains("p") && !parameter.equals(paraPartition);
-//
-//
-//		Map<Object, List<Object>> partitionUsedPara = partitionUsed.get(paraSchemaInfo);
-//
-//		if (!cardinality4paraInSchema.containsKey(paraSchemaInfo)){
-//			return parameter;
-//		}
+		Object paraPartition = getParameterPartition(parameter, idx);
+
+		boolean hasPartition = paraPartition.toString().contains("p") && !parameter.equals(paraPartition);
+
+
+		Map<Object, List<Object>> partitionUsedPara = partitionUsed.get(paraSchemaInfo);
+
+		if (!cardinality4paraInSchema.containsKey(paraSchemaInfo)){
+			return parameter;
+		}
 //
 //		if (Configurations.isUsePartitionRule()){
 //			Random random = new Random();
@@ -498,12 +465,12 @@ public abstract class SqlStatement extends TransactionBlock {
 //		}
 //
 //
-//		if (!partitionUsedPara.containsKey(paraPartition)) {
-//			partitionUsedPara.put(paraPartition, new ArrayList<>());
-//		}
-//		if (hasPartition){
-//			partitionUsedPara.get(paraPartition).add(parameter);
-//		}
+		if (!partitionUsedPara.containsKey(paraPartition)) {
+			partitionUsedPara.put(paraPartition, new ArrayList<>());
+		}
+		if (hasPartition){
+			partitionUsedPara.get(paraPartition).add(parameter);
+		}
 
 
 		return parameter;
@@ -520,12 +487,7 @@ public abstract class SqlStatement extends TransactionBlock {
 			String paraIdentifier = operationId + "_para_" + paraIndex;
 			TxRunningValue txRunningValue = intermediateState.get(paraIdentifier);
 			// 这里返回的参数不可能为null
-			if (increment == 0) {
-				return txRunningValue.value;
-			} else {
-
-				return txRunningValue.getMultipleLogicValue(increment * round);
-			}
+			return txRunningValue.getMultipleLogicValue(increment * round);
 		} else {
 //			System.out.println("根据一般的参数生成");
 			return geneParameter(paraIndex);
@@ -558,8 +520,8 @@ public abstract class SqlStatement extends TransactionBlock {
 		for(;i < this.fullLifeCycleParaGenerators.length;i++){
 			fullLifeCycleParaGeneratorsModified[i] = fullLifeCycleParaGenerators[i];
 		}
-		for(int j = 0;j < fakeColumn.length;j++){
-			fullLifeCycleParaGeneratorsModified[i] = generateFakeColumnParaDistribution(fakeColumn[j]);
+		for (Column column : fakeColumn) {
+			fullLifeCycleParaGeneratorsModified[i] = generateFakeColumnParaDistribution(column);
 			i++;
 		}
 		this.fullLifeCycleParaGenerators = fullLifeCycleParaGeneratorsModified;
