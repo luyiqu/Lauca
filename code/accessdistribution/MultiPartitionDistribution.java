@@ -87,6 +87,20 @@ public class MultiPartitionDistribution<T extends Number> extends DataAccessDist
     }
 
     @Override
+    public Object geneValueInDiffPartition(Object parameter){
+        String partitionName = (String)getParaPartition(parameter);
+        if (partitionName != null && partitionDistribution.size() > 1){
+            Object para = geneValue();
+            while(partitionName.equals(partition.getPartition((T)para))){
+                para = geneValue();
+            }
+            return para;
+        }
+
+        return geneValue();
+    }
+
+    @Override
     public boolean inDomain(Object parameter) {
         for (DataAccessDistribution d : partitionDistribution) {
             if (d !=null && d.inDomain(parameter)) {

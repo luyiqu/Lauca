@@ -1,15 +1,8 @@
 package transactionlogic;
 
 import java.io.File;
-import java.util.ArrayList;
-import java.util.HashMap;
-import java.util.HashSet;
-import java.util.Iterator;
-import java.util.List;
-import java.util.Map;
+import java.util.*;
 import java.util.Map.Entry;
-import java.util.Set;
-import java.util.TreeMap;
 
 import abstraction.Partition;
 import org.apache.log4j.PropertyConfigurator;
@@ -71,11 +64,21 @@ public class TxLogicAnalyzer {
 
 		// 分区等于依赖关系
 		if (Configurations.isUsePartitionRule()){
+			Map<Integer, Integer> operationId2ExecutionNumWithLoop = countOperationExecutionNumWithLoop(txDataList);
+
+			PartitionNotEqualRelationAnalyzer partitionNotEqualRelationAnalyzer = new PartitionNotEqualRelationAnalyzer();
+			Map<String, Map<String, Integer>> para2Para2PartitionNotEqualCounter = partitionNotEqualRelationAnalyzer.countPartitionNotEqualInfo(txDataList, opId2Partition, opId2paraSchema);
+			List<Entry<String, List<Entry<String, Double>>>> formattedPartitionNotEqualCounter = Util
+					.convertCounter(para2Para2PartitionNotEqualCounter, operationId2ExecutionNumWithLoop);
+			partitionNotEqualRelationAnalyzer.constructDependency(parameterNodeMap, formattedPartitionNotEqualCounter, identicalSets);
+
 			PartitionEqualRelationAnalyzer partitionEqualRelationAnalyzer = new PartitionEqualRelationAnalyzer();
 			Map<String, Map<String, Integer>> para2Para2PartitionEqualCounter = partitionEqualRelationAnalyzer.countPartitionEqualInfo(txDataList, opId2Partition, opId2paraSchema);
 			List<Entry<String, List<Entry<String, Double>>>> formattedPartitionEqualCounter = Util
-					.convertCounter(para2Para2PartitionEqualCounter, countOperationExecutionNumWithLoop(txDataList));
+					.convertCounter(para2Para2PartitionEqualCounter, operationId2ExecutionNumWithLoop);
 			partitionEqualRelationAnalyzer.constructDependency(parameterNodeMap, formattedPartitionEqualCounter, identicalSets);
+
+
 		}
 
 		// 包含依赖关系
@@ -205,12 +208,12 @@ public class TxLogicAnalyzer {
 			}
 		}
 
-		// 获得平均的基数
+		// 获得最大的基数
 		Map<String, Integer> ret = new HashMap<>();
 		for (String para : paraSchemaInfo){
 //			System.out.println(para+": "+ (cardinality4paraInSchema.get(para) ));
-			double sum = cardinality4paraInSchema.get(para).stream().mapToInt(e->e).sum();
-			ret.put(para, (int) (sum / txDataList.size()));
+			OptionalInt sum = cardinality4paraInSchema.get(para).stream().mapToInt(e->e).max();
+			ret.put(para, sum.getAsInt() );
 
 		}
 //		System.out.println();

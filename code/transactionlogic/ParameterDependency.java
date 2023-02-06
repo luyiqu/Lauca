@@ -17,7 +17,8 @@ public class ParameterDependency {
 		EQUAL,
 		INCLUDE,
 		LINEAR,
-		PARTITION_EQUAL
+		PARTITION_EQUAL,
+		PARTITION_NOT_EQUAL
 	}
 
 	// 依赖类型。0：相等；1：包含；2：线性关系

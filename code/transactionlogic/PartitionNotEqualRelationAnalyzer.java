@@ -4,7 +4,7 @@ import abstraction.Partition;
 
 import java.util.*;
 
-public class PartitionEqualRelationAnalyzer {
+public class PartitionNotEqualRelationAnalyzer {
 
     /**
      * @param txDataList: 一个事务（同一个事务模板）的所有运行数据（多个事务实例数据）
@@ -15,7 +15,7 @@ public class PartitionEqualRelationAnalyzer {
      *     参数的等于关联（依赖）关系对于资源竞争强度，死锁发生的可能性和分布式事务的比例有很大的影响，是事务逻辑的重要组成部分。
      */
     @SuppressWarnings("unchecked")
-    public Map<String, Map<String, Integer>> countPartitionEqualInfo(List<TransactionData> txDataList, Map<Integer, List<Partition>> opId2Partition, Map<Integer, List<String>> opId2paraSchema) {
+    public Map<String, Map<String, Integer>> countPartitionNotEqualInfo(List<TransactionData> txDataList, Map<Integer, List<Partition>> opId2Partition, Map<Integer, List<String>> opId2paraSchema) {
         // 等于依赖关系的计数器
         // 数据结构解释：当前参数的标识符 -> Map(前一个参数或返回结果集元素的标识符 -> 相等的次数，即计数器)
         // operationId_"para"_paraIndex -> Map(operationId_"para"_paraIndex -> counter)
@@ -93,7 +93,7 @@ public class PartitionEqualRelationAnalyzer {
                                  String frontPartitionKey = frontPartition.getPartition((Number)frontParameters[m]);
 
                                  String frontParaSchema = opId2paraSchema.get(frontOperationId).get(m);
-                                 addParaIfPartitionEqual(para2Para2PartitionEqualCounter, partitionKey, paraSchema, paraIdentifier, frontPartitionKey, frontParaSchema, frontParaIdentifier);
+                                 addParaIfPartitionNotEqual(para2Para2PartitionEqualCounter, partitionKey, paraSchema, paraIdentifier, frontPartitionKey, frontParaSchema, frontParaIdentifier);
                              }
 
                          } // 针对当前参数前面操作数据(不同SQL)的遍历
@@ -101,21 +101,21 @@ public class PartitionEqualRelationAnalyzer {
                          // ----- 统计当前参数与自身操作（即之前循环的操作以及当前操作）的关联关系
                          // 记录之前的参数的关系是否已经记录，如果记录过了就略过
                          boolean[] isAdd = new boolean[parameters.length];
-                         for (int frontIdx = 0; frontIdx < cnt ; ++ frontIdx) {
+                         for (int frontIdx = 0; frontIdx <= cnt ; ++ frontIdx) {
                              OperationData frontOperationData = operationDataList.get(frontIdx);
                              Object[] frontParameter = frontOperationData.getParameters();
                              // 如果检查到当前操作，只探测和前面参数的关联，否则全部探测
-                             int usedIdx = frontIdx == cnt ? j : frontParameter.length;
+                             int usedIdx = j + 1;//frontIdx == cnt ? j : frontParameter.length;
 
-                             for (int k = 0; k < usedIdx; k++){
+                             for (int k = j; k < usedIdx; k++){
                                  String frontParaIdentifier = operationId + "_para_" + k;
 
                                  Partition frontPartition = opId2Partition.get(operationId).get(k);
-                                 if (frontPartition == null || isAdd[k] || k == j) continue;
+                                 if (frontPartition == null || isAdd[k] ) continue;
                                  String frontPartitionKey = frontPartition.getPartition((Number)frontParameter[k]);
 
                                  String frontParaSchema = opId2paraSchema.get(operationId).get(k);
-                                 isAdd[k] |= addParaIfPartitionEqual(para2Para2PartitionEqualCounter, partitionKey, paraSchema, paraIdentifier, frontPartitionKey, frontParaSchema, frontParaIdentifier);
+                                 isAdd[k] |= addParaIfPartitionNotEqual(para2Para2PartitionEqualCounter, partitionKey, paraSchema, paraIdentifier, frontPartitionKey, frontParaSchema, frontParaIdentifier);
                              }
                          }
                  }
@@ -130,9 +130,9 @@ public class PartitionEqualRelationAnalyzer {
     }
 
     /**
-     * 检查当前参数与之前的参数是否相等，如果是，更新对应的计数器
+     * 检查当前参数与之前的参数是否不等，如果是，更新对应的计数器
      *
-     * @param para2Para2PartitionEqualCounter 参数相等的计数器
+     * @param para2Para2PartitionNotEqualCounter 参数不等的计数器
      * @param partitionKey                    分区
      * @param paraSchema                      参数的schema
      * @param paraIdentifier                  参数的标识符
@@ -140,15 +140,15 @@ public class PartitionEqualRelationAnalyzer {
      * @param frontParaSchema 之前的参数的schema
      * @param frontIdentifier                 之前参数的标识符
      */
-    private boolean addParaIfPartitionEqual(Map<String, Map<String, Integer>> para2Para2PartitionEqualCounter, String partitionKey,
-                                         String paraSchema, String paraIdentifier, String frontPartitionKey, String frontParaSchema, String frontIdentifier) {
-        if (paraSchema.equals(frontParaSchema) && partitionKey.equals(frontPartitionKey)) {
+    private boolean addParaIfPartitionNotEqual(Map<String, Map<String, Integer>> para2Para2PartitionNotEqualCounter, String partitionKey,
+                                               String paraSchema, String paraIdentifier, String frontPartitionKey, String frontParaSchema, String frontIdentifier) {
+        if (paraSchema.equals(frontParaSchema) && !partitionKey.equals(frontPartitionKey)) {
 
-            if (!para2Para2PartitionEqualCounter.get(paraIdentifier).containsKey(frontIdentifier)) {
-                para2Para2PartitionEqualCounter.get(paraIdentifier).put(frontIdentifier, 1);
+            if (!para2Para2PartitionNotEqualCounter.get(paraIdentifier).containsKey(frontIdentifier)) {
+                para2Para2PartitionNotEqualCounter.get(paraIdentifier).put(frontIdentifier, 1);
             } else {
-                int tmp = para2Para2PartitionEqualCounter.get(paraIdentifier).get(frontIdentifier);
-                para2Para2PartitionEqualCounter.get(paraIdentifier).put(frontIdentifier, tmp + 1);
+                int tmp = para2Para2PartitionNotEqualCounter.get(paraIdentifier).get(frontIdentifier);
+                para2Para2PartitionNotEqualCounter.get(paraIdentifier).put(frontIdentifier, tmp + 1);
             }
             return true;
         }
@@ -205,7 +205,7 @@ public class PartitionEqualRelationAnalyzer {
                 Map.Entry<String, Double> includeDependency = paraDependencyInfo.get(j);
                 if (probabilitySum + includeDependency.getValue() <= 1) {
                     appendedIncludeDependencies.add(
-                            new ParameterDependency(includeDependency.getKey(), includeDependency.getValue(), ParameterDependency.DependencyType.PARTITION_EQUAL));
+                            new ParameterDependency(includeDependency.getKey(), includeDependency.getValue(), ParameterDependency.DependencyType.PARTITION_NOT_EQUAL));
                     probabilitySum += includeDependency.getValue();
                     paraDependencyInfo.remove(j--);
                 }
@@ -239,11 +239,11 @@ public class PartitionEqualRelationAnalyzer {
             if (dependencies.get(k).getDependencyType() == ParameterDependency.DependencyType.EQUAL
                     && includeDependency.getValue() >= dependencies.get(k).getProbability() * 2
                     && probabilitySum - dependencies.get(k).getProbability() + includeDependency.getValue() <= 1.00000001) {
-                dependencies.set(k, new ParameterDependency(includeDependency.getKey(), includeDependency.getValue(), ParameterDependency.DependencyType.PARTITION_EQUAL));
+                dependencies.set(k, new ParameterDependency(includeDependency.getKey(), includeDependency.getValue(), ParameterDependency.DependencyType.PARTITION_NOT_EQUAL));
                 probabilitySum = probabilitySum - dependencies.get(k).getProbability() + includeDependency.getValue();
                 break;
             }else if (includeDependency.getValue() >= dependencies.get(k).getProbability() && probabilitySum - dependencies.get(k).getProbability() + includeDependency.getValue() <= 1.00000001){
-                dependencies.set(k, new ParameterDependency(includeDependency.getKey(), includeDependency.getValue(), ParameterDependency.DependencyType.PARTITION_EQUAL));
+                dependencies.set(k, new ParameterDependency(includeDependency.getKey(), includeDependency.getValue(), ParameterDependency.DependencyType.PARTITION_NOT_EQUAL));
                 probabilitySum = probabilitySum - dependencies.get(k).getProbability() + includeDependency.getValue();
                 break;
             }

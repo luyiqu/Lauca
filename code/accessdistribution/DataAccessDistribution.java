@@ -124,6 +124,10 @@ public abstract class DataAccessDistribution implements Comparable<DataAccessDis
 	public Object geneValueInSamePartition(Object parameter){
 		return geneValue();
 	}
+
+	public Object geneValueInDiffPartition(Object parameter){
+		return geneValue();
+	}
 	
 	// 利用二分搜索，基于cumulativeFrequencies随机生成一个参数位置
 	protected int binarySearch() {

@@ -98,6 +98,14 @@ public abstract class SqlStatement extends TransactionBlock {
 		}
 	}
 
+	private Object getParameterInDiffPartitionByIdx(int idx, Object parameter){
+		if (windowParaGenerators[idx] != null && !Configurations.isExpFullLifeCycleDist()) {
+			return windowParaGenerators[idx].geneValueInDiffPartition(parameter);
+		} else {
+			return fullLifeCycleParaGenerators[idx].geneValueInDiffPartition(parameter);
+		}
+	}
+
 
 
 	// 返回值一定需和当前参数的数据类型一致（且为包装类型），paraIndex的起始位置为0
@@ -290,6 +298,12 @@ public abstract class SqlStatement extends TransactionBlock {
 						Object para = getParameterInSamePartitionByIdx(paraIndex,parameter);
 //						System.out.println(parameter+" : "+para);
 						parameter = para;
+					}else if (parameterDependency.getDependencyType() == ParameterDependency.DependencyType.PARTITION_NOT_EQUAL){
+						parameter = intermediateState.get(parameterDependency.getIdentifier()).value;
+
+						Object para = getParameterInDiffPartitionByIdx(paraIndex,parameter);
+//						System.out.println(parameter+" : "+para);
+						parameter = para;
 					}
 					else if (parameterDependency.getDependencyType() == ParameterDependency.DependencyType.INCLUDE) { // "包含" 依赖关系
 //						System.out.println("进入包含依赖");
@@ -403,10 +417,10 @@ public abstract class SqlStatement extends TransactionBlock {
 //			}
 //			else{
 //				// 如果还没填满就重复了，重新生成
-////				while (Configurations.isUsePartitionRule() && partitionUsedPara.containsKey(paraPartition) && random.nextDouble() < 0.7){
-////					parameter = geneParameter(idx);
-////					paraPartition = getParameterPartition(parameter, idx);
-////				}
+//				while (partitionUsedPara.containsKey(paraPartition) && random.nextDouble() < 0.5){
+//					parameter = geneParameter(idx);
+//					paraPartition = getParameterPartition(parameter, idx);
+//				}
 //			}
 //		}
 //
@@ -458,9 +472,9 @@ public abstract class SqlStatement extends TransactionBlock {
 //			}
 //			else{
 //				// 如果还没填满就重复了，重新生成
-////				if (Configurations.isUsePartitionRule() && partitionUsedPara.containsKey(paraPartition) && random.nextDouble() < 0.7){
-////					return null;
-////				}
+//				if (Configurations.isUsePartitionRule() && partitionUsedPara.containsKey(paraPartition) && random.nextDouble() < 0.7){
+//					return null;
+//				}
 //			}
 //		}
 //
