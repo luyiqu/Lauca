@@ -105,13 +105,13 @@ public class PartitionNotEqualRelationAnalyzer {
                              OperationData frontOperationData = operationDataList.get(frontIdx);
                              Object[] frontParameter = frontOperationData.getParameters();
                              // 如果检查到当前操作，只探测和前面参数的关联，否则全部探测
-                             int usedIdx = j + 1;//frontIdx == cnt ? j : frontParameter.length;
+                             int usedIdx = frontIdx == cnt ? j : frontParameter.length;
 
-                             for (int k = j; k < usedIdx; k++){
+                             for (int k = 0; k < usedIdx; k++){
                                  String frontParaIdentifier = operationId + "_para_" + k;
 
                                  Partition frontPartition = opId2Partition.get(operationId).get(k);
-                                 if (frontPartition == null || isAdd[k] ) continue;
+                                 if (frontPartition == null) continue;
                                  String frontPartitionKey = frontPartition.getPartition((Number)frontParameter[k]);
 
                                  String frontParaSchema = opId2paraSchema.get(operationId).get(k);
@@ -242,11 +242,14 @@ public class PartitionNotEqualRelationAnalyzer {
                 dependencies.set(k, new ParameterDependency(includeDependency.getKey(), includeDependency.getValue(), ParameterDependency.DependencyType.PARTITION_NOT_EQUAL));
                 probabilitySum = probabilitySum - dependencies.get(k).getProbability() + includeDependency.getValue();
                 break;
-            }else if (includeDependency.getValue() >= dependencies.get(k).getProbability() && probabilitySum - dependencies.get(k).getProbability() + includeDependency.getValue() <= 1.00000001){
+            } else if (dependencies.get(k).getDependencyType() != ParameterDependency.DependencyType.EQUAL
+                    && includeDependency.getValue() >= dependencies.get(k).getProbability()
+                    && probabilitySum - dependencies.get(k).getProbability() + includeDependency.getValue() <= 1.00000001) {
                 dependencies.set(k, new ParameterDependency(includeDependency.getKey(), includeDependency.getValue(), ParameterDependency.DependencyType.PARTITION_NOT_EQUAL));
                 probabilitySum = probabilitySum - dependencies.get(k).getProbability() + includeDependency.getValue();
                 break;
             }
+
         }
         return probabilitySum;
     }

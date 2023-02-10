@@ -5,6 +5,8 @@ import java.util.*;
 import java.util.Map.Entry;
 
 import abstraction.Partition;
+import accessdistribution.DistributionCounter;
+import accessdistribution.IntegerParaDistribution;
 import org.apache.log4j.PropertyConfigurator;
 
 import abstraction.Table;
@@ -23,7 +25,7 @@ public class TxLogicAnalyzer {
 	private Map<Integer, Double> operationId2AvgRunTimes = null;
 
 	// 统计每个列在该事务的参数中的基数，如果这个列有分区键，统计其分区的基数
-	private Map<String, Integer> cardinality4paraInSchema = null;
+	private Map<String, Map<Integer,Double>> cardinality4paraInSchema = null;
 
 	// 线性依赖关系分析时的配置参数，见LinearRelationAnalyzer
 	private int minTxDataSize = 1;
@@ -66,11 +68,7 @@ public class TxLogicAnalyzer {
 		if (Configurations.isUsePartitionRule()){
 			Map<Integer, Integer> operationId2ExecutionNumWithLoop = countOperationExecutionNumWithLoop(txDataList);
 
-			PartitionNotEqualRelationAnalyzer partitionNotEqualRelationAnalyzer = new PartitionNotEqualRelationAnalyzer();
-			Map<String, Map<String, Integer>> para2Para2PartitionNotEqualCounter = partitionNotEqualRelationAnalyzer.countPartitionNotEqualInfo(txDataList, opId2Partition, opId2paraSchema);
-			List<Entry<String, List<Entry<String, Double>>>> formattedPartitionNotEqualCounter = Util
-					.convertCounter(para2Para2PartitionNotEqualCounter, operationId2ExecutionNumWithLoop);
-			partitionNotEqualRelationAnalyzer.constructDependency(parameterNodeMap, formattedPartitionNotEqualCounter, identicalSets);
+
 
 			PartitionEqualRelationAnalyzer partitionEqualRelationAnalyzer = new PartitionEqualRelationAnalyzer();
 			Map<String, Map<String, Integer>> para2Para2PartitionEqualCounter = partitionEqualRelationAnalyzer.countPartitionEqualInfo(txDataList, opId2Partition, opId2paraSchema);
@@ -78,7 +76,11 @@ public class TxLogicAnalyzer {
 					.convertCounter(para2Para2PartitionEqualCounter, operationId2ExecutionNumWithLoop);
 			partitionEqualRelationAnalyzer.constructDependency(parameterNodeMap, formattedPartitionEqualCounter, identicalSets);
 
-
+			PartitionNotEqualRelationAnalyzer partitionNotEqualRelationAnalyzer = new PartitionNotEqualRelationAnalyzer();
+			Map<String, Map<String, Integer>> para2Para2PartitionNotEqualCounter = partitionNotEqualRelationAnalyzer.countPartitionNotEqualInfo(txDataList, opId2Partition, opId2paraSchema);
+			List<Entry<String, List<Entry<String, Double>>>> formattedPartitionNotEqualCounter = Util
+					.convertCounter(para2Para2PartitionNotEqualCounter, operationId2ExecutionNumWithLoop);
+			partitionNotEqualRelationAnalyzer.constructDependency(parameterNodeMap, formattedPartitionNotEqualCounter, identicalSets);
 		}
 
 		// 包含依赖关系
@@ -167,8 +169,8 @@ public class TxLogicAnalyzer {
 	}
 
 	// 如果有分区键，基于分区键进行基数统计；否则直接统计
-	private Map<String, Integer> obtainCardinality(List<Table> tables, List<TransactionData> txDataList, Map<Integer, List<String>> opId2paraSchema) {
-		Map<String, List<Integer>> cardinality4paraInSchema = new HashMap<>();
+	private Map<String,Map<Integer,Double>> obtainCardinality(List<Table> tables, List<TransactionData> txDataList, Map<Integer, List<String>> opId2paraSchema) {
+		Map<String, ArrayList<Integer>> cardinality4paraInSchema = new HashMap<>();
 
 		// 所有可能被用到的列
 		Set<String> paraSchemaInfo = new HashSet<>();
@@ -208,13 +210,19 @@ public class TxLogicAnalyzer {
 			}
 		}
 
-		// 获得最大的基数
-		Map<String, Integer> ret = new HashMap<>();
+		// 获得基数分布
+		Map<String,Map<Integer,Double>> ret = new HashMap<>();
 		for (String para : paraSchemaInfo){
-//			System.out.println(para+": "+ (cardinality4paraInSchema.get(para) ));
-			OptionalInt sum = cardinality4paraInSchema.get(para).stream().mapToInt(e->e).max();
-			ret.put(para, sum.getAsInt() );
+			ArrayList<Integer> data = cardinality4paraInSchema.get(para);
 
+			Map<Integer, Double> calculation = new HashMap<>();
+			for (Integer i : data){
+				if (i == 0) continue;
+				calculation.put(i, calculation.getOrDefault(i,0.0) + 1 );
+			}
+			calculation.replaceAll((k, v) -> v / data.size());
+			if (calculation.size() > 0)
+				ret.put(para,  calculation);
 		}
 //		System.out.println();
 		return ret;
@@ -251,9 +259,6 @@ public class TxLogicAnalyzer {
 			if (table != null && table.getPartition() != null && table.getPartition().getPartitionKey().equals(columnName)){
 				String partitionName = table.getPartition().getPartition((Number) operationData.getParameters()[i]);
 				para4paraInSchema.get(para).add(partitionName);
-			}
-			else {
-				para4paraInSchema.get(para).add(operationData.getParameters()[i]);
 			}
 		}
 	}
@@ -300,6 +305,7 @@ public class TxLogicAnalyzer {
 				} else if (operationTypes[i] == 1) {// 是循环中的操作并执行了多次
 					operationData = ((ArrayList<OperationData>) operationDatas[i]).get(0);
 					cnt = ((ArrayList<OperationData>) operationDatas[i]).size();
+					cnt = cnt * (cnt -1) / 2;
 				} else if (operationTypes[i] == 0) {// 不是循环中的操作或者只执行了一次
 					operationData = (OperationData) operationDatas[i];
 				}
@@ -451,7 +457,7 @@ public class TxLogicAnalyzer {
 		return operationId2AvgRunTimes;
 	}
 
-	public Map<String, Integer> getCardinality4paraInSchema() {
+	public Map<String, Map<Integer,Double>> getCardinality4paraInSchema() {
 		return cardinality4paraInSchema;
 	}
 

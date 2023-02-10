@@ -62,7 +62,7 @@ public class MultiPartitionDistribution<T extends Number> extends DataAccessDist
 //        }
 
 
-        return genePartitionValue(idx);
+        return partitionDistribution.get(idx).geneValue();
     }
 
     @Override

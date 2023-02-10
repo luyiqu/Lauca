@@ -34,7 +34,7 @@ public class Transaction{
 	// Multiple块内SQL操作的逻辑（目前仅考虑SQL输入参数是否保持不变或者单调改变）
 	private Map<String, Double> multipleLogicMap = null;
 	// 以访问的列为单位统计的基数
-	private Map<String, Integer> cardinality4paraInSchema = new HashMap<>();
+	private Map<String, Map<Integer,Double>> cardinality4paraInSchema = new HashMap<>();
 	// 操作ID -> 平均执行次数，用来确定：if/else分支执行比例，multiple内操作平均执行次数
 	private Map<Integer, Double> operationId2AvgRunTimes = null;
 
@@ -58,7 +58,7 @@ public class Transaction{
 	// 设置事务逻辑信息
 	public void setTransactionLogicInfo(Map<String, ParameterNode> parameterNodeMap,
 			Map<String, Double> multipleLogicMap, Map<Integer, Double> operationId2AvgRunTimes,
-										Map<String, Integer> cardinality4paraInSchema) {
+										Map<String, Map<Integer,Double>> cardinality4paraInSchema) {
 		this.parameterNodeMap = parameterNodeMap;
 		this.multipleLogicMap = multipleLogicMap;
 		this.operationId2AvgRunTimes = operationId2AvgRunTimes;
@@ -178,6 +178,20 @@ public class Transaction{
 			partitionUsed.put(para, new HashMap<>());
 		}
 
+		Map<String, Integer> cardUsed = new HashMap<>();
+		Random random = new Random();
+		for (String columnName : cardinality4paraInSchema.keySet()){
+			double idx = random.nextDouble();
+			double sum = 0;
+			for (Integer k: cardinality4paraInSchema.get(columnName).keySet()) {
+				sum += cardinality4paraInSchema.get(columnName).get(k);
+				if (sum > idx - 1e-7){
+					cardUsed.put(columnName, k);
+					break;
+				}
+			}
+		}
+
 
 //		if(transactionBlocks.size()!=1){
 //			System.out.println(transactionBlocks.size());
@@ -188,14 +202,14 @@ public class Transaction{
 //		}
 		for (int i = 0; i < transactionBlocks.size(); i++) {
 			if (prepared) {
-				flag = transactionBlocks.get(i).execute(cardinality4paraInSchema, partitionUsed);
+				flag = transactionBlocks.get(i).execute(cardUsed, partitionUsed);
 				if (flag != 1) {
 //					System.out.println("prepared"+this.name+" "+i);
 					break;
 				}
 			} else {
 
-				flag = transactionBlocks.get(i).execute(cardinality4paraInSchema, partitionUsed, stmt);
+				flag = transactionBlocks.get(i).execute(cardUsed, partitionUsed, stmt);
 //				System.out.println("NoPrepared: "+transactionBlocks.get(i));
 				if (flag != 1) {
 					break;

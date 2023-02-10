@@ -101,7 +101,7 @@ public class PartitionEqualRelationAnalyzer {
                          // ----- 统计当前参数与自身操作（即之前循环的操作以及当前操作）的关联关系
                          // 记录之前的参数的关系是否已经记录，如果记录过了就略过
                          boolean[] isAdd = new boolean[parameters.length];
-                         for (int frontIdx = 0; frontIdx < cnt ; ++ frontIdx) {
+                         for (int frontIdx = 0; frontIdx <= cnt ; ++ frontIdx) {
                              OperationData frontOperationData = operationDataList.get(frontIdx);
                              Object[] frontParameter = frontOperationData.getParameters();
                              // 如果检查到当前操作，只探测和前面参数的关联，否则全部探测
@@ -111,7 +111,7 @@ public class PartitionEqualRelationAnalyzer {
                                  String frontParaIdentifier = operationId + "_para_" + k;
 
                                  Partition frontPartition = opId2Partition.get(operationId).get(k);
-                                 if (frontPartition == null || isAdd[k] || k == j) continue;
+                                 if (frontPartition == null) continue;
                                  String frontPartitionKey = frontPartition.getPartition((Number)frontParameter[k]);
 
                                  String frontParaSchema = opId2paraSchema.get(operationId).get(k);
@@ -242,7 +242,8 @@ public class PartitionEqualRelationAnalyzer {
                 dependencies.set(k, new ParameterDependency(includeDependency.getKey(), includeDependency.getValue(), ParameterDependency.DependencyType.PARTITION_EQUAL));
                 probabilitySum = probabilitySum - dependencies.get(k).getProbability() + includeDependency.getValue();
                 break;
-            }else if (includeDependency.getValue() >= dependencies.get(k).getProbability() && probabilitySum - dependencies.get(k).getProbability() + includeDependency.getValue() <= 1.00000001){
+            }else if (dependencies.get(k).getDependencyType() != ParameterDependency.DependencyType.EQUAL &&
+                    includeDependency.getValue() >= dependencies.get(k).getProbability() && probabilitySum - dependencies.get(k).getProbability() + includeDependency.getValue() <= 1.00000001){
                 dependencies.set(k, new ParameterDependency(includeDependency.getKey(), includeDependency.getValue(), ParameterDependency.DependencyType.PARTITION_EQUAL));
                 probabilitySum = probabilitySum - dependencies.get(k).getProbability() + includeDependency.getValue();
                 break;
