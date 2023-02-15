@@ -250,18 +250,18 @@ public abstract class SqlStatement extends TransactionBlock {
 //					System.out.println("出现这个了，说明程序会出现问题");
 					// 某些依赖项不存在（所属分支未执行），注意目前这里的概率转换是有问题的！具有相当大的误差！TODO
 					//todo: 看一下这里20210102
-//					cumulativeProbabilities = new double[dependencies.size()];
-//					Arrays.fill(cumulativeProbabilities, 0);
-//					for (int i = 0; i < dependencies.size(); i++) {
-//						if (flags[i]) {
-//							cumulativeProbabilities[i] = dependencies.get(i).getProbability();
-//						}
-//					}
-//					for (int i = 1; i < cumulativeProbabilities.length; i++) {
-//						cumulativeProbabilities[i] += cumulativeProbabilities[i - 1];
-//					}
-//					randomValue = randomValue * (cumulativeProbabilities[cumulativeProbabilities.length - 1]
-//							/ parameterNode.getProbabilitySum());
+					cumulativeProbabilities = new double[dependencies.size()];
+					Arrays.fill(cumulativeProbabilities, 0);
+					for (int i = 0; i < dependencies.size(); i++) {
+						if (flags[i]) {
+							cumulativeProbabilities[i] = dependencies.get(i).getProbability();
+						}
+					}
+					for (int i = 1; i < cumulativeProbabilities.length; i++) {
+						cumulativeProbabilities[i] += cumulativeProbabilities[i - 1];
+					}
+					randomValue = randomValue * (cumulativeProbabilities[cumulativeProbabilities.length - 1]
+							/ parameterNode.getProbabilitySum());
 				}
 
 				for (int i = 0; i < cumulativeProbabilities.length; i++) {
@@ -397,29 +397,29 @@ public abstract class SqlStatement extends TransactionBlock {
 			return parameter;
 		}
 //
-		if (Configurations.isUsePartitionRule() && hasPartition && cardinality4paraInSchema.get(paraSchemaInfo) > 0){
-			Random random = new Random();
-			if (cardinality4paraInSchema.get(paraSchemaInfo) <= partitionUsedPara.size()){
-//				if (paraSchemaInfo.contains("s_w_id") ){
-//					System.out.println(partitionUsedPara.size()+" "+partitionUsedPara.get(paraPartition) + " " + paraPartition + " " + parameter);
+//		if (Configurations.isUsePartitionRule() && hasPartition && cardinality4paraInSchema.get(paraSchemaInfo) > 0){
+//			Random random = new Random();
+//			if (cardinality4paraInSchema.get(paraSchemaInfo) <= partitionUsedPara.size()){
+////				if (paraSchemaInfo.contains("s_w_id") ){
+////					System.out.println(partitionUsedPara.size()+" "+partitionUsedPara.get(paraPartition) + " " + paraPartition + " " + parameter);
+////				}
+//				if (!partitionUsedPara.containsKey(paraPartition)){// 如果已经填满基数，不再重新构造，直接从已知的参数里找一个
+//
+//					int partitionIdx = random.nextInt(partitionUsedPara.size());
+//					paraPartition = new ArrayList<>(partitionUsedPara.keySet()).get(partitionIdx);
+//
+//					partitionIdx = new Random().nextInt(partitionUsedPara.get(paraPartition).size());
+//						parameter = partitionUsedPara.get(paraPartition).get(partitionIdx);
 //				}
-				if (!partitionUsedPara.containsKey(paraPartition)){// 如果已经填满基数，不再重新构造，直接从已知的参数里找一个
-
-					int partitionIdx = random.nextInt(partitionUsedPara.size());
-					paraPartition = new ArrayList<>(partitionUsedPara.keySet()).get(partitionIdx);
-
-					partitionIdx = new Random().nextInt(partitionUsedPara.get(paraPartition).size());
-						parameter = partitionUsedPara.get(paraPartition).get(partitionIdx);
-				}
-			}
-			else{
-				// 如果还没填满就重复了，重新生成
-				while (partitionUsedPara.containsKey(paraPartition) && random.nextDouble() < 0.5){
-					parameter = geneParameter(idx);
-					paraPartition = getParameterPartition(parameter, idx);
-				}
-			}
-		}
+//			}
+//			else{
+//				// 如果还没填满就重复了，重新生成
+//				while (partitionUsedPara.containsKey(paraPartition) && random.nextDouble() < 0.5){
+//					parameter = geneParameter(idx);
+//					paraPartition = getParameterPartition(parameter, idx);
+//				}
+//			}
+//		}
 //
 //
 		if (!partitionUsedPara.containsKey(paraPartition)) {
@@ -447,31 +447,31 @@ public abstract class SqlStatement extends TransactionBlock {
 			return parameter;
 		}
 //
-		if (Configurations.isUsePartitionRule() && hasPartition && cardinality4paraInSchema.get(paraSchemaInfo) > 0){
-			Random random = new Random();
-			if (cardinality4paraInSchema.get(paraSchemaInfo) <= partitionUsedPara.size()){
-//				if (paraSchemaInfo.contains("s_w_id") ){
-//					System.out.println(partitionUsedPara.size()+" "+partitionUsedPara.get(paraPartition) + " " + paraPartition + " " + parameter);
+//		if (Configurations.isUsePartitionRule() && hasPartition && cardinality4paraInSchema.get(paraSchemaInfo) > 0){
+//			Random random = new Random();
+//			if (cardinality4paraInSchema.get(paraSchemaInfo) <= partitionUsedPara.size()){
+////				if (paraSchemaInfo.contains("s_w_id") ){
+////					System.out.println(partitionUsedPara.size()+" "+partitionUsedPara.get(paraPartition) + " " + paraPartition + " " + parameter);
+////				}
+//				if (!partitionUsedPara.containsKey(paraPartition)){// 如果已经填满基数，不再重新构造，直接从已知的参数里找一个
+//
+//
+//					int partitionIdx = random.nextInt(partitionUsedPara.size());
+//					paraPartition = new ArrayList<>(partitionUsedPara.keySet()).get(partitionIdx);
+//
+//					// 分区键的参数是value
+//					partitionIdx = new Random().nextInt(partitionUsedPara.get(paraPartition).size());
+//
+//					parameter = partitionUsedPara.get(paraPartition).get(partitionIdx);
 //				}
-				if (!partitionUsedPara.containsKey(paraPartition)){// 如果已经填满基数，不再重新构造，直接从已知的参数里找一个
-
-
-					int partitionIdx = random.nextInt(partitionUsedPara.size());
-					paraPartition = new ArrayList<>(partitionUsedPara.keySet()).get(partitionIdx);
-
-					// 分区键的参数是value
-					partitionIdx = new Random().nextInt(partitionUsedPara.get(paraPartition).size());
-
-					parameter = partitionUsedPara.get(paraPartition).get(partitionIdx);
-				}
-			}
-			else{
-				// 如果还没填满就重复了，重新生成
-				if (Configurations.isUsePartitionRule() && partitionUsedPara.containsKey(paraPartition) && random.nextDouble() < 0.7){
-					return null;
-				}
-			}
-		}
+//			}
+//			else{
+//				// 如果还没填满就重复了，重新生成
+//				if (Configurations.isUsePartitionRule() && partitionUsedPara.containsKey(paraPartition) && random.nextDouble() < 0.7){
+//					return null;
+//				}
+//			}
+//		}
 //
 //
 		if (!partitionUsedPara.containsKey(paraPartition)) {

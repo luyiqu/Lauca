@@ -157,15 +157,16 @@ public class LaucaTestingEnv {
 			try {
 				CountDownLatch countDownLatch = new CountDownLatch(tableDataFiles.length);
 				long startTime = System.currentTimeMillis();
+
 				for (File tableDataFile : tableDataFiles) {
 					Connection finalLaucaConn = laucaConn;
 					new Thread(() -> {
 						String tableName = tableDataFile.getName().substring(0, tableDataFile.getName().length() - 6);
-						System.out.println(tableDataFile.getName()+" loading...");
 						switch (databaseType) {
 							case "mysql":
 							case "tidb":
 								try {
+									System.out.println(tableDataFile.getCanonicalPath());
 									stmt.execute("LOAD DATA  INFILE '" + tableDataFile.getCanonicalPath() + "' INTO TABLE "
 											+ tableName + " FIELDS TERMINATED BY ',' LINES TERMINATED BY '\r\n'");
 								} catch (SQLException | IOException e) {

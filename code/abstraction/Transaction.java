@@ -203,19 +203,12 @@ public class Transaction{
 		for (int i = 0; i < transactionBlocks.size(); i++) {
 			if (prepared) {
 				flag = transactionBlocks.get(i).execute(cardUsed, partitionUsed);
-				if (flag != 1) {
-//					System.out.println("prepared"+this.name+" "+i);
-					break;
-				}
 			} else {
-
 				flag = transactionBlocks.get(i).execute(cardUsed, partitionUsed, stmt);
-//				System.out.println("NoPrepared: "+transactionBlocks.get(i));
-				if (flag != 1) {
-					break;
-				}
 			}
-
+			if (flag != 1) {
+				break;
+			}
 			// mainly for smallbank workload. 针对其他负载，rollbackProbabilities[i]都为0
 			if (Math.random() < rollbackProbabilities[i]) {
 				flag = 0;

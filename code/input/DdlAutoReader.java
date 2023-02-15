@@ -241,13 +241,12 @@ public class DdlAutoReader {
             List<String> createFK = new ArrayList<>();
             //laucaStmt.addBatch("SET @OLD_UNIQUE_CHECKS=@@UNIQUE_CHECKS, UNIQUE_CHECKS=0");
             //laucaStmt.addBatch("SET @OLD_FOREIGN_KEY_CHECKS=@@FOREIGN_KEY_CHECKS, FOREIGN_KEY_CHECKS=0");
-            for(int i=0;i<tables.size();i++){
-                Table table = tables.get(i);
+            for (Table table : tables) {
                 String anonymousTableName = table.getName();
                 String originalTableName = anonymity2Tables.get(anonymousTableName);
                 Set<String> cols = new HashSet<>();
 
-                String sql = "SHOW CREATE TABLE " + originalTableName ;
+                String sql = "SHOW CREATE TABLE " + originalTableName;
                 // 发送sql语句，执行sql语句,得到返回结果
                 ResultSet rs = oriStmt.executeQuery(sql);
                 if (rs.next())
@@ -269,25 +268,25 @@ public class DdlAutoReader {
                         if (line.equals("")) continue;
                         else if (line.startsWith("CREATE TABLE"))//修改表名
                             strbuf.append("CREATE TABLE " + anonymousTableName + " (\r\n");
-                        else if (line.startsWith("FOREIGN KEY ")||line.startsWith("UNIQUE KEY")
-                                ||line.startsWith("CONSTRAINT")||line.startsWith("KEY"))
+                        else if (line.startsWith("FOREIGN KEY ") || line.startsWith("UNIQUE KEY")
+                                || line.startsWith("CONSTRAINT") || line.startsWith("KEY"))
                             constraints.add(line);
                         else
                             strbuf.append(line + "\r\n");
 
                     }
-                }catch (IOException e){
+                } catch (IOException e) {
                     e.printStackTrace();
                 }
                 ddl = strbuf.toString();
 
                 //列名匿名
-                int index1 = 0,index2 = 0;
+                int index1 = 0, index2 = 0;
                 while ((index1 = ddl.indexOf("`", index2)) != -1) {
                     if ((index2 = ddl.indexOf("`", index1 + 1)) == -1) break;
                     String originalColumnName = ddl.substring(index1 + 1, index2).toLowerCase();
                     String anonymousColumnName = null;
-                    if(table2Columns2Anonymity.get(originalTableName).containsKey(originalColumnName)){
+                    if (table2Columns2Anonymity.get(originalTableName).containsKey(originalColumnName)) {
                         anonymousColumnName = table2Columns2Anonymity.get(originalTableName).get(originalColumnName);
                         ddl = ddl.substring(0, index1) + anonymousColumnName + ddl.substring(index2 + 1);
                         cols.add(anonymousColumnName.trim());
@@ -303,47 +302,47 @@ public class DdlAutoReader {
                 index1 = ddl.lastIndexOf(",");
                 index2 = ddl.lastIndexOf(")");
                 Pattern p = Pattern.compile("\\w+");
-                Matcher m = p.matcher(ddl.substring(index1,index2));
-                if(!m.find()) ddl = ddl.substring(0,index1) + ')';
+                Matcher m = p.matcher(ddl.substring(index1, index2));
+                if (!m.find()) ddl = ddl.substring(0, index1) + ')';
                 //连接测试数据库，通过读取并修改的ddl语句建表
                 laucaStmt.addBatch("DROP TABLE IF EXISTS " + anonymousTableName);
                 laucaStmt.addBatch(ddl);
-                System.out.println(ddl);
+//                System.out.println(ddl);
 
                 //增加字段
                 Column[] columns = table.getColumns();
-                for(int j=0;j<columns.length;j++){//将真实数据库中的列与table中的列对比
-                    String addColumnSQL = "ALTER TABLE " + anonymousTableName +" ADD COLUMN ";
-                    String colName = columns[j].getName();
-                    int dataType = columns[j].getDataType();
-                    if(!cols.contains(colName)){
-                        addColumnSQL += colName +" "+Int2dataType(dataType);
+                for (Column column : columns) {//将真实数据库中的列与table中的列对比
+                    String addColumnSQL = "ALTER TABLE " + anonymousTableName + " ADD COLUMN ";
+                    String colName = column.getName();
+                    int dataType = column.getDataType();
+                    if (!cols.contains(colName)) {
+                        addColumnSQL += colName + " " + Int2dataType(dataType);
                         laucaStmt.addBatch(addColumnSQL);
                     }
                 }
                 //处理外键，UNIQUE，索引等约束
                 ArrayList<String> col = new ArrayList<String>();
-                for(String cons : constraints){
+                for (String cons : constraints) {
                     String alter_sql = "ALTER TABLE " + anonymousTableName + " ADD ";
-                    index1 = 0; index2 = 0;
+                    index1 = 0;
+                    index2 = 0;
                     while ((index1 = cons.indexOf("`", index2)) != -1) {
                         if ((index2 = cons.indexOf("`", index1 + 1)) == -1) break;
                         String originalColumnName = cons.substring(index1 + 1, index2).toLowerCase();
                         String anonymousColumnName = null;
-                        if(table2Columns2Anonymity.get(originalTableName).containsKey(originalColumnName)){
+                        if (table2Columns2Anonymity.get(originalTableName).containsKey(originalColumnName)) {
                             anonymousColumnName = table2Columns2Anonymity.get(originalTableName).get(originalColumnName);
                             cons = cons.substring(0, index1) + anonymousColumnName + cons.substring(index2 + 1);
-                        }
-                        else{//可能是索引名，约束名
-                        String indexName = geneRandomName(originalColumnName.length());
-                        cons = cons.substring(0,index1) + indexName + cons.substring(index2 + 1);
-                        //index2 = index2 + (indexName.length()-originalColumnName.length());
+                        } else {//可能是索引名，约束名
+                            String indexName = geneRandomName(originalColumnName.length());
+                            cons = cons.substring(0, index1) + indexName + cons.substring(index2 + 1);
+                            //index2 = index2 + (indexName.length()-originalColumnName.length());
                         }
                     }
                     //去除末尾逗号
-                    if(cons.endsWith(",")) cons = cons.substring(0, cons.length()-1);
+                    if (cons.endsWith(",")) cons = cons.substring(0, cons.length() - 1);
                     alter_sql += cons;
-                    System.out.println("alter: "+alter_sql);
+                    System.out.println("alter: " + alter_sql);
                     FKs_Indexes.add(alter_sql);
                 }
             }

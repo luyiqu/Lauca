@@ -260,6 +260,9 @@ public class DdlAutoReaderWOA {
                 }
                 ddl = strbuf.toString();
 
+                Pattern commentPattern = Pattern.compile("/\\*.*\\*/");
+                ddl = commentPattern.matcher(ddl).replaceAll("");
+
                 //列名
                 int index1 = 0, index2 = 0;
                 while ((index1 = ddl.indexOf("`", index2 + 1)) != -1) {
@@ -281,9 +284,8 @@ public class DdlAutoReaderWOA {
                 //去除末尾多余的逗号
                 index1 = ddl.lastIndexOf(",");
                 index2 = ddl.lastIndexOf(")");
-                Pattern p = Pattern.compile("\\w+");
-                Matcher m = p.matcher(ddl.substring(index1, index2));
-                if (!m.find()) ddl = ddl.substring(0, index1) + ')';
+                Pattern lastCommaWithBracket = Pattern.compile(",\\s+\\)");
+                ddl = lastCommaWithBracket.matcher(ddl).replaceAll(")");
                 //连接测试数据库，通过读取并修改的ddl语句建表
                 laucaStmt.addBatch("DROP TABLE IF EXISTS " + originalTableName);
                 if (partitionRule != null){

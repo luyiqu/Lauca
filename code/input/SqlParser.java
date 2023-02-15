@@ -1221,7 +1221,7 @@ public class SqlParser {
 	private String searchTableName4Column(String[] tableNames, String columnName){
 		for (Table table : tables) {
 			for (String tableName : tableNames) {
-				if (table.getName().equals(tableName)) {
+				if (table.getName().equalsIgnoreCase(tableName)) {
 					Column[] columns = table.getColumns();
 					for (Column column : columns) {
 						if (column.getName().equals(columnName)) {
@@ -1240,10 +1240,10 @@ public class SqlParser {
 
 	private Column searchColumn(String tableName, String columnName) {
 		for (Table table : tables) {
-			if (table.getName().equals(tableName)) {
+			if (table.getName().equalsIgnoreCase(tableName)) {
 				Column[] columns = table.getColumns();
 				for (Column column : columns) {
-					if (column.getName().equals(columnName)) {
+					if (column.getName().equalsIgnoreCase(columnName)) {
 						return column;
 					}
 				}
@@ -1319,10 +1319,10 @@ public class SqlParser {
 		Table table = null;
 		Column column = null;
 		for (Table value : tables) {
-			if (value.getName().equals(tableName)) {
+			if (value.getName().equalsIgnoreCase(tableName)) {
 				Column[] columns = value.getColumns();
 				for (Column item : columns) {
-					if (item.getName().equals(columnName)) {
+					if (item.getName().equalsIgnoreCase(columnName)) {
 						table = value;
 						column = item;
 					}
