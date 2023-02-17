@@ -57,7 +57,7 @@ public class WriteOperation extends SqlStatement {
 //		long para = -1; //lyqu: 照理说不应该为long类型，而是int主键类型
 //		LaucaTestingEnv.writeOperationTimes.getAndIncrement();
 		try {
-
+			Map<String, Map<Object,Integer>> usedPartitionSize = getUsedPartitionSize(partitionUsed);
 			for (int i = 0; i < paraDataTypes.length; i++) {
 
 //				if(i == paraDataTypes.length-1){
@@ -99,6 +99,7 @@ public class WriteOperation extends SqlStatement {
 //					LaucaTestingEnv.moreUpdateRowCount.getAndIncrement();
 //				}
 			}
+			getDiffUsedPartitionSize(usedPartitionSize, partitionUsed);
 			return 1;
 		} catch (Exception e) {
 //			return -1;
@@ -127,6 +128,7 @@ public class WriteOperation extends SqlStatement {
 		String tmp = sql; // 方便程序调试
 		
 		try {
+			Map<String, Map<Object,Integer>> usedPartitionSize = getUsedPartitionSize(partitionUsed);
 			// String tmp = sql;
 			for (int i = 0; i < paraDataTypes.length; i++) {
 
@@ -147,6 +149,7 @@ public class WriteOperation extends SqlStatement {
 			}
 			// 非预编译执行不存在批处理的策略
 			stmt.executeUpdate(tmp);
+			getDiffUsedPartitionSize(usedPartitionSize, partitionUsed);
 			return 1;
 		} catch (SQLException e) {
 //			e.printStackTrace();
@@ -171,6 +174,7 @@ public class WriteOperation extends SqlStatement {
 	public int execute(Map<String, Integer> cardinality4paraInSchema, Map<String, Map<Object, List<Object>>> partitionUsed,
 					   Map<String, Double> multipleLogicMap, int round) {
 		try {
+			Map<String, Map<Object,Integer>> usedPartitionSize = getUsedPartitionSize(partitionUsed);
 			for (int i = 0; i < paraDataTypes.length; i++) {
 
 				Object parameter = checkParaOutOfCardinality(i,
@@ -195,6 +199,7 @@ public class WriteOperation extends SqlStatement {
 			} else {
 				pstmt.executeUpdate();
 			}
+			getDiffUsedPartitionSize(usedPartitionSize, partitionUsed);
 			return 1;
 		} catch (SQLException e) {
 //			e.printStackTrace();
@@ -214,6 +219,7 @@ public class WriteOperation extends SqlStatement {
 	public int execute(Map<String, Integer> cardinality4paraInSchema, Map<String, Map<Object, List<Object>>> partitionUsed,
 					   Statement stmt, Map<String, Double> multipleLogicMap, int round) {
 		try {
+			Map<String, Map<Object,Integer>> usedPartitionSize = getUsedPartitionSize(partitionUsed);
 			String tmp = sql;
 			for (int i = 0; i < paraDataTypes.length; i++) {
 
@@ -240,6 +246,7 @@ public class WriteOperation extends SqlStatement {
 				}
 			}
 			stmt.executeUpdate(tmp);
+			getDiffUsedPartitionSize(usedPartitionSize, partitionUsed);
 			return 1;
 		} catch (SQLException e) {
 //			e.printStackTrace();

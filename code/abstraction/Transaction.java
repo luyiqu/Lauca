@@ -238,7 +238,7 @@ public class Transaction{
 					cnt = cnt == 0 ? 1 : cnt;
 					partitionCnt = Math.max(partitionCnt, cnt);
 				}
-				Stats.addPartitionCnt(partitionCnt);
+				Stats.addTxPartitionCnt(partitionCnt);
 			} else {
 				this.cleanBatch(transactionBlocks);
 				conn.rollback();

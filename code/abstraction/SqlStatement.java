@@ -15,6 +15,7 @@ import accessdistribution.IntegerParaDistribution;
 import config.Configurations;
 import transactionlogic.ParameterDependency;
 import transactionlogic.ParameterNode;
+import workloadgenerator.Stats;
 
 public abstract class SqlStatement extends TransactionBlock {
 
@@ -593,6 +594,43 @@ public abstract class SqlStatement extends TransactionBlock {
 		}
 		return paraDistTypeInfos;
 	}
+
+	/**
+	 * 获取记录表中每个分区共有多少个参数
+	 * @param partitionUsed
+	 * @return
+	 */
+	protected Map<String, Map<Object, Integer>> getUsedPartitionSize(Map<String, Map<Object, List<Object>>> partitionUsed) {
+		Map<String, Map<Object, Integer>> usedPartitionSize = new HashMap<>();
+		for (String columnName :partitionUsed.keySet()) {
+			Map<Object, Integer> usedSize = new HashMap<>();
+			for (Object key : partitionUsed.get(columnName).keySet()) {
+				if (partitionUsed.get(columnName).get(key) != null)
+					usedSize.put(key, partitionUsed.get(columnName).get(key).size());
+			}
+			usedPartitionSize.put(columnName, usedSize);
+		}
+		return usedPartitionSize;
+	}
+
+
+
+	protected void getDiffUsedPartitionSize(Map<String, Map<Object, Integer>> usedPartitionSize, Map<String, Map<Object, List<Object>>> partitionUsed) {
+		int partitionCnt = 1;
+		for (String columnName :partitionUsed.keySet()) {
+			int cnt = 0;
+			for (Object key : partitionUsed.get(columnName).keySet()) {
+				if (partitionUsed.get(columnName).get(key) != null && (
+						!usedPartitionSize.get(columnName).containsKey(key) ||
+								partitionUsed.get(columnName).get(key).size() > usedPartitionSize.get(columnName).get(key))) {
+					cnt ++;
+				}
+			}
+			partitionCnt = Math.max(partitionCnt, cnt);
+		}
+		Stats.addSQLPartitionCnt(partitionCnt);
+	}
+
 	public void setParaDistribution(Map<String, DataAccessDistribution> paraId2Distribution, int type) {
 		if (type == 0) { // 全负载周期数据访问分布
 			for (int i = 0; i < (paraDataTypes == null ? 0 : paraDataTypes.length); i++) {

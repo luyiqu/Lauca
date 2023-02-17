@@ -80,6 +80,9 @@ public class ReadOperation extends SqlStatement {
 	public int execute(Map<String, Integer> cardinality4paraInSchema, Map<String, Map<Object, List<Object>>> partitionUsed) {
 //		long startTime = System.currentTimeMillis();
 		try {
+
+			Map<String, Map<Object,Integer>> usedPartitionSize = getUsedPartitionSize(partitionUsed);
+
 			for (int i = 0; i < paraDataTypes.length; i++) {
 //				Object para = geneParameter(i);
 //				System.out.println("**************");
@@ -103,6 +106,9 @@ public class ReadOperation extends SqlStatement {
 //			long endTime1 = System.currentTimeMillis();
 //			LaucaTestingEnv.updateTime += endTime1 - startTime1;
 			saveResultSet(rs);
+
+			getDiffUsedPartitionSize(usedPartitionSize, partitionUsed);
+
 			return 1;
 		} catch (Exception e) {
 			if (e instanceof  SQLException) {
@@ -115,9 +121,14 @@ public class ReadOperation extends SqlStatement {
 		}
 	}
 
+
+
+
 	@Override
 	public int execute(Map<String, Integer> cardinality4paraInSchema, Map<String, Map<Object, List<Object>>> partitionUsed, Statement stmt) {
 		try {
+			Map<String, Map<Object,Integer>> usedPartitionSize = getUsedPartitionSize(partitionUsed);
+
 			String tmp = sql;
 			for (int i = 0; i < paraDataTypes.length; i++) {
 				Object parameter = geneParameter(i);
@@ -131,6 +142,7 @@ public class ReadOperation extends SqlStatement {
 			}
 			ResultSet rs = stmt.executeQuery(tmp);
 			saveResultSet(rs);
+			getDiffUsedPartitionSize(usedPartitionSize, partitionUsed);
 			return 1;
 		} catch (SQLException e) {
 //			e.printStackTrace();
@@ -148,6 +160,7 @@ public class ReadOperation extends SqlStatement {
 //		long startTime = System.currentTimeMillis();
 //		System.out.println("照例说Read操作肯定会走这里，但这里是指multiple的事务逻辑");
 		try {
+			Map<String, Map<Object,Integer>> usedPartitionSize = getUsedPartitionSize(partitionUsed);
 			for (int i = 0; i < paraDataTypes.length; i++) {
 				Object parameter = checkParaOutOfCardinality(i,
 						geneParameterByMultipleLogic(i, multipleLogicMap, round),
@@ -176,6 +189,7 @@ public class ReadOperation extends SqlStatement {
 
 //			long endTime1 = System.currentTimeMillis();
 //			LaucaTestingEnv.updateTime += endTime1 - startTime1;
+			getDiffUsedPartitionSize(usedPartitionSize, partitionUsed);
 			return 1;
 		} catch (Exception e) {
 			if ( e instanceof SQLException) {
@@ -190,6 +204,7 @@ public class ReadOperation extends SqlStatement {
 	public int execute(Map<String, Integer> cardinality4paraInSchema, Map<String, Map<Object, List<Object>>> partitionUsed,
 					   Statement stmt, Map<String, Double> multipleLogicMap, int round) {
 		try {
+			Map<String, Map<Object,Integer>> usedPartitionSize = getUsedPartitionSize(partitionUsed);
 			String tmp = sql;
 			for (int i = 0; i < paraDataTypes.length; i++) {
 				Object parameter = geneParameterByMultipleLogic(i, multipleLogicMap, round);
@@ -203,6 +218,7 @@ public class ReadOperation extends SqlStatement {
 			}
 			ResultSet rs = stmt.executeQuery(tmp);
 			saveResultSet(rs);
+			getDiffUsedPartitionSize(usedPartitionSize, partitionUsed);
 			return 1;
 		} catch (SQLException e) {
 //			e.printStackTrace();
