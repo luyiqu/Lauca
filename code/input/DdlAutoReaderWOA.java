@@ -375,23 +375,23 @@ public class DdlAutoReaderWOA {
             // 创建Statement
             Statement oriStmt = oriConn.createStatement();
             Statement laucaStmt = laucaConn.createStatement();
-            for(int i=0;i<tables.size();i++){
+            for (Table value : tables) {
                 Set<String> cols = new HashSet<>();
-                Table table = tables.get(i);
+                Table table = value;
                 String originalTableName = table.getName();
                 //String anonymousTableName = table.getName();
                 //String originalTableName = anonymity2Tables.get(anonymousTableName);
                 String ddl = "CREATE TABLE ";
-                ddl += originalTableName +"(\n";
+                ddl += originalTableName + "(\n";
                 String sql = "SELECT format_type(a.atttypid,a.atttypmod) as type,a.attname as name, a.attnotnull as notnull "
-                        + "FROM pg_class as c,pg_attribute as a where c.relname = '"+originalTableName.toLowerCase()+"' "
+                        + "FROM pg_class as c,pg_attribute as a where c.relname = '" + originalTableName.toLowerCase() + "' "
                         + "and a.attrelid = c.oid and a.attnum>0";
 
                 ResultSet rs = oriStmt.executeQuery(sql);
-                if(rs.next()){
+                if (rs.next()) {
                     ddl += rs.getString("name");
                     ddl += " " + rs.getString("type");
-                    if(rs.getString("notnull").equals("t"))
+                    if (rs.getString("notnull").equals("t"))
                         ddl += " NOT NULL";
                     else
                         ddl += " NULL";
@@ -401,21 +401,21 @@ public class DdlAutoReaderWOA {
                     ddl += ",\n";
                     ddl += rs.getString("name");
                     ddl += " " + rs.getString("type");
-                    if(rs.getString("notnull").equals("t"))
+                    if (rs.getString("notnull").equals("t"))
                         ddl += " NOT NULL";
                     else
                         ddl += " NULL";
                     cols.add(rs.getString("name"));
                 }
                 String[] primaryKeys = table.getPrimaryKey();
-                if(primaryKeys.length > 0){
+                if (primaryKeys.length > 0) {
                     ddl += ",\nPRIMARY KEY (";
-                    for(int j=0;j<primaryKeys.length;j++){
-                        if(j!=0) ddl += ","+primaryKeys[j];
+                    for (int j = 0; j < primaryKeys.length; j++) {
+                        if (j != 0) ddl += "," + primaryKeys[j];
                         else ddl += primaryKeys[j];
                     }
                     ddl += "))";
-                }else {
+                } else {
                     ddl += ")";
                 }
 
@@ -425,20 +425,20 @@ public class DdlAutoReaderWOA {
 
                 //增加字段
                 Column[] columns = table.getColumns();
-                for(int j=0;j<columns.length;j++){//将真实数据库中的列与table中的列对比
-                    String addColumnSQL = "ALTER TABLE " + originalTableName +" ADD COLUMN ";
-                    String colName = columns[j].getName();
-                    int dataType = columns[j].getDataType();
-                    if(!cols.contains(colName)){
-                        addColumnSQL += colName +" "+Int2dataType(dataType);
+                for (Column column : columns) {//将真实数据库中的列与table中的列对比
+                    String addColumnSQL = "ALTER TABLE " + originalTableName + " ADD COLUMN ";
+                    String colName = column.getName();
+                    int dataType = column.getDataType();
+                    if (!cols.contains(colName)) {
+                        addColumnSQL += colName + " " + Int2dataType(dataType);
                         laucaStmt.addBatch(addColumnSQL);
                     }
                 }
                 //创建索引
-                sql = "SELECT * FROM pg_indexes WHERE tablename = '" + originalTableName.toLowerCase()+"'";
+                sql = "SELECT * FROM pg_indexes WHERE tablename = '" + originalTableName.toLowerCase() + "'";
                 rs = oriStmt.executeQuery(sql);
-                while(rs.next()){
-                    if(rs.getString("indexname").contains("_pkey"))
+                while (rs.next()) {
+                    if (rs.getString("indexname").contains("_pkey"))
                         continue;
                     String indexSQL = rs.getString("indexdef");
                     indexSQL = indexSQL.replaceAll("[ \\t]+", " ");
@@ -466,22 +466,21 @@ public class DdlAutoReaderWOA {
                 }
             }
             //创建外键
-            for(int i=0;i<tables.size();i++){
-                Table table = tables.get(i);
+            for (Table table : tables) {
                 String tableName = table.getName();
                 ForeignKey[] foreignKeys = table.getForeignKeys();
-                for(ForeignKey fk : foreignKeys){
+                for (ForeignKey fk : foreignKeys) {
                     String fkSQL = "ALTER TABLE " + tableName + " ADD FOREIGN KEY (";
                     String[] localColumns = fk.getLocalColumns();
                     String referencedTable = fk.getReferencedTable();
                     String[] referencedColumns = fk.getReferencedColumns();
-                    for(int j=0;j<localColumns.length;j++){
-                        if(j!=0) fkSQL += ", ";
+                    for (int j = 0; j < localColumns.length; j++) {
+                        if (j != 0) fkSQL += ", ";
                         fkSQL += localColumns[j];
                     }
-                    fkSQL += ") REFERENCES " + referencedTable +" (";
-                    for(int j=0;j<referencedColumns.length;j++){
-                        if(j!=0) fkSQL += ", ";
+                    fkSQL += ") REFERENCES " + referencedTable + " (";
+                    for (int j = 0; j < referencedColumns.length; j++) {
+                        if (j != 0) fkSQL += ", ";
                         fkSQL += referencedColumns[j];
                     }
                     fkSQL += ") ON DELETE CASCADE";

@@ -139,7 +139,7 @@ public class TxLogicAnalyzer {
 		// 表名和表本身的映射
 		Map<String, Table> tableMap = new HashMap<>();
 		for (Table table : tables){
-			tableMap.put(table.getName(),table);
+			tableMap.put(table.getName().toLowerCase(),table);
 		}
 
 		Map<Integer, List<Partition>> ret = new HashMap<>();
@@ -245,7 +245,7 @@ public class TxLogicAnalyzer {
 		// 表名和表本身的映射
 		Map<String, Table> tableMap = new HashMap<>();
 		for (Table table : tables){
-			tableMap.put(table.getName(),table);
+			tableMap.put(table.getName().toLowerCase(),table);
 		}
 
 		for (int i = 0; i < paraDataTypes.length; i++){

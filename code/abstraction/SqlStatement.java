@@ -618,15 +618,15 @@ public abstract class SqlStatement extends TransactionBlock {
 	protected void getDiffUsedPartitionSize(Map<String, Map<Object, Integer>> usedPartitionSize, Map<String, Map<Object, List<Object>>> partitionUsed) {
 		int partitionCnt = 1;
 		for (String columnName :partitionUsed.keySet()) {
-			int cnt = 0;
+//			int cnt = 0;
 			for (Object key : partitionUsed.get(columnName).keySet()) {
 				if (partitionUsed.get(columnName).get(key) != null && (
 						!usedPartitionSize.get(columnName).containsKey(key) ||
 								partitionUsed.get(columnName).get(key).size() > usedPartitionSize.get(columnName).get(key))) {
-					cnt ++;
+					partitionCnt ++;
 				}
 			}
-			partitionCnt = Math.max(partitionCnt, cnt);
+//			partitionCnt = Math.max(partitionCnt, cnt);
 		}
 		Stats.addSQLPartitionCnt(partitionCnt);
 	}

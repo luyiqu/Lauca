@@ -121,6 +121,8 @@ public class DBStatisticsCollector {
 							"select count(*) from " + table.getName() + " where " + column.getName() + " is null");
 					rs.next();
 					column.setNullRatio((double) rs.getLong(1) / table.getSize());
+					System.out.println("select count(distinct(" + column.getName() + ")) from " + table.getName()
+							+ " where " + column.getName() + " is not null");
 					rs = stmt.executeQuery("select count(distinct(" + column.getName() + ")) from " + table.getName()
 							+ " where " + column.getName() + " is not null");
 					rs.next();
