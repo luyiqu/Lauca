@@ -154,6 +154,17 @@ public class Configurations {
 	// 是否启用分区统计
 	private static boolean usePartitionRule = false;
 
+	// 是否启用分区基数控制
+	private static boolean usePartitionCardinalityControl = false;
+
+	public static boolean isUsePartitionCardinalityControl() {
+		return usePartitionCardinalityControl;
+	}
+
+	public static void setUsePartitionCardinalityControl(boolean usePartitionCardinalityControl) {
+		Configurations.usePartitionCardinalityControl = usePartitionCardinalityControl;
+	}
+
 	private static int quantileNum= 10;
 
 	//启用存储过程

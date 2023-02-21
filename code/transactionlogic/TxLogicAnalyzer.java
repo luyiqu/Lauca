@@ -65,7 +65,7 @@ public class TxLogicAnalyzer {
 		}
 
 		// 分区等于依赖关系
-		if (Configurations.isUsePartitionRule()){
+		if (Configurations.isUsePartitionRule() && Configurations.isUsePartitionCardinalityControl()){
 			Map<Integer, Integer> operationId2ExecutionNumWithLoop = countOperationExecutionNumWithLoop(txDataList);
 
 
@@ -76,11 +76,11 @@ public class TxLogicAnalyzer {
 //					.convertCounter(para2Para2PartitionEqualCounter, operationId2ExecutionNumWithLoop);
 //			partitionEqualRelationAnalyzer.constructDependency(parameterNodeMap, formattedPartitionEqualCounter, identicalSets);
 //
-//			PartitionNotEqualRelationAnalyzer partitionNotEqualRelationAnalyzer = new PartitionNotEqualRelationAnalyzer();
-//			Map<String, Map<String, Integer>> para2Para2PartitionNotEqualCounter = partitionNotEqualRelationAnalyzer.countPartitionNotEqualInfo(txDataList, opId2Partition, opId2paraSchema);
-//			List<Entry<String, List<Entry<String, Double>>>> formattedPartitionNotEqualCounter = Util
-//					.convertCounter(para2Para2PartitionNotEqualCounter, operationId2ExecutionNumWithLoop);
-//			partitionNotEqualRelationAnalyzer.constructDependency(parameterNodeMap, formattedPartitionNotEqualCounter, identicalSets);
+			PartitionNotEqualRelationAnalyzer partitionNotEqualRelationAnalyzer = new PartitionNotEqualRelationAnalyzer();
+			Map<String, Map<String, Integer>> para2Para2PartitionNotEqualCounter = partitionNotEqualRelationAnalyzer.countPartitionNotEqualInfo(txDataList, opId2Partition, opId2paraSchema);
+			List<Entry<String, List<Entry<String, Double>>>> formattedPartitionNotEqualCounter = Util
+					.convertCounter(para2Para2PartitionNotEqualCounter, operationId2ExecutionNumWithLoop);
+			partitionNotEqualRelationAnalyzer.constructDependency(parameterNodeMap, formattedPartitionNotEqualCounter, identicalSets);
 		}
 
 		// 包含依赖关系

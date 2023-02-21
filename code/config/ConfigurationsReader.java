@@ -215,6 +215,9 @@ public class ConfigurationsReader {
 				case "usePartitionRule":
 					Configurations.setUsePartitionRule(Boolean.parseBoolean(arr[1].trim()));
 					break;
+				case "usePartitionCardinalityControl":
+					Configurations.setUsePartitionCardinalityControl(Boolean.parseBoolean(arr[1].trim()));
+					break;
 				}
 			}
 		} catch (IOException e) {

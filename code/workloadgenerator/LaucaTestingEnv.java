@@ -163,7 +163,7 @@ public class LaucaTestingEnv {
 							case "tidb":
 								try {
 									System.out.println(tableDataFile.getCanonicalPath());
-									stmt.execute("LOAD DATA  INFILE '" + tableDataFile.getCanonicalPath() + "' INTO TABLE "
+									stmt.execute("LOAD DATA LOCAL INFILE '" + tableDataFile.getCanonicalPath() + "' INTO TABLE "
 											+ tableName + " FIELDS TERMINATED BY ',' LINES TERMINATED BY '\r\n'");
 								} catch (SQLException | IOException e) {
 									throw new RuntimeException(e);
