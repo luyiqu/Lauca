@@ -1224,7 +1224,7 @@ public class SqlParser {
 				if (table.getName().equalsIgnoreCase(tableName)) {
 					Column[] columns = table.getColumns();
 					for (Column column : columns) {
-						if (column.getName().equals(columnName)) {
+						if (column.getName().equalsIgnoreCase(columnName)) {
 							return tableName;
 						}
 					}

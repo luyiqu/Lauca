@@ -284,13 +284,19 @@ public class DistributionCounter {
 		for (String partitionName : partition.getPartitionNameList()){
 			dataInPartition.put(partitionName,new ArrayList<>());
 		}
+		String partitionName = null;
 		for (String d: data) {
-			String partitionName = partition.getPartition(Long.parseLong(d));
-			dataInPartition.get(partitionName).add(d);
+			try {
+				partitionName = partition.getPartition(Long.parseLong(d));
+				dataInPartition.get(partitionName).add(d);
+			}
+			catch (Exception e){
+				e.printStackTrace();
+			}
 		}
 
 		for (int i = 0; i < length; i++) {
-			String partitionName = partition.getPartitionNameList().get(i);
+			partitionName = partition.getPartitionNameList().get(i);
 
 			List<String> values = dataInPartition.get(partitionName);
 			List<Entry<String, Integer>> valueNumEntryList = getValueNumEntryList(values);

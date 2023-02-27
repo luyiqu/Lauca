@@ -171,7 +171,7 @@ public class SchemaAutoReader {
 
     // 从建表语句中得到分区信息，现在只支持ob，int型分区键，列名全小写
     private Partition getPartition(Connection conn, String databaseType, String tableName, List<Column> columns) throws SQLException {
-        if (!databaseType.equals("mysql")){
+        if (!databaseType.equals("mysql") && !databaseType.equals("tidb")){
             return null;
         }
 
@@ -193,7 +193,13 @@ public class SchemaAutoReader {
         List<String> partitionNameList = new ArrayList<>();
         PartitionFunction  partitionRule;
         List<List<Integer>> partitionParam = new ArrayList<>();
-        String partitionKey = partitionSQLs[0].split(" ")[partitionSQLs[0].split(" ").length - 1];
+
+        String[] tmp = partitionSQLs[0].split("\\s+");
+        String partitionKey = tmp[tmp.length - 1];
+        if (databaseType.equals("tidb")){
+            partitionKey = tmp[tmp.length - 3];
+            partitionKey = partitionKey.substring(1,partitionKey.length() -1);
+        }
 
         // 检查是否真的有这个列，并且是否是int类型
         for (Column c : columns) {
@@ -221,6 +227,16 @@ public class SchemaAutoReader {
                 return null;
         }
 
+        if (databaseType.equals("tidb") && partitionRule == PartitionFunction.HASH){
+            int partitionCnt = Integer.parseInt(tmp[tmp.length - 1]);
+            for (int i = 0; i < partitionCnt; i++) {
+                partitionNameList.add("p"+i);
+                ArrayList<Integer> params = new ArrayList<>();
+                params.add(i);
+                partitionParam.add(params);
+            }
+        }
+
         int lowerBound = Integer.MIN_VALUE;
         for (int i = 1; i < partitionSQLs.length; i++) {
             String[] token = partitionSQLs[i].trim().split(" ");
@@ -230,10 +246,14 @@ public class SchemaAutoReader {
             switch (partitionRule){
                 case HASH:
                     /*
+                    -- ob
                      partition by hash(c_w_id)
                      (partition p0,
                      partition p1,
                      partition p2)
+
+                     -- tidb
+                     partition by hash (`c_w_id`) partition 5
                      */
                     params.add(i-1);
                     break;

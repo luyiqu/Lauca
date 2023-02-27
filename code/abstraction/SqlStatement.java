@@ -15,6 +15,7 @@ import accessdistribution.IntegerParaDistribution;
 import config.Configurations;
 import transactionlogic.ParameterDependency;
 import transactionlogic.ParameterNode;
+import workloadgenerator.Stats;
 
 public abstract class SqlStatement extends TransactionBlock {
 
@@ -397,29 +398,30 @@ public abstract class SqlStatement extends TransactionBlock {
 			return parameter;
 		}
 //
-//		if (Configurations.isUsePartitionRule() && hasPartition && cardinality4paraInSchema.get(paraSchemaInfo) > 0){
-//			Random random = new Random();
-//			if (cardinality4paraInSchema.get(paraSchemaInfo) <= partitionUsedPara.size()){
-////				if (paraSchemaInfo.contains("s_w_id") ){
-////					System.out.println(partitionUsedPara.size()+" "+partitionUsedPara.get(paraPartition) + " " + paraPartition + " " + parameter);
-////				}
-//				if (!partitionUsedPara.containsKey(paraPartition)){// 如果已经填满基数，不再重新构造，直接从已知的参数里找一个
-//
-//					int partitionIdx = random.nextInt(partitionUsedPara.size());
-//					paraPartition = new ArrayList<>(partitionUsedPara.keySet()).get(partitionIdx);
-//
-//					partitionIdx = new Random().nextInt(partitionUsedPara.get(paraPartition).size());
-//						parameter = partitionUsedPara.get(paraPartition).get(partitionIdx);
+		if (Configurations.isUsePartitionRule() && Configurations.isUsePartitionCardinalityControl()
+				&& hasPartition && cardinality4paraInSchema.get(paraSchemaInfo) > 0){
+			Random random = new Random();
+			if (cardinality4paraInSchema.get(paraSchemaInfo) <= partitionUsedPara.size()){
+//				if (paraSchemaInfo.contains("s_w_id") ){
+//					System.out.println(partitionUsedPara.size()+" "+partitionUsedPara.get(paraPartition) + " " + paraPartition + " " + parameter);
 //				}
-//			}
-//			else{
-//				// 如果还没填满就重复了，重新生成
+				if (!partitionUsedPara.containsKey(paraPartition)){// 如果已经填满基数，不再重新构造，直接从已知的参数里找一个
+
+					int partitionIdx = random.nextInt(partitionUsedPara.size());
+					paraPartition = new ArrayList<>(partitionUsedPara.keySet()).get(partitionIdx);
+
+					partitionIdx = new Random().nextInt(partitionUsedPara.get(paraPartition).size());
+						parameter = partitionUsedPara.get(paraPartition).get(partitionIdx);
+				}
+			}
+			else{
+				// 如果还没填满就重复了，重新生成
 //				while (partitionUsedPara.containsKey(paraPartition) && random.nextDouble() < 0.5){
 //					parameter = geneParameter(idx);
 //					paraPartition = getParameterPartition(parameter, idx);
 //				}
-//			}
-//		}
+			}
+		}
 //
 //
 		if (!partitionUsedPara.containsKey(paraPartition)) {
@@ -447,31 +449,32 @@ public abstract class SqlStatement extends TransactionBlock {
 			return parameter;
 		}
 //
-//		if (Configurations.isUsePartitionRule() && hasPartition && cardinality4paraInSchema.get(paraSchemaInfo) > 0){
-//			Random random = new Random();
-//			if (cardinality4paraInSchema.get(paraSchemaInfo) <= partitionUsedPara.size()){
-////				if (paraSchemaInfo.contains("s_w_id") ){
-////					System.out.println(partitionUsedPara.size()+" "+partitionUsedPara.get(paraPartition) + " " + paraPartition + " " + parameter);
-////				}
-//				if (!partitionUsedPara.containsKey(paraPartition)){// 如果已经填满基数，不再重新构造，直接从已知的参数里找一个
-//
-//
-//					int partitionIdx = random.nextInt(partitionUsedPara.size());
-//					paraPartition = new ArrayList<>(partitionUsedPara.keySet()).get(partitionIdx);
-//
-//					// 分区键的参数是value
-//					partitionIdx = new Random().nextInt(partitionUsedPara.get(paraPartition).size());
-//
-//					parameter = partitionUsedPara.get(paraPartition).get(partitionIdx);
+		if (Configurations.isUsePartitionRule() && hasPartition && Configurations.isUsePartitionCardinalityControl()
+				&& cardinality4paraInSchema.get(paraSchemaInfo) > 0){
+			Random random = new Random();
+			if (cardinality4paraInSchema.get(paraSchemaInfo) <= partitionUsedPara.size()){
+//				if (paraSchemaInfo.contains("s_w_id") ){
+//					System.out.println(partitionUsedPara.size()+" "+partitionUsedPara.get(paraPartition) + " " + paraPartition + " " + parameter);
 //				}
-//			}
-//			else{
-//				// 如果还没填满就重复了，重新生成
+				if (!partitionUsedPara.containsKey(paraPartition)){// 如果已经填满基数，不再重新构造，直接从已知的参数里找一个
+
+
+					int partitionIdx = random.nextInt(partitionUsedPara.size());
+					paraPartition = new ArrayList<>(partitionUsedPara.keySet()).get(partitionIdx);
+
+					// 分区键的参数是value
+					partitionIdx = new Random().nextInt(partitionUsedPara.get(paraPartition).size());
+
+					parameter = partitionUsedPara.get(paraPartition).get(partitionIdx);
+				}
+			}
+			else{
+				// 如果还没填满就重复了，重新生成
 //				if (Configurations.isUsePartitionRule() && partitionUsedPara.containsKey(paraPartition) && random.nextDouble() < 0.7){
 //					return null;
 //				}
-//			}
-//		}
+			}
+		}
 //
 //
 		if (!partitionUsedPara.containsKey(paraPartition)) {
@@ -593,6 +596,43 @@ public abstract class SqlStatement extends TransactionBlock {
 		}
 		return paraDistTypeInfos;
 	}
+
+	/**
+	 * 获取记录表中每个分区共有多少个参数
+	 * @param partitionUsed
+	 * @return
+	 */
+	protected Map<String, Map<Object, Integer>> getUsedPartitionSize(Map<String, Map<Object, List<Object>>> partitionUsed) {
+		Map<String, Map<Object, Integer>> usedPartitionSize = new HashMap<>();
+		for (String columnName :partitionUsed.keySet()) {
+			Map<Object, Integer> usedSize = new HashMap<>();
+			for (Object key : partitionUsed.get(columnName).keySet()) {
+				if (partitionUsed.get(columnName).get(key) != null)
+					usedSize.put(key, partitionUsed.get(columnName).get(key).size());
+			}
+			usedPartitionSize.put(columnName, usedSize);
+		}
+		return usedPartitionSize;
+	}
+
+
+
+	protected void getDiffUsedPartitionSize(Map<String, Map<Object, Integer>> usedPartitionSize, Map<String, Map<Object, List<Object>>> partitionUsed) {
+		int partitionCnt = 1;
+		for (String columnName :partitionUsed.keySet()) {
+//			int cnt = 0;
+			for (Object key : partitionUsed.get(columnName).keySet()) {
+				if (partitionUsed.get(columnName).get(key) != null && (
+						!usedPartitionSize.get(columnName).containsKey(key) ||
+								partitionUsed.get(columnName).get(key).size() > usedPartitionSize.get(columnName).get(key))) {
+					partitionCnt ++;
+				}
+			}
+//			partitionCnt = Math.max(partitionCnt, cnt);
+		}
+		Stats.addSQLPartitionCnt(partitionCnt);
+	}
+
 	public void setParaDistribution(Map<String, DataAccessDistribution> paraId2Distribution, int type) {
 		if (type == 0) { // 全负载周期数据访问分布
 			for (int i = 0; i < (paraDataTypes == null ? 0 : paraDataTypes.length); i++) {

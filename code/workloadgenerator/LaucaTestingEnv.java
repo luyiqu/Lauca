@@ -1,6 +1,5 @@
 package workloadgenerator;
 
-import java.io.BufferedReader;
 import java.io.File;
 import java.io.FileInputStream;
 import java.io.FileReader;
@@ -12,10 +11,8 @@ import java.sql.SQLException;
 import java.sql.Statement;
 import java.util.*;
 import java.util.concurrent.CountDownLatch;
-import java.util.concurrent.atomic.AtomicInteger;
 
 import abstraction.*;
-import com.mysql.jdbc.log.Log;
 import input.DdlAutoReaderWOA;
 import org.apache.log4j.PropertyConfigurator;
 import org.postgresql.copy.CopyManager;
@@ -29,7 +26,6 @@ import input.DdlAutoReader;
 import accessdistribution.DataAccessDistribution;
 import accessdistribution.DistributionCounter;
 import accessdistribution.SequentialParaDistribution;
-import config.Configurations;
 import config.ConfigurationsReader;
 import datageneration.DataGenerator;
 import input.TableInfoSerializer;
@@ -167,7 +163,7 @@ public class LaucaTestingEnv {
 							case "tidb":
 								try {
 									System.out.println(tableDataFile.getCanonicalPath());
-									stmt.execute("LOAD DATA  INFILE '" + tableDataFile.getCanonicalPath() + "' INTO TABLE "
+									stmt.execute("LOAD DATA LOCAL INFILE '" + tableDataFile.getCanonicalPath() + "' INTO TABLE "
 											+ tableName + " FIELDS TERMINATED BY ',' LINES TERMINATED BY '\r\n'");
 								} catch (SQLException | IOException e) {
 									throw new RuntimeException(e);
@@ -320,7 +316,8 @@ public class LaucaTestingEnv {
 
 
 
-		Stats.printPartitionStats();
+		Stats.printTxnPartitionStats();
+		Stats.printSQLPartitionStats();
 		System.exit(0);
 	}
 
