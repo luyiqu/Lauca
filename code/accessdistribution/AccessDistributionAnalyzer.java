@@ -4,16 +4,10 @@ import java.io.BufferedReader;
 import java.io.File;
 import java.io.FileInputStream;
 import java.io.InputStreamReader;
-import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.Comparator;
-import java.util.HashMap;
-import java.util.Iterator;
-import java.util.List;
-import java.util.Map;
+import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
+import java.util.*;
 import java.util.Map.Entry;
-import java.util.TreeMap;
-import java.util.Vector;
 import java.util.concurrent.ArrayBlockingQueue;
 import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.CountDownLatch;
@@ -60,11 +54,12 @@ public class AccessDistributionAnalyzer {
 				.getTxName2OperationId2paraDistTypeInfos();
 		Map<String, Map<String, DistributionTypeInfo>> txName2ParaId2DistTypeInfo = getParaDistributionTypeInfo(
 				txName2OperationId2paraDistTypeInfos);
+		Map<String, Map<Integer, List<String>>> txName2OpId2paraSchema = preprocessor.getTxName2OperationId2paraSchema();
+
 
 		RunningLogReader runningLogReader = new RunningLogReader(txName2OperationId2Template);
 		runningLogReader.read(new File(".//testdata//log4txlogic"));
-		Iterator<Entry<String, List<TransactionData>>> txDataIter = runningLogReader.getTxName2TxDataList().entrySet()
-				.iterator();
+
 
 		int timeWindowSize = Configurations.getTimeWindowSize();
 		int statThreadNum = Configurations.getStatThreadNum();
@@ -77,17 +72,14 @@ public class AccessDistributionAnalyzer {
 			windowDataBlockingQueues.add(windowDataBlockingQueue);
 		}
 		CountDownLatch cdl = new CountDownLatch(transactions.size());
-		while (txDataIter.hasNext()) {
-			Entry<String, List<TransactionData>> entry = txDataIter.next();
-
-//			System.out.println(entry.getKey());
+		for (Entry<String, List<TransactionData>> entry : runningLogReader.getTxName2TxDataList().entrySet()) {
+			//			System.out.println(entry.getKey());
 
 			TxLogicAnalyzer txLogicAnalyzer = new TxLogicAnalyzer();
-			txLogicAnalyzer.obtainTxLogic(entry.getValue());
+			txLogicAnalyzer.obtainTxLogic(entry.getValue(), txName2OpId2paraSchema.get(entry.getKey()), tables);
 
 			Map<Integer, OperationData> operationDataTemplates = txName2OperationId2Template.get(entry.getKey());
-			Map<Integer, OperationData> sortedOperationDataTemplates = new TreeMap<>();
-			sortedOperationDataTemplates.putAll(operationDataTemplates);
+			Map<Integer, OperationData> sortedOperationDataTemplates = new TreeMap<>(operationDataTemplates);
 			Iterator<Entry<Integer, OperationData>> operationDataTemplateIter = sortedOperationDataTemplates.entrySet()
 					.iterator();
 
@@ -104,10 +96,10 @@ public class AccessDistributionAnalyzer {
 					txName2StatParameters, cdl)).start();
 
 			// for testing workload generator! -- 为每个事务设置事务逻辑信息
-			for (int i = 0; i < transactions.size(); i++) {
-				if (transactions.get(i).getName().equals(entry.getKey())) {
-					transactions.get(i).setTransactionLogicInfo(txLogicAnalyzer.getParameterNodeMap(),
-							txLogicAnalyzer.getMultipleLogicMap(), txLogicAnalyzer.getOperationId2AvgRunTimes());
+			for (Transaction transaction : transactions) {
+				if (transaction.getName().equals(entry.getKey())) {
+					transaction.setTransactionLogicInfo(txLogicAnalyzer.getParameterNodeMap(),
+							txLogicAnalyzer.getMultipleLogicMap(), txLogicAnalyzer.getOperationId2AvgRunTimes(), txLogicAnalyzer.getCardinality4paraInSchema());
 					break;
 				}
 			}
@@ -150,8 +142,8 @@ public class AccessDistributionAnalyzer {
 		try {
 			cdl.await();
 			// 关闭所有分布统计线程（DistributionStatisticalThread）
-			for (int i = 0; i < windowDataBlockingQueues.size(); i++) {
-				windowDataBlockingQueues.get(i).put(new WindowData("txName", "paraIdentifier", -1, null));
+			for (BlockingQueue<WindowData> windowDataBlockingQueue : windowDataBlockingQueues) {
+				windowDataBlockingQueue.put(new WindowData("txName", "paraIdentifier", -1, null));
 			}
 
 			Thread.sleep(2000);
@@ -208,6 +200,8 @@ public class AccessDistributionAnalyzer {
 //		TableInfoSerializer serializer = new TableInfoSerializer();
 //		List<Table> tables = serializer.read(new File(Configurations.getDataCharacteristicSaveFile()));
 		WorkloadReader workloadReader;
+
+		// 是否使用存储过程
 		if(Configurations.isUseStoredProcedure()){
 			StoredProcedureReader storedProcedureReader = new StoredProcedureReader();
 			List<StoredProcedure> storedProcedures = storedProcedureReader.read(new File(Configurations.getStoredProcedureSaveFile()));
@@ -217,6 +211,8 @@ public class AccessDistributionAnalyzer {
 			workloadReader = new WorkloadReader(tables);
 		}
 		List<Transaction> transactions;
+
+		// 是否使用skywalking，读取统计信息
 		if (Configurations.isUseSkywalking()) {
 			transactions = workloadReader.readLaucaLog(new File(Configurations. getLaucaLogDir()));
 //		} else if (Configurations.isUseTidbLog()) {
@@ -225,6 +221,7 @@ public class AccessDistributionAnalyzer {
 			transactions = workloadReader.read(new File(Configurations.getTransactionTemplatesFile()));
 		}
 
+		// 将统计信息与操作模板对齐
 		Preprocessor preprocessor = new Preprocessor();
 		preprocessor.constructOperationTemplateAndDistInfo(transactions);
 		Map<String, Map<Integer, OperationData>> txName2OperationId2Template = preprocessor
@@ -233,7 +230,9 @@ public class AccessDistributionAnalyzer {
 				.getTxName2OperationId2paraDistTypeInfos();
 		Map<String, Map<String, DistributionTypeInfo>> txName2ParaId2DistTypeInfo = getParaDistributionTypeInfo(
 				txName2OperationId2paraDistTypeInfos);
+		Map<String, Map<Integer, List<String>>> txName2OpId2paraSchema = preprocessor.getTxName2OperationId2paraSchema();
 
+		// 处理事务实例
 		RunningLogReader runningLogReader = new RunningLogReader(txName2OperationId2Template);
 		if (Configurations.isUseSkywalking()) {
 			runningLogReader.readTrace(workloadReader.txnId2txnTrace, workloadReader.txnId2txnTemplateID);
@@ -242,8 +241,7 @@ public class AccessDistributionAnalyzer {
 		}
 //		System.out.println("Size1: "+runningLogReader.getTxName2TxDataList().get("Transaction1").size());
 //		System.out.println("Size2: "+runningLogReader.getTxName2TxDataList().get("Transaction2").size());
-		Iterator<Entry<String, List<TransactionData>>> txDataIter = runningLogReader.getTxName2TxDataList().entrySet()
-				.iterator();
+
 
 		int timeWindowSize = Configurations.getTimeWindowSize();
 		int statThreadNum = Configurations.getStatThreadNum();
@@ -262,22 +260,19 @@ public class AccessDistributionAnalyzer {
 		CountDownLatch cdl = new CountDownLatch(runningLogReader.getTxName2TxDataList().size());
 
 		// 针对每个事务模板的处理
-		while (txDataIter.hasNext()) {
-			Entry<String, List<TransactionData>> entry = txDataIter.next();
-//			System.out.println("-----------------------------------");
+		for (Entry<String, List<TransactionData>> entry : runningLogReader.getTxName2TxDataList().entrySet()) {
+			//			System.out.println("-----------------------------------");
 //			System.out.println(entry.getKey());
 
 			TxLogicAnalyzer txLogicAnalyzer = new TxLogicAnalyzer();
-			txLogicAnalyzer.obtainTxLogic(entry.getValue());
+			txLogicAnalyzer.obtainTxLogic(entry.getValue(), txName2OpId2paraSchema.get(entry.getKey()),tables);
 
 
-			Map<Integer, OperationData> operationDataTemplates = txName2OperationId2Template.get(entry.getKey());
-			Map<Integer, OperationData> sortedOperationDataTemplates = new TreeMap<>();
-			sortedOperationDataTemplates.putAll(operationDataTemplates); //qly：按照key值的升序进行排序
-			Iterator<Entry<Integer, OperationData>> operationDataTemplateIter = sortedOperationDataTemplates.entrySet()
-					.iterator(); //qly: 迭代器实现了对key值排序
-			List<List<String>> statParameters = txLogicAnalyzer.getStatParameters(operationDataTemplateIter);
-			txName2StatParameters.put(entry.getKey(), statParameters);
+			// wsy 获取当前操作所有需要统计的参数（位置），按key升序排列（话说为什么要升序排列？
+			List<Entry<Integer, OperationData>> sortedOperationDataTemplates = new ArrayList<>(txName2OperationId2Template.get(entry.getKey()).entrySet());
+			sortedOperationDataTemplates.sort(Comparator.comparingInt(Entry::getKey));
+			txName2StatParameters.put(entry.getKey(),
+					txLogicAnalyzer.getStatParameters(sortedOperationDataTemplates.listIterator()));
 
 			// txName2ParaId2AvgRunTimes用来计算事务吞吐
 			txName2ParaId2AvgRunTimes.put(entry.getKey(), new HashMap<>());
@@ -290,10 +285,10 @@ public class AccessDistributionAnalyzer {
 					txName2StatParameters, cdl)).start();
 
 			// for workload generator! -- 为每个事务设置事务逻辑信息
-			for (int i = 0; i < transactions.size(); i++) {
-				if (transactions.get(i).getName().equals(entry.getKey())) {
-					transactions.get(i).setTransactionLogicInfo(txLogicAnalyzer.getParameterNodeMap(),
-							txLogicAnalyzer.getMultipleLogicMap(), txLogicAnalyzer.getOperationId2AvgRunTimes());
+			for (Transaction transaction : transactions) {
+				if (transaction.getName().equals(entry.getKey())) {
+					transaction.setTransactionLogicInfo(txLogicAnalyzer.getParameterNodeMap(),
+							txLogicAnalyzer.getMultipleLogicMap(), txLogicAnalyzer.getOperationId2AvgRunTimes(), txLogicAnalyzer.getCardinality4paraInSchema());
 					break;
 				} //qly:在这里才把事务逻辑，每个操作平均执行的次数和Multiple逻辑关系加入transaction中
 			}
@@ -324,8 +319,10 @@ public class AccessDistributionAnalyzer {
 		deleteLogicalTxnPara.changeForm();
 		deleteLogicalTxnPara.deleteTxnLogicPara();
 
+		// 统计访问分布
 		DistributionCounter.init(txName2StatParameters);
 		DistributionCounter.setTxName2ParaId2AvgRunTimes(txName2ParaId2AvgRunTimes);
+		DistributionCounter.mapPara2PartitionRule(tables, transactions);
 		for (int i = 0; i < statThreadNum; i++) {
 			new Thread(new DistributionStatisticalThread(windowDataBlockingQueues.get(i), txName2ParaId2DistTypeInfo))
 					.start();
@@ -353,13 +350,7 @@ public class AccessDistributionAnalyzer {
 					String[] fileName2 = file2.getName().split("\\.");
 					int sequenceNumber1 = (fileName1.length > 2) ? Integer.parseInt(fileName1[2]) : 0;
 					int sequenceNumber2 = (fileName2.length > 2) ? Integer.parseInt(fileName2[2]) : 0;
-					if (sequenceNumber1 < sequenceNumber2) {
-						return 1;
-					} else if (sequenceNumber1 > sequenceNumber2) {
-						return -1;
-					} else {
-						return 0;
-					}
+					return Integer.compare(sequenceNumber2, sequenceNumber1);
 				}
 			});
 
@@ -368,11 +359,11 @@ public class AccessDistributionAnalyzer {
 		try {
 			cdl.await();
 			// 关闭所有分布统计线程（DistributionStatisticalThread）
-			for (int i = 0; i < windowDataBlockingQueues.size(); i++) {
-				windowDataBlockingQueues.get(i).put(new WindowData("txName", "paraIdentifier", -1, null));
+			for (BlockingQueue<WindowData> windowDataBlockingQueue : windowDataBlockingQueues) {
+				windowDataBlockingQueue.put(new WindowData("txName", "paraIdentifier", -1, null));
 			}
 
-			Thread.sleep(3000);
+//			Thread.sleep(1000);
 		} catch (InterruptedException e) {
 			e.printStackTrace();
 		}
@@ -406,19 +397,14 @@ public class AccessDistributionAnalyzer {
 		// 事务名称 -> 参数标识符（operationId + "_" + paraIndex） -> 数据分布类型信息
 		Map<String, Map<String, DistributionTypeInfo>> txName2ParaId2DistTypeInfo = new HashMap<>();
 
-		Iterator<Entry<String, Map<Integer, DistributionTypeInfo[]>>> iter = txName2OperationId2paraDistTypeInfos
-				.entrySet().iterator();
-
-		while (iter.hasNext()) {
-			Entry<String, Map<Integer, DistributionTypeInfo[]>> entry = iter.next();
+		for (Entry<String, Map<Integer, DistributionTypeInfo[]>> entry : txName2OperationId2paraDistTypeInfos
+				.entrySet()) {
 			txName2ParaId2DistTypeInfo.put(entry.getKey(), new HashMap<>());
 
-			Iterator<Entry<Integer, DistributionTypeInfo[]>> iter2 = entry.getValue().entrySet().iterator();
-			while (iter2.hasNext()) {
-				Entry<Integer, DistributionTypeInfo[]> entry2 = iter2.next();
+			for (Entry<Integer, DistributionTypeInfo[]> entry2 : entry.getValue().entrySet()) {
 				int operationId = entry2.getKey();
 				DistributionTypeInfo[] paraDistTypeInfos = entry2.getValue();
-				for (int i = 0; i < paraDistTypeInfos.length; i++) {
+				for (int i = 0; paraDistTypeInfos != null && i < paraDistTypeInfos.length; i++) {
 					String paraIdentifier = operationId + "_" + i;
 					txName2ParaId2DistTypeInfo.get(entry.getKey()).put(paraIdentifier, paraDistTypeInfos[i]);
 				}
@@ -449,7 +435,7 @@ class LogReader implements Runnable {
 		System.out.println("为获取数据访问分布而读取的负载轨迹：");
 		String logPrefix = "lauca;";
 		for (File logFile : logFiles) {
-			try (BufferedReader br = new BufferedReader(new InputStreamReader(new FileInputStream(logFile), "utf-8"))) {
+			try (BufferedReader br = new BufferedReader(new InputStreamReader(Files.newInputStream(logFile.toPath()), StandardCharsets.UTF_8))) {
 				System.out.println(logFile.getName());
 				String inputLine = null;
 				while ((inputLine = br.readLine()) != null) {
@@ -469,10 +455,9 @@ class LogReader implements Runnable {
 
 		try {
 			// 通知LogSplitter线程 日志文件已读取结束
-			Iterator<Entry<String, BlockingQueue<String>>> iter = LogSplitterQueueMap.entrySet().iterator();
-			while (iter.hasNext()) {
+			for (Entry<String, BlockingQueue<String>> stringBlockingQueueEntry : LogSplitterQueueMap.entrySet()) {
 				// 日志时间; 操作id和输入参数
-				iter.next().getValue().put("-1; end");
+				stringBlockingQueueEntry.getValue().put("-1; end");
 			}
 		} catch (InterruptedException e) {
 			e.printStackTrace();
@@ -502,17 +487,18 @@ class LogReaderForTidb implements Runnable {
 
 	@Override
 	public void run() {
-		for (Entry<Long, List<TraceInfo>> txnIdAndtxnTrace : this.txnId2txnTrace.entrySet()) {
+		List<Entry<Long, List<TraceInfo>>> txnIdAndtxnTraceList = new ArrayList<>(this.txnId2txnTrace.entrySet());
+		txnIdAndtxnTraceList.sort((o1, o2) -> (int)(o1.getValue().get(0).operationTS - o2.getValue().get(0).operationTS));
+
+		for (Entry<Long, List<TraceInfo>> txnIdAndtxnTrace : txnIdAndtxnTraceList) {
 //			System.out.println("************** AFTER ********");  //qly : 顺序没问题
 			String txnName = "Transaction" + this.txnId2txnTemplateID.get(txnIdAndtxnTrace.getKey());
 			for (TraceInfo trace : txnIdAndtxnTrace.getValue()) {
-				String prefix = trace.operationTS + ";" + trace.operationID + ";";  //qly: trace.operationTS是日志时间
+				String info = trace.operationTS + ";" + trace.operationID + ";";  //qly: trace.operationTS是日志时间
 				List<String> paras = trace.parameters;
-				String info = new String(prefix);
 				for (String para : paras) {
 					info = info + para + ",";   //qly: info 为 事务名称; 操作id; para1, para2, ...
 				}
-				info.substring(0, info.length() - 1);
 				try {
 					LogSplitterQueueMap.get(txnName).put(info);
 				} catch (InterruptedException e) {
@@ -522,10 +508,9 @@ class LogReaderForTidb implements Runnable {
 		}
 		try {
 			// 通知LogSplitter线程 日志文件已读取结束
-			Iterator<Entry<String, BlockingQueue<String>>> iter = LogSplitterQueueMap.entrySet().iterator();
-			while (iter.hasNext()) {
+			for (Entry<String, BlockingQueue<String>> stringBlockingQueueEntry : LogSplitterQueueMap.entrySet()) {
 				// 日志时间; 操作id和输入参数
-				iter.next().getValue().put("-1; end");
+				stringBlockingQueueEntry.getValue().put("-1; end");
 			}
 		} catch (InterruptedException e) {
 			e.printStackTrace();
@@ -574,9 +559,7 @@ class LogSplitter implements Runnable {
 		// 其实都统计了
 
 		txName2ParaId2DataList = new HashMap<>();
-		Iterator<Entry<String, List<List<String>>>> iter = txName2StatParameters.entrySet().iterator();
-		while (iter.hasNext()) {
-			Entry<String, List<List<String>>> entry = iter.next();
+		for (Entry<String, List<List<String>>> entry : txName2StatParameters.entrySet()) {
 			Map<String, List<String>> paraId2DataList = new HashMap<>();
 			txName2ParaId2DataList.put(entry.getKey(), paraId2DataList);
 
@@ -679,7 +662,12 @@ class LogSplitter implements Runnable {
 		for (String operationData : windowLog) {   // qly windowLog日志格式： 操作id; para1, para2, ...
 			String[] arr = operationData.split(";");
 			String operationId = arr[0].trim();
+			if (arr.length <= 1) {// 可能不存在参数
+				continue;
+			}
 			String[] parameters = arr[1].split(",");
+
+
 			for (int i = 0; i < parameters.length; i++) {
 				String identifier = operationId + "_" + i;
 				// 过滤掉不需要统计数据访问分布的参数数据
@@ -689,11 +677,10 @@ class LogSplitter implements Runnable {
 					paraId2DataList.get(identifier).add(parameters[i].trim());
 //				}
 			}
+
 		}
 
-		Iterator<Entry<String, List<String>>> iter = paraId2DataList.entrySet().iterator();
-		while (iter.hasNext()) {
-			Entry<String, List<String>> entry = iter.next();
+		for (Entry<String, List<String>> entry : paraId2DataList.entrySet()) {
 			String tmp = txName + entry.getKey();
 			int idx = Math.abs(tmp.hashCode()) % windowDataBlockingQueues.size();
 			WindowData windowParaData = new WindowData(txName, entry.getKey(), windowTime, entry.getValue());

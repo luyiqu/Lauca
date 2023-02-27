@@ -7,9 +7,7 @@ import java.sql.SQLException;
 import java.sql.Statement;
 import java.sql.Timestamp;
 import java.text.SimpleDateFormat;
-import java.util.Arrays;
-import java.util.List;
-import java.util.Map;
+import java.util.*;
 
 import accessdistribution.DataAccessDistribution;
 import accessdistribution.DistributionTypeInfo;
@@ -17,9 +15,6 @@ import accessdistribution.IntegerParaDistribution;
 import config.Configurations;
 import transactionlogic.ParameterDependency;
 import transactionlogic.ParameterNode;
-import accessdistribution.DistributionCounter;
-
-import javax.swing.plaf.synth.SynthOptionPaneUI;
 
 public abstract class SqlStatement extends TransactionBlock {
 
@@ -53,34 +48,63 @@ public abstract class SqlStatement extends TransactionBlock {
 
 	// 注意这里的obj都是包装类型，index的起始位置是1
 	protected void setParameter(int index, int dataType, Object obj) throws SQLException {
-		switch (dataType) {
-		case 0:
-			pstmt.setLong(index, (Long) obj);
-			break;
-		case 1:
-			pstmt.setDouble(index, (Double) obj);
-			break;
-		case 2:
-			pstmt.setBigDecimal(index, new BigDecimal(obj.toString()));
-			break;
-		case 3:
-			// pstmt.setDate(index, new Date((Long)obj));
-			pstmt.setTimestamp(index, new Timestamp((Long) obj));
-			break;
-		case 4:
-			pstmt.setString(index, obj.toString());
-			break;
-		case 5:
-			pstmt.setBoolean(index, (Boolean) obj);
-			break;
-		default:
-			System.err.println("Unrecognized data type!");
+		try{
+			switch (dataType) {
+				case 0:
+					pstmt.setLong(index, (Long) obj);
+					break;
+				case 1:
+					pstmt.setDouble(index, (Double) obj);
+					break;
+				case 2:
+					pstmt.setBigDecimal(index, new BigDecimal(obj.toString()));
+					break;
+				case 3:
+					// pstmt.setDate(index, new Date((Long)obj));
+					pstmt.setTimestamp(index, new Timestamp((Long) obj));
+					break;
+				case 4:
+					pstmt.setString(index, obj.toString());
+					break;
+				case 5:
+					pstmt.setBoolean(index, (Boolean) obj);
+					break;
+				default:
+					System.err.println("Unrecognized data type!");
+			}
+		}catch (Exception e){
+			e.printStackTrace();
 		}
+
 	}
 //
 //	protected Object geneParameter(int paraIndex) {
 //		return 1l;
 //	}
+
+	private Object getParameterByIdx(int idx){
+		if (windowParaGenerators[idx] != null && !Configurations.isExpFullLifeCycleDist()) {
+			return windowParaGenerators[idx].geneValue();
+		} else {
+			return fullLifeCycleParaGenerators[idx].geneValue();
+		}
+	}
+
+	private Object getParameterInSamePartitionByIdx(int idx, Object parameter){
+		if (windowParaGenerators[idx] != null && !Configurations.isExpFullLifeCycleDist()) {
+			return windowParaGenerators[idx].geneValueInSamePartition(parameter);
+		} else {
+			return fullLifeCycleParaGenerators[idx].geneValueInSamePartition(parameter);
+		}
+	}
+
+	private Object getParameterInDiffPartitionByIdx(int idx, Object parameter){
+		if (windowParaGenerators[idx] != null && !Configurations.isExpFullLifeCycleDist()) {
+			return windowParaGenerators[idx].geneValueInDiffPartition(parameter);
+		} else {
+			return fullLifeCycleParaGenerators[idx].geneValueInDiffPartition(parameter);
+		}
+	}
 
 
 
@@ -101,6 +125,7 @@ public abstract class SqlStatement extends TransactionBlock {
 		Object parameter = null;
 		// 当前参数的标识符
 		String paraIdentifier = operationId + "_para_" + paraIndex;
+
 //		System.out.println("看一下进来的是哪个参数： "+paraIdentifier);
 		// 获得当前参数的事务逻辑信息（等于、包含和线性依赖关系）
 		ParameterNode parameterNode = parameterNodeMap.get(paraIdentifier);
@@ -111,13 +136,7 @@ public abstract class SqlStatement extends TransactionBlock {
 		if (parameterNode == null) {
 //			System.out.println("parameterNode居然是空的，小概率出现这个现象");
 //			System.out.println("**** parameterNode == null ");
-			if (windowParaGenerators[paraIndex] != null && !Configurations.isExpFullLifeCycleDist()) {
-//				System.out.println("parameterNode居然是空的，小概率出现这个现象,windowParaGenerators生成");
-				parameter = windowParaGenerators[paraIndex].geneValue();
-			} else {
-//				System.out.println("parameterNode居然是空的，小概率出现这个现象,fullLifeCycleParaGenerators生成");
-				parameter = fullLifeCycleParaGenerators[paraIndex].geneValue();
-			}
+			parameter = getParameterByIdx(paraIndex);
 			intermediateState.put(paraIdentifier,
 					new TxRunningValue(paraIdentifier, parameter, paraDataTypes[paraIndex]));
 			//todo: 20210102这样的设计，照理说multiple不会有问题的！
@@ -160,8 +179,7 @@ public abstract class SqlStatement extends TransactionBlock {
 
 				List<ParameterDependency> linearDependencies = parameterNode.getLinearDependencies();
 				// 可能其中多个线性依赖关系本质上是一样的，依赖项是相等的 && 线性系数也一致，但这不影响程序的正确性，随便选择其中一个生成参数即可
-				for (int i = 0; i < linearDependencies.size(); i++) {
-					ParameterDependency linearDependency = linearDependencies.get(i);
+				for (ParameterDependency linearDependency : linearDependencies) {
 					if (intermediateState.containsKey(linearDependency.getIdentifier())) {
 //						System.out.println("通过线性依赖关系来生成的 ");
 						TxRunningValue txRunningValue = intermediateState.get(linearDependency.getIdentifier());
@@ -173,16 +191,16 @@ public abstract class SqlStatement extends TransactionBlock {
 						}
 						// 将value转化成当前参数的数据类型
 						switch (paraDataTypes[paraIndex]) {
-						case 0:
-						case 3:
-							parameter = new Long(value.longValue());
-							break;
-						case 1:
-							parameter = value;
-							break;
-						case 2:
-							parameter = new BigDecimal(value);
-							break;
+							case 0:
+							case 3:
+								parameter = value.longValue();
+								break;
+							case 1:
+								parameter = value;
+								break;
+							case 2:
+								parameter = new BigDecimal(value);
+								break;
 						}
 						break;
 					}
@@ -207,41 +225,7 @@ public abstract class SqlStatement extends TransactionBlock {
 			if (randomValue >= parameterNode.getProbabilitySum()) {
 				// 根据数据访问分布生成SQL参数
 
-
-				if (windowParaGenerators[paraIndex] != null && !Configurations.isExpFullLifeCycleDist()) {
-
-//					if(sql.equals("SELECT C_DISCOUNT, C_LAST, C_CREDIT FROM CUSTOMER WHERE C_W_ID = ? AND C_D_ID = ? AND C_ID = ?")&&
-//							paraIndex == 2){
-//						System.out.println("访问分布类型："+this.paraDistTypeInfos[paraIndex]);
-//
-//					}
-					parameter = windowParaGenerators[paraIndex].geneValue();
-
-//					System.out.println("通过窗口访问分布来生成的 ");
-
-//					if (parameter != null && parameter instanceof Long && (Long) parameter == Long.MIN_VALUE) {
-//						System.out.println("4444444444444444444444444444444444444444444444"+" "+paraIdentifier+" "+sql);
-//					}
-//					if (sql.startsWith("UPDATE STOCK SET")&&paraIdentifier.equals("9_para_3")) {
-//						System.out.println("4444444444444444444444444444444444444444444444"+" "+paraIdentifier+" "+sql);
-//					}
-//					if (sql.startsWith("UPDATE STOCK SET")&&paraIdentifier.equals("9_para_3")) {
-//						System.out.println("4444444444444444444444444444444444444444444444"+" "+paraIdentifier+" "+parameter+" "+sql);
-//					}
-				} else {
-					// 程序走到这里的原因：当前时间窗口的分支执行比例与全负载周期有差异，直白点就是：当前时间窗口这个分支未被执行过
-					// 对于这个参数来说，当前时间窗口没有其数据分布，只能借用全负载周期的数据分布来生成参数
-					parameter = fullLifeCycleParaGenerators[paraIndex].geneValue();
-//					System.out.println("**** 全局访问分布 ");
-//					System.out.println("通过全局访问分布来生成的 ");
-
-//					if (parameter != null && parameter instanceof Long && (Long) parameter == Long.MIN_VALUE) {
-//						System.out.println("55555555555555555555555555555555555555555555");
-//					}
-//					if (sql.startsWith("UPDATE STOCK SET")&&paraIdentifier.equals("9_para_3")) {
-//						System.out.println("55555555555555555555555555555555555555555555"+" "+paraIdentifier+" "+sql);
-//					}
-				}
+				parameter = getParameterByIdx(paraIndex);
 			} else {
 				// 根据等于、包含事务依赖关系生成SQL参数
 				// dependencies中仅含有所有 等于、包含 事务依赖关系
@@ -290,7 +274,7 @@ public abstract class SqlStatement extends TransactionBlock {
 				// bug fix: parameterDependency报空指针错误，原因是依赖的所有项都为空（相应的分支都未执行）
 				if (parameterDependency != null) {
 					// 根据 "等于" 依赖关系 或者 "包含" 依赖关系 生成参数
-					if (parameterDependency.getDependencyType() == 0) { // "等于" 依赖关系
+					if (parameterDependency.getDependencyType() == ParameterDependency.DependencyType.EQUAL) { // "等于" 依赖关系
 //						//modified by lyqu
 //						if(paraIdentifier.equals("2_para_0")){
 //							System.out.println("这里判别一下2_para_0的问题，明明就是包含依赖，怎么跑等于依赖来了");
@@ -309,7 +293,20 @@ public abstract class SqlStatement extends TransactionBlock {
 //							System.out.println("66666666666666666666666666666666666666666666");
 //						}
 
-					} else if (parameterDependency.getDependencyType() == 1) { // "包含" 依赖关系
+					} else if (parameterDependency.getDependencyType() == ParameterDependency.DependencyType.PARTITION_EQUAL){
+						parameter = intermediateState.get(parameterDependency.getIdentifier()).value;
+
+						Object para = getParameterInSamePartitionByIdx(paraIndex,parameter);
+//						System.out.println(parameter+" : "+para);
+						parameter = para;
+					}else if (parameterDependency.getDependencyType() == ParameterDependency.DependencyType.PARTITION_NOT_EQUAL){
+						parameter = intermediateState.get(parameterDependency.getIdentifier()).value;
+
+						Object para = getParameterInDiffPartitionByIdx(paraIndex,parameter);
+//						System.out.println(parameter+" : "+para);
+						parameter = para;
+					}
+					else if (parameterDependency.getDependencyType() == ParameterDependency.DependencyType.INCLUDE) { // "包含" 依赖关系
 //						System.out.println("进入包含依赖");
 						TxRunningValue txRunningValue = intermediateState.get(parameterDependency.getIdentifier());
 						parameter = txRunningValue.getIncludeRelationValue();
@@ -327,23 +324,7 @@ public abstract class SqlStatement extends TransactionBlock {
 
 				// 搞了半天，依赖的数据项竟然都为空... 只能再一次进行补救了~
 				if (parameter == null) {
-					if (windowParaGenerators[paraIndex] != null && !Configurations.isExpFullLifeCycleDist()) {
-						parameter = windowParaGenerators[paraIndex].geneValue();
-//						if (sql.startsWith("UPDATE STOCK SET")&&paraIdentifier.equals("9_para_3")) {
-//							System.out.println("88888888888888888888888888888888888888888888"+" "+paraIdentifier+" "+sql);
-//						}
-//						if (parameter != null && parameter instanceof Long && (Long) parameter == Long.MIN_VALUE) {
-//							System.out.println("88888888888888888888888888888888888888888888");
-//						}
-					} else {
-						parameter = fullLifeCycleParaGenerators[paraIndex].geneValue();
-//						if (parameter != null && parameter instanceof Long && (Long) parameter == Long.MIN_VALUE) {
-//							System.out.println("999999999999999999999999999999999999999999999");
-//						}
-//						if (sql.startsWith("UPDATE STOCK SET")&&paraIdentifier.equals("9_para_3")) {
-//							System.out.println("999999999999999999999999999999999999999999999"+" "+paraIdentifier+" "+sql);
-//						}
-					}
+					parameter = getParameterByIdx(paraIndex);
 
 					// bug fix: parameterDependency可能为空
 					if (parameterDependency != null) {
@@ -381,6 +362,129 @@ public abstract class SqlStatement extends TransactionBlock {
 		return parameter;
 	}
 
+	private Object getParameterPartition(Object parameter, int idx){
+		Object paraPartition = parameter;
+		String paraIdentifier = operationId + "_para_" + idx;
+		ParameterNode parameterNode = parameterNodeMap.get(paraIdentifier);
+//		if (parameterNode == null){
+			if (windowParaGenerators[idx] != null){
+				paraPartition = windowParaGenerators[idx].getParaPartition(parameter);
+			}
+			else if(fullLifeCycleParaGenerators[idx] != null){
+				paraPartition = fullLifeCycleParaGenerators[idx].getParaPartition(paraPartition);
+			}
+//		}
+
+		return paraPartition;
+	}
+
+	protected Object checkParaOutOfCardinality(int idx , String paraSchemaInfo,
+											   Map<String, Integer> cardinality4paraInSchema, Map<String, Map<Object, List<Object>>> partitionUsed){
+//		return geneParameter(idx);
+
+		Object parameter = geneParameter(idx);
+////		if (paraSchemaInfo.contains("@w_id") ){
+////			System.out.println();
+////		}
+		Object paraPartition = getParameterPartition(parameter, idx);
+
+		boolean hasPartition =  paraPartition.toString().contains("p") && !parameter.equals(paraPartition);
+
+
+		Map<Object, List<Object>> partitionUsedPara = partitionUsed.get(paraSchemaInfo);
+
+		if (!cardinality4paraInSchema.containsKey(paraSchemaInfo)){
+			return parameter;
+		}
+//
+//		if (Configurations.isUsePartitionRule() && hasPartition && cardinality4paraInSchema.get(paraSchemaInfo) > 0){
+//			Random random = new Random();
+//			if (cardinality4paraInSchema.get(paraSchemaInfo) <= partitionUsedPara.size()){
+////				if (paraSchemaInfo.contains("s_w_id") ){
+////					System.out.println(partitionUsedPara.size()+" "+partitionUsedPara.get(paraPartition) + " " + paraPartition + " " + parameter);
+////				}
+//				if (!partitionUsedPara.containsKey(paraPartition)){// 如果已经填满基数，不再重新构造，直接从已知的参数里找一个
+//
+//					int partitionIdx = random.nextInt(partitionUsedPara.size());
+//					paraPartition = new ArrayList<>(partitionUsedPara.keySet()).get(partitionIdx);
+//
+//					partitionIdx = new Random().nextInt(partitionUsedPara.get(paraPartition).size());
+//						parameter = partitionUsedPara.get(paraPartition).get(partitionIdx);
+//				}
+//			}
+//			else{
+//				// 如果还没填满就重复了，重新生成
+//				while (partitionUsedPara.containsKey(paraPartition) && random.nextDouble() < 0.5){
+//					parameter = geneParameter(idx);
+//					paraPartition = getParameterPartition(parameter, idx);
+//				}
+//			}
+//		}
+//
+//
+		if (!partitionUsedPara.containsKey(paraPartition)) {
+			partitionUsedPara.put(paraPartition, new ArrayList<>());
+		}
+		if (hasPartition){
+			partitionUsedPara.get(paraPartition).add(parameter);
+		}
+//
+//
+		return parameter;
+	}
+
+	protected Object checkParaOutOfCardinality(int idx, Object para , String paraSchemaInfo,
+											   Map<String, Integer> cardinality4paraInSchema, Map<String, Map<Object, List<Object>>> partitionUsed){
+		Object parameter = para;
+		Object paraPartition = getParameterPartition(parameter, idx);
+
+		boolean hasPartition = paraPartition.toString().contains("p") && !parameter.equals(paraPartition);
+
+
+		Map<Object, List<Object>> partitionUsedPara = partitionUsed.get(paraSchemaInfo);
+
+		if (!cardinality4paraInSchema.containsKey(paraSchemaInfo)){
+			return parameter;
+		}
+//
+//		if (Configurations.isUsePartitionRule() && hasPartition && cardinality4paraInSchema.get(paraSchemaInfo) > 0){
+//			Random random = new Random();
+//			if (cardinality4paraInSchema.get(paraSchemaInfo) <= partitionUsedPara.size()){
+////				if (paraSchemaInfo.contains("s_w_id") ){
+////					System.out.println(partitionUsedPara.size()+" "+partitionUsedPara.get(paraPartition) + " " + paraPartition + " " + parameter);
+////				}
+//				if (!partitionUsedPara.containsKey(paraPartition)){// 如果已经填满基数，不再重新构造，直接从已知的参数里找一个
+//
+//
+//					int partitionIdx = random.nextInt(partitionUsedPara.size());
+//					paraPartition = new ArrayList<>(partitionUsedPara.keySet()).get(partitionIdx);
+//
+//					// 分区键的参数是value
+//					partitionIdx = new Random().nextInt(partitionUsedPara.get(paraPartition).size());
+//
+//					parameter = partitionUsedPara.get(paraPartition).get(partitionIdx);
+//				}
+//			}
+//			else{
+//				// 如果还没填满就重复了，重新生成
+//				if (Configurations.isUsePartitionRule() && partitionUsedPara.containsKey(paraPartition) && random.nextDouble() < 0.7){
+//					return null;
+//				}
+//			}
+//		}
+//
+//
+		if (!partitionUsedPara.containsKey(paraPartition)) {
+			partitionUsedPara.put(paraPartition, new ArrayList<>());
+		}
+		if (hasPartition){
+			partitionUsedPara.get(paraPartition).add(parameter);
+		}
+
+
+		return parameter;
+	}
+
 
 
 	protected Object geneParameterByMultipleLogic(int paraIndex, Map<String, Double> multipleLogicMap, int round) {
@@ -392,12 +496,7 @@ public abstract class SqlStatement extends TransactionBlock {
 			String paraIdentifier = operationId + "_para_" + paraIndex;
 			TxRunningValue txRunningValue = intermediateState.get(paraIdentifier);
 			// 这里返回的参数不可能为null
-			if (increment == 0) {
-				return txRunningValue.value;
-			} else {
-
-				return txRunningValue.getMultipleLogicValue(increment * round);
-			}
+			return txRunningValue.getMultipleLogicValue(increment * round);
 		} else {
 //			System.out.println("根据一般的参数生成");
 			return geneParameter(paraIndex);
@@ -418,8 +517,8 @@ public abstract class SqlStatement extends TransactionBlock {
 		for(;i < this.windowParaGenerators.length;i++){
 			windowParaGeneratorsModified[i] = windowParaGenerators[i];
 		}
-		for(int j = 0;j < fakeColumn.length;j++){
-			windowParaGeneratorsModified[i] = generateFakeColumnParaDistribution(fakeColumn[j]);
+		for (Column column : fakeColumn) {
+			windowParaGeneratorsModified[i] = generateFakeColumnParaDistribution(column);
 			i++;
 		}
 		this.windowParaGenerators = windowParaGeneratorsModified;
@@ -430,8 +529,8 @@ public abstract class SqlStatement extends TransactionBlock {
 		for(;i < this.fullLifeCycleParaGenerators.length;i++){
 			fullLifeCycleParaGeneratorsModified[i] = fullLifeCycleParaGenerators[i];
 		}
-		for(int j = 0;j < fakeColumn.length;j++){
-			fullLifeCycleParaGeneratorsModified[i] = generateFakeColumnParaDistribution(fakeColumn[j]);
+		for (Column column : fakeColumn) {
+			fullLifeCycleParaGeneratorsModified[i] = generateFakeColumnParaDistribution(column);
 			i++;
 		}
 		this.fullLifeCycleParaGenerators = fullLifeCycleParaGeneratorsModified;
@@ -470,9 +569,15 @@ public abstract class SqlStatement extends TransactionBlock {
 	}
 
 	// 服务于Multiple块内操作的执行（非第一次执行）
-	public abstract int execute(Map<String, Double> multipleLogicMap, int round);
+//	public abstract int execute(Map<String, Double> multipleLogicMap, int round);
 
-	public abstract int execute(Statement stmt, Map<String, Double> multipleLogicMap, int round);
+	public abstract int execute(Map<String, Integer> cardinality4paraInSchema, Map<String, Map<Object, List<Object>>> partitionUsed,
+								Map<String, Double> multipleLogicMap, int round);
+
+	public abstract int execute(Map<String, Integer> cardinality4paraInSchema, Map<String, Map<Object, List<Object>>> partitionUsed,
+								Statement stmt, Map<String, Double> multipleLogicMap, int round);
+
+//	public abstract int execute(Statement stmt, Map<String, Double> multipleLogicMap, int round);
 
 	public int getOperationId() {
 		return operationId;
@@ -483,18 +588,21 @@ public abstract class SqlStatement extends TransactionBlock {
 	}
 
 	public DistributionTypeInfo[] getParaDistTypeInfos() {
+		if (paraDistTypeInfos == null){
+			return new DistributionTypeInfo[0];
+		}
 		return paraDistTypeInfos;
 	}
 	public void setParaDistribution(Map<String, DataAccessDistribution> paraId2Distribution, int type) {
 		if (type == 0) { // 全负载周期数据访问分布
-			for (int i = 0; i < paraDataTypes.length; i++) {
+			for (int i = 0; i < (paraDataTypes == null ? 0 : paraDataTypes.length); i++) {
 				String paraIdentifier = operationId + "_" + i;
 				if (paraId2Distribution != null) { // 等于null应该是不可能的
 					fullLifeCycleParaGenerators[i] = paraId2Distribution.get(paraIdentifier);
 				}
 			}
 		} else if (type == 1) { // 当前时间窗口的数据访问分布
-			for (int i = 0; i < paraDataTypes.length; i++) {
+			for (int i = 0; i < (paraDataTypes == null ? 0 : paraDataTypes.length); i++) {
 				String paraIdentifier = operationId + "_" + i;
 				// 更倾向于利用全负载周期的数据访问分布，而不是保留一个最近时间窗口的数据访问分布 TODO 是否合理呢？
 				if (paraId2Distribution == null) { // 有可能等于null，在当前时间窗口该事务没有执行过

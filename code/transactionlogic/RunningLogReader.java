@@ -55,9 +55,7 @@ public class RunningLogReader {
 		maxSizeOfTxDataList = Configurations.getMaxSizeOfTxDataList();
 		txName2OperationNum = new HashMap<>();
 
-		Iterator<Entry<String, Map<Integer, OperationData>>> iter = txName2OperationId2Template.entrySet().iterator();
-		while (iter.hasNext()) {
-			Entry<String, Map<Integer, OperationData>> entry = iter.next();
+		for (Entry<String, Map<Integer, OperationData>> entry : txName2OperationId2Template.entrySet()) {
 			txName2OperationNum.put(entry.getKey(), entry.getValue().size());
 		}
 	}
@@ -83,6 +81,7 @@ public class RunningLogReader {
 							.add(txName2OperationId2Template.get(txName).get(operationId).newInstance(oneTrace));
 					operationIdSet.add(operationId);
 				}catch (Exception e){
+					e.printStackTrace();
 					System.out.println(txName);
 					System.out.println(txName2OperationId2Template.get(txName).get(operationId));
 					System.out.println("*************");

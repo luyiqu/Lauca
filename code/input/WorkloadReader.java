@@ -5,6 +5,7 @@ import java.io.File;
 import java.io.FileInputStream;
 import java.io.IOException;
 import java.io.InputStreamReader;
+import java.nio.file.Files;
 import java.sql.Timestamp;
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -13,22 +14,11 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Map.Entry;
+import java.util.regex.Pattern;
 
 import abstraction.*;
-import accessdistribution.DataAccessDistribution;
-import accessdistribution.DeleteLogicalTxnPara;
-import accessdistribution.SequentialParaDistribution;
-import com.google.gson.Gson;
-import com.google.gson.GsonBuilder;
-import com.sun.org.apache.bcel.internal.generic.GOTO;
 import config.Configurations;
 import org.apache.log4j.Logger;
-import serializable.DataAccessDistributionAdapter;
-import serializable.SequentialParaDistributionAdapter;
-import serializable.SqlStatementAdapter;
-import serializable.TransactionBlockAdapter;
-
-import javax.swing.plaf.IconUIResource;
 
 
 public class WorkloadReader {
@@ -41,6 +31,8 @@ public class WorkloadReader {
 	public Map<Long, List<TraceInfo>> txnId2txnTrace = new HashMap<>();
 	/** 记录每个事务实例对应的事务模板号（相当于事务名）,模板号从1开始 */
 	public Map<Long, Integer> txnId2txnTemplateID = new HashMap<>();
+
+	private static Pattern blankLinePattern = Pattern.compile("[\\s]*");
 //	public Map<String,Integer> rollbackTxname2BlockId2Count = new HashMap<>();  //added by lyqu 支持主动回滚
 	public static Map<Long,List<String>> rollbacktxnId2txnInstance = new HashMap<>();  //added by lyqu
 	public WorkloadReader(List<Table> tables) {
@@ -160,6 +152,110 @@ public class WorkloadReader {
 	}
 
 	/**
+	 * 检查是否处于循环结构，构建事务块
+	 * @param txnStatements
+	 * @param txnTrace
+	 * @return
+	 */
+	private List<TransactionBlock> buildTxnBlock(List<SqlStatement> txnStatements, List<TraceInfo> txnTrace ){
+		int operationID = 1;
+		// 检查是否处于循环结构，构建事务块
+		List<TransactionBlock> txnBlocks = new ArrayList<>();
+		int loopEndIndex = -1;// 最后一个循环体结束的位置，由于不支持循环嵌套，这个位置以前不可能再有循环了。
+//			System.out.println("TxnStatements.size(): "+txnStatements.size() +":照理说这里应该是70");
+		for (int i = 0; i < txnStatements.size(); ++i) {
+			SqlStatement iterSqlStatement = txnStatements.get(i);
+			// 先检查是否在当前循环中
+			if (loopEndIndex != -1) {
+				Multiple loopBlock = (Multiple) txnBlocks.get(loopEndIndex);
+				if (iterSqlStatement.sql.equals(loopBlock.getSqls().get(0).sql)) {
+
+					// 在，后面连续几条sql也不处理了
+//						System.out.println("loopBlock.getSqls().size(): "+loopBlock.getSqls().size() +":照理说这里应该是7");
+					for (int cnt = 0; cnt < loopBlock.getSqls().size(); cnt++) {
+						try {
+							txnTrace.get(i + cnt).operationID = loopBlock.getSqls().get(cnt).operationId;
+						} catch (java.lang.IndexOutOfBoundsException e) {  //qly: 感觉是因为rollback造成的
+//								System.out.println("I am IndexOutOfBoundsException");
+//								System.out.println(iterSqlStatement.sql);
+						}
+					}
+					i += loopBlock.getSqls().size() - 1;
+					continue;
+				}
+			}
+
+			// 检查是否构成新循环
+			int j;// 遍历事务块的序号
+			for (j = loopEndIndex + 1; j < txnBlocks.size(); ++j) {
+
+				SqlStatement previousSqlStatement = (SqlStatement) txnBlocks.get(j);
+				// 出现循环了
+				if (previousSqlStatement.sql.equals(iterSqlStatement.sql)) {
+					loopEndIndex = j;
+					// 构造循环结构
+
+					List<SqlStatement> loopSqls = new ArrayList<>();
+					boolean multipleBatchExecute = false;
+					for (int k = j; k < txnBlocks.size(); ++k) {
+//							if(txnTrace.size()== 46){
+//								System.out.println(txnBlocks.size());
+//								System.out.println(k);
+//							}
+
+						loopSqls.add((SqlStatement) txnBlocks.get(k));
+						try {
+
+							txnTrace.get(i + k - j).operationID = ((SqlStatement) txnBlocks.get(k)).operationId;
+
+						}catch (Exception e){
+//								if(txnTrace.size()== 46){
+							System.out.println(txnTrace);
+							System.out.println(i+k-j);
+							System.out.println(k);
+							System.out.println(txnBlocks);
+//								}
+							System.out.println(iterSqlStatement.sql);
+							System.out.println(e);
+							System.exit(1);
+						}
+
+
+					}
+
+					//modified by lyqu
+//						Multiple aLoop = new Multiple(loopSqls, false);
+//						Multiple aLoop = new Multiple(loopSqls,true);
+					multipleBatch:for(SqlStatement stat : loopSqls){
+						if(stat.getClass().getName().equals("abstraction.WriteOperation")){
+							WriteOperation op = (WriteOperation) stat;
+							if(op.isBatchExecute()){
+								multipleBatchExecute = true;
+								break multipleBatch;
+							}
+						}
+					}
+					Multiple aLoop = new Multiple(loopSqls, multipleBatchExecute);
+					//------lyqu
+//
+					//遍历整个aLoop中的sql，查看isBatch为true，只有存在一个isBatch就吧Multiple设为true  20201022
+					txnBlocks = txnBlocks.subList(0, j);
+					txnBlocks.add(aLoop);
+					i += loopSqls.size() - 1;
+					break;
+				}
+			}
+			// 没有循环
+			if (j == txnBlocks.size()) {
+				iterSqlStatement.operationId = operationID;
+				txnBlocks.add(iterSqlStatement);
+				txnTrace.get(i).operationID = operationID++;
+			}
+		}
+		return txnBlocks;
+	}
+
+	/**
 	 * 从Oracle客户端打的log中获取事务模板，同时获取负载轨迹
 	 *
 	 * @param logDir 存日志的目录
@@ -174,20 +270,15 @@ public class WorkloadReader {
 		File[] logFiles = logDir.listFiles();
 
 		// 文件名的格式为: 'lauca.log.xx'，降序读
+		Pattern pointPattern = Pattern.compile("\\.");
 		Arrays.sort(logFiles, new Comparator<File>() {
 			@Override
 			public int compare(File file1, File file2) {
-				String[] fileName1 = file1.getName().split("\\.");
-				String[] fileName2 = file2.getName().split("\\.");
+				String[] fileName1 = pointPattern.split(file1.getName());
+				String[] fileName2 = pointPattern.split(file2.getName());
 				int sequenceNumber1 = (fileName1.length > 2) ? Integer.parseInt(fileName1[2]) : 0;
 				int sequenceNumber2 = (fileName2.length > 2) ? Integer.parseInt(fileName2[2]) : 0;
-				if (sequenceNumber1 < sequenceNumber2) {
-					return 1;
-				} else if (sequenceNumber1 > sequenceNumber2) {
-					return -1;
-				} else {
-					return 0;
-				}
+				return Integer.compare(sequenceNumber2, sequenceNumber1);
 			}
 		});
 
@@ -206,29 +297,30 @@ public class WorkloadReader {
 //		String beforeSql = null;
 		//--
 		List<input.OracleLog> oraclelogs = new ArrayList<>();
-		for (int f = 0; f < logFiles.length; ++f) {
-			System.out.println(logFiles[f]);
+		Pattern blankPattern = Pattern.compile("[ ]*");
+		Pattern equalPattern = Pattern.compile("=");
+		Pattern commaPattern = Pattern.compile(",");
+		Pattern bracketPattern = Pattern.compile("\\[|\\]");
+
+		for (File logFile : logFiles) {
+			System.out.println(logFile);
 			try (BufferedReader br = new BufferedReader(
-					new InputStreamReader(new FileInputStream(logFiles[f]), "utf-8"))) {
+					new InputStreamReader(Files.newInputStream(logFile.toPath()), "utf-8"))) {
 				String inputLine = null;
 				// 解析每一行Log
 				//记录上一条 判断是否重复
 				String beforeline = inputLine;
 				while ((inputLine = br.readLine()) != null) {
 					// 过滤掉空行
-					if (inputLine.matches("[\\s]*")) {
+					if (blankLinePattern.matcher(inputLine).matches()) {
 						continue;
 					}
 
-					if(beforeline!=null&&beforeline.equals(inputLine)){
-//						System.out.println("重复~~:  "+inputLine);
-						continue;
-					}
-//					beforeline = inputLine;
-					String[] log = inputLine.split("\\[|\\]");
+					//					beforeline = inputLine;
+					String[] log = bracketPattern.split(inputLine);
 					ArrayList<String> refineLog = new ArrayList<>();
 					for (String s : log) {
-						if (!s.matches("[ ]*")) {
+						if (!blankPattern.matcher(s).matches()) {
 							refineLog.add(s);
 						}
 					}
@@ -238,9 +330,9 @@ public class WorkloadReader {
 					}
 
 
-					input.OracleLog oracleLog = new input.OracleLog();
-					for (int i = 0; i < refineLog.size(); ++i) {
-						String[] nameAndValue = refineLog.get(i).split("=", 2);
+					OracleLog oracleLog = new OracleLog();
+					for (String s : refineLog) {
+						String[] nameAndValue = equalPattern.split(s, 2);
 //						System.out.println(nameAndValue[0]);
 						switch (nameAndValue[0]) {
 							case "timestamp":
@@ -259,7 +351,7 @@ public class WorkloadReader {
 ////										sqlRollbackCount.put(beforeSql,sqlRollbackCount.get(beforeSql)+1);
 ////									}
 //								}
-								if(Configurations.isEnableAnonymity())
+								if (Configurations.isEnableAnonymity())
 									oracleLog.sql = anonymity.sql2Anonymity(nameAndValue[1]);
 								else
 									oracleLog.sql = nameAndValue[1];
@@ -273,25 +365,25 @@ public class WorkloadReader {
 							case "batchpara":
 								oracleLog.setBatched(true);
 							case "para":
-								String[] paraArray = nameAndValue[1].split("\\,");
+								String[] paraArray = commaPattern.split(nameAndValue[1]);
 								oracleLog.parameters = new ArrayList<String>();
 								// 去掉参数头尾引号
 								for (int j = 0; j < paraArray.length; ++j) {
-									if (paraArray[j].charAt(0) == '"') {
+									if (paraArray[j].length() > 0 && paraArray[j].charAt(0) == '"') {
 										paraArray[j] = paraArray[j].substring(1, paraArray[j].length() - 1);
 									}
 								}
 								oracleLog.parameters = Arrays.asList(paraArray);
 								break;
 							case "res":
-								String[] resArray = nameAndValue[1].split("\\,");
+								String[] resArray = commaPattern.split(nameAndValue[1]);
 								if (oracleLog.results == null) {
 									oracleLog.results = new ArrayList<List<String>>();
 								}
 								oracleLog.results.add(Arrays.asList(resArray));
 								break;
 							default:
-								System.out.println(refineLog.get(i));
+								System.out.println(s);
 								System.out.println("日志格式不合法！");
 
 						}
@@ -314,16 +406,17 @@ public class WorkloadReader {
 		// 记录每个链接当前在处理的事务号，没有在处理事务则为-1
 		Map<Long, Long> connId2txnId = new HashMap<>();
 		long txnId = 1;
+		Pattern sqlPattern = Pattern.compile("(CALL|call|Call|SELECT|Select|select|UPDATE|Update|update|INSERT|Insert|insert|DELETE|Delete|delete|REPLACE|Replace|replace)[\\s\\S]+");
+		Pattern blankSeqPattern = Pattern.compile("[\\s]+");
 		for (input.OracleLog aLog : oraclelogs) {
 			// 将CRUD操作加入
-			if (aLog.sql != null && aLog.sql.matches(
-					"(CALL|call|Call|SELECT|Select|select|UPDATE|Update|update|INSERT|Insert|insert|DELETE|Delete|delete|REPLACE|Replace|replace)[\\s\\S]+")) {
+			if (aLog.sql != null && sqlPattern.matcher(aLog.sql).matches() ) {
 				// SqlParser里再淘汰这种特殊的事务
 //				if (aLog.sql.matches("(SELECT|Select|select)[\\s]+(@@)[\\s\\S]+")) {
 //					continue;
 //				}
 				// 多个空白字符变成一个
-				aLog.sql = aLog.sql.replaceAll("[\\s]+", " ");
+				aLog.sql =  blankSeqPattern.matcher(aLog.sql).replaceAll(" ");
 				// 变成小写方便找关键词
 				String tempSql = aLog.sql.toLowerCase();
 
@@ -333,12 +426,12 @@ public class WorkloadReader {
 				while ((betweenIndex = tempSql.indexOf(" between ")) != -1) {
 					// 找到col名字
 					String firstHalf = aLog.sql.substring(0, betweenIndex);
-					String[] subStrings = firstHalf.split(" ");
+					String[] subStrings = blankPattern.split(firstHalf);
 					String colName = subStrings[subStrings.length - 1];
 					// 找到between后第一个and
 					int andIndex = tempSql.indexOf("and", betweenIndex);
 					// 在and后插入“ col ≤”
-					StringBuffer sqlCopy = new StringBuffer(aLog.sql);
+					StringBuilder sqlCopy = new StringBuilder(aLog.sql);
 					sqlCopy.insert(andIndex + 3, " " + colName + " <=");
 
 					sqlCopy.replace(betweenIndex + 1, betweenIndex + 8, ">=");
@@ -491,103 +584,9 @@ public class WorkloadReader {
 //					System.out.println(tra.sql);
 //				}
 //			}
-			int operationID = 1;
+
 			// 检查是否处于循环结构，构建事务块
-			List<TransactionBlock> txnBlocks = new ArrayList<>();
-			int loopEndIndex = -1;// 最后一个循环体结束的位置，由于不支持循环嵌套，这个位置以前不可能再有循环了。
-//			System.out.println("TxnStatements.size(): "+txnStatements.size() +":照理说这里应该是70");
-			for (int i = 0; i < txnStatements.size(); ++i) {
-				SqlStatement iterSqlStatement = txnStatements.get(i);
-				// 先检查是否在当前循环中
-				if (loopEndIndex != -1) {
-					Multiple loopBlock = (Multiple) txnBlocks.get(loopEndIndex);
-					if (iterSqlStatement.sql.equals(loopBlock.getSqls().get(0).sql)) {
-
-						// 在，后面连续几条sql也不处理了
-//						System.out.println("loopBlock.getSqls().size(): "+loopBlock.getSqls().size() +":照理说这里应该是7");
-						for (int cnt = 0; cnt < loopBlock.getSqls().size(); cnt++) {
-							try {
-								txnTrace.get(i + cnt).operationID = loopBlock.getSqls().get(cnt).operationId;
-							} catch (java.lang.IndexOutOfBoundsException e) {  //qly: 感觉是因为rollback造成的
-//								System.out.println("I am IndexOutOfBoundsException");
-//								System.out.println(iterSqlStatement.sql);
-							}
-						}
-						i += loopBlock.getSqls().size() - 1;
-						continue;
-					}
-				}
-
-				// 检查是否构成新循环
-				int j;// 遍历事务块的序号
-				for (j = loopEndIndex + 1; j < txnBlocks.size(); ++j) {
-
-					SqlStatement previousSqlStatement = (SqlStatement) txnBlocks.get(j);
-					// 出现循环了
-					if (previousSqlStatement.sql.equals(iterSqlStatement.sql)) {
-						loopEndIndex = j;
-						// 构造循环结构
-
-						List<SqlStatement> loopSqls = new ArrayList<>();
-						boolean multipleBatchExecute = false;
-						for (int k = j; k < txnBlocks.size(); ++k) {
-//							if(txnTrace.size()== 46){
-//								System.out.println(txnBlocks.size());
-//								System.out.println(k);
-//							}
-
-							loopSqls.add((SqlStatement) txnBlocks.get(k));
-							try {
-
-
-								txnTrace.get(i + k - j).operationID = ((SqlStatement) txnBlocks.get(k)).operationId;
-
-							}catch (Exception e){
-//								if(txnTrace.size()== 46){
-								System.out.println(txnTrace);
-								System.out.println(i+k-j);
-								System.out.println(k);
-								System.out.println(txnBlocks);
-//								}
-								System.out.println(iterSqlStatement.sql);
-								System.out.println(e);
-								System.exit(1);
-							}
-
-
-						}
-
-						//modified by lyqu
-//						Multiple aLoop = new Multiple(loopSqls, false);
-//						Multiple aLoop = new Multiple(loopSqls,true);
-						multipleBatch:for(SqlStatement stat : loopSqls){
-							if(stat.getClass().getName().equals("abstraction.WriteOperation")){
-								WriteOperation op = (WriteOperation) stat;
-								if(op.isBatchExecute()){
-									multipleBatchExecute = true;
-									break multipleBatch;
-								}
-							}
-						}
-						Multiple aLoop = new Multiple(loopSqls, multipleBatchExecute);
-						//------lyqu
-//
-						//遍历整个aLoop中的sql，查看isBatch为true，只有存在一个isBatch就吧Multiple设为true  20201022
-						txnBlocks = txnBlocks.subList(0, j);
-						txnBlocks.add(aLoop);
-						i += loopSqls.size() - 1;
-						break;
-					}
-				}
-				// 没有循环
-				if (j == txnBlocks.size()) {
-					iterSqlStatement.operationId = operationID;
-					txnBlocks.add(iterSqlStatement);
-					txnTrace.get(i).operationID = operationID++;
-				}
-			}
-			// 搞好了放进去
-			txnId2txnTemplate.put(txnIdAndInstance.getKey(), txnBlocks);
+			txnId2txnTemplate.put(txnIdAndInstance.getKey(), buildTxnBlock(txnStatements,txnTrace));
 		}
 
 //		System.out.println("*******  "+txnId2txnTemplate.size());
@@ -598,40 +597,20 @@ public class WorkloadReader {
 		Map<Transaction, Integer> txnTemplate2txnTemplateID = new HashMap<>();
 		int txnTempID = 1;
 		// 处理一个模板
-//		int qly = 0;
-//		int qly2= 0;
 		for (Entry<Long, List<TransactionBlock>> txnIdAndtxnTemplate : txnId2txnTemplate.entrySet()) {
 			// 事务名称形如Transaction1,Transaction2...
-//			System.out.println("qly: \n"+qly);
-//			System.out.println("qly2: \n"+qly2);
 			Transaction txn = new Transaction("Transaction" + txnTempID, 0, true, txnIdAndtxnTemplate.getValue());
 			// 该模板是否已存在
-//			System.out.println(txn.getName()+"\n");
 			Integer myTID = txnTemplate2txnTemplateID.get(txn);
-//			System.out.println(myTID);
 			if (myTID == null) {
 				txnTemplate2txnTemplateID.put(txn, txnTempID);
 				this.txnId2txnTemplateID.put(txnIdAndtxnTemplate.getKey(), txnTempID);
 				transactions.add(txn);
 				txnTempID++;
-//				qly2++;
 			} else {
 				this.txnId2txnTemplateID.put(txnIdAndtxnTemplate.getKey(), myTID);
 			}
-//			qly++;
 		}
-
-//		System.out.println(rollbacktxnId2txnInstance);
-
-
-
-//		for(int i = 0; i < transactions.size();i++){
-//			int size = transactions.get(i).getTransactionBlocks().size();
-//			System.out.println(transactions.get(i).getTransactionBlocks());
-//			System.out.println(size);
-//		}
-
-
 
 		return transactions;
 

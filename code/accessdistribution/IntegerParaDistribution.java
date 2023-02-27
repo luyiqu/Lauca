@@ -1,9 +1,7 @@
 package accessdistribution;
 
-import java.util.Arrays;
-import java.util.HashSet;
-import java.util.Random;
-import java.util.Set;
+import java.util.*;
+
 import abstraction.Column;
 import config.Configurations;
 
@@ -42,6 +40,31 @@ public class IntegerParaDistribution extends DataAccessDistribution {
 		super(hFItemFrequencies, intervalCardinalities, intervalFrequencies);
 		this.windowMinValue = windowMinValue;
 		this.windowMaxValue = windowMaxValue;
+	}
+
+	public IntegerParaDistribution(long windowMinValue, long windowMaxValue, double[] hFItemFrequencies,
+								   long[] intervalCardinalities, double[] intervalFrequencies, ArrayList<ArrayList<Double>> quantilePerInterval) {
+		super(hFItemFrequencies, intervalCardinalities, intervalFrequencies, quantilePerInterval);
+		this.windowMinValue = windowMinValue;
+		this.windowMaxValue = windowMaxValue;
+	}
+
+	public IntegerParaDistribution(IntegerParaDistribution integerParaDistribution){
+		super(integerParaDistribution);
+		this.windowMaxValue = integerParaDistribution.windowMaxValue;
+		this.windowMinValue = integerParaDistribution.windowMinValue;
+		this.highFrequencyItems = new long[integerParaDistribution.highFrequencyItems.length];
+
+		for (int i = 0 ;i< highFrequencyItems.length; ++i){
+			highFrequencyItems[i] = integerParaDistribution.highFrequencyItems[i];
+		}
+
+		setColumnInfo(integerParaDistribution.columnMinValue, integerParaDistribution.columnMaxValue,
+				integerParaDistribution.columnCardinality, integerParaDistribution.coefficient);
+	}
+
+	public IntegerParaDistribution copy(){
+		return new IntegerParaDistribution(this);
 	}
 
 	public void setColumnInfo(long columnMinValue, long columnMaxValue, 

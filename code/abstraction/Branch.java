@@ -1,13 +1,8 @@
 package abstraction;
 
-import workloadgenerator.LaucaTestingEnv;
-
 import java.sql.Connection;
-import java.sql.SQLException;
 import java.sql.Statement;
-import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.List;
+import java.util.*;
 
 public class Branch extends TransactionBlock {
 
@@ -48,15 +43,15 @@ public class Branch extends TransactionBlock {
 
 	@Override
 	public void prepare(Connection conn) {
-		for (int i = 0; i < branches.size(); i++) {
-			for (int j = 0; j < branches.get(i).size(); j++) {
-				branches.get(i).get(j).prepare(conn);
+		for (List<SqlStatement> branch : branches) {
+			for (SqlStatement sqlStatement : branch) {
+				sqlStatement.prepare(conn);
 			}
 		}
 	}
 
 	@Override
-	public int execute(){
+	public int execute(Map<String, Integer> cardinality4paraInSchema, Map<String, Map<Object, List<Object>>> partitionUsed){
 		double randomValue = Math.random();
 		if (randomValue > 0.99999999) {
 			randomValue = randomValue - 0.000000001;
@@ -65,7 +60,7 @@ public class Branch extends TransactionBlock {
 		for (int i = 0; i < cumulativeRatios.length; i++) {
 			if (randomValue < cumulativeRatios[i]) {
 				for (int j = 0; j < branches.get(i).size(); j++) {
-					int flag = branches.get(i).get(j).execute();
+					int flag = branches.get(i).get(j).execute(cardinality4paraInSchema, partitionUsed);
 					if (flag != 1) {
 						return flag;
 					}
@@ -78,7 +73,7 @@ public class Branch extends TransactionBlock {
 	}
 
 	@Override
-	public int execute(Statement stmt) {
+	public int execute(Map<String, Integer> cardinality4paraInSchema, Map<String, Map<Object, List<Object>>> partitionUsed, Statement stmt) {
 		double randomValue = Math.random();
 		if (randomValue > 0.99999999) {
 			randomValue = randomValue - 0.000000001;
@@ -87,7 +82,7 @@ public class Branch extends TransactionBlock {
 		for (int i = 0; i < cumulativeRatios.length; i++) {
 			if (randomValue < cumulativeRatios[i]) {
 				for (int j = 0; j < branches.get(i).size(); j++) {
-					int flag = branches.get(i).get(j).execute(stmt);
+					int flag = branches.get(i).get(j).execute(cardinality4paraInSchema, partitionUsed, stmt);
 					if (flag != 1) {
 						return flag;
 					}
@@ -104,10 +99,21 @@ public class Branch extends TransactionBlock {
 	}
 
 	@Override
+	public Map<String, String> getParaId2Name() {
+		Map<String, String> paraId2Name = new HashMap<>();
+		for (List<SqlStatement> branch: branches ) {
+			for (SqlStatement sql : branch) {
+				paraId2Name.putAll(sql.getParaId2Name());
+			}
+		}
+		return paraId2Name;
+	}
+
+	@Override
 	public String toString() {
 		StringBuilder sb = new StringBuilder();
-		for (int i = 0; i < branches.size(); i++) {
-			sb.append(branches.get(i));
+		for (List<SqlStatement> branch : branches) {
+			sb.append(branch);
 			sb.append("\n\t\t---------------------------------");
 		}
 		return "\n\t\tBranch [branchRatios=" + Arrays.toString(branchRatios) + ", branches=" + sb.toString() + "]";

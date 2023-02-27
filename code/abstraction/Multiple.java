@@ -1,15 +1,9 @@
 package abstraction;
 
-import com.sun.javaws.IconUtil;
-import workloadgenerator.LaucaTestingEnv;
-
-import javax.swing.plaf.IconUIResource;
 import java.sql.Connection;
 import java.sql.SQLException;
 import java.sql.Statement;
-import java.util.ArrayList;
-import java.util.List;
-import java.util.Map;
+import java.util.*;
 
 public class Multiple extends TransactionBlock {
 
@@ -62,13 +56,13 @@ public class Multiple extends TransactionBlock {
 
 	@Override
 	public void prepare(Connection conn) {
-		for (int i = 0; i < sqls.size(); i++) {
-			sqls.get(i).prepare(conn);
+		for (SqlStatement sql : sqls) {
+			sql.prepare(conn);
 		}
 	}
 
 	@Override
-	public int execute(){
+	public int execute(Map<String, Integer> cardinality4paraInSchema, Map<String, Map<Object, List<Object>>> partitionUsed){
 		//modified by lyqu for debug
 		double decimalPart = avgRunTimes % 1;
 		int runTimes = (int) avgRunTimes;
@@ -81,15 +75,15 @@ public class Multiple extends TransactionBlock {
 //		System.out.println("runTimes: "+runTimes);
 		for (int i = 0; i < runTimes; i++) {
 			if (i == 0) { // multiple块内操作的第一次执行，无需考虑multiple逻辑
-				for (int j = 0; j < sqls.size(); j++) {
-					int flag = sqls.get(j).execute();
+				for (SqlStatement sql : sqls) {
+					int flag = sql.execute(cardinality4paraInSchema, partitionUsed);
 					if (flag != 1) {
 						return flag;
 					}
 				}
 			} else { // 非第一次执行，此时块内操作的执行需考虑multiple逻辑
-				for (int j = 0; j < sqls.size(); j++) {
-					int flag = sqls.get(j).execute(multipleLogicMap, i);
+				for (SqlStatement sql : sqls) {
+					int flag = sql.execute(cardinality4paraInSchema, partitionUsed, multipleLogicMap, i);
 					if (flag != 1) {
 						return flag;
 					}
@@ -113,10 +107,10 @@ public class Multiple extends TransactionBlock {
 					if (flag != 1) {
 
 						// bug fix: clearBatch
-						for (int j = 0; j < sqls.size(); j++) {
-							if (sqls.get(j).getClass().getSimpleName().equals("WriteOperation")) {
+						for (SqlStatement sql : sqls) {
+							if (sql.getClass().getSimpleName().equals("WriteOperation")) {
 								try {
-									sqls.get(j).pstmt.clearBatch();
+									sql.pstmt.clearBatch();
 								} catch (SQLException e) {
 									e.printStackTrace();
 								}
@@ -133,7 +127,7 @@ public class Multiple extends TransactionBlock {
 	}
 
 	@Override
-	public int execute(Statement stmt) {
+	public int execute(Map<String, Integer> cardinality4paraInSchema, Map<String, Map<Object, List<Object>>> partitionUsed, Statement stmt) {
 		double decimalPart = avgRunTimes % 1;
 		//modified by lyqu
 //		System.out.println("2222");
@@ -147,15 +141,15 @@ public class Multiple extends TransactionBlock {
 
 		for (int i = 0; i < runTimes; i++) {
 			if (i == 0) {
-				for (int j = 0; j < sqls.size(); j++) {
-					int flag = sqls.get(j).execute(stmt);
+				for (SqlStatement sql : sqls) {
+					int flag = sql.execute(cardinality4paraInSchema, partitionUsed, stmt);
 					if (flag != 1) {
 						return flag;
 					}
 				}
 			} else {
-				for (int j = 0; j < sqls.size(); j++) {
-					int flag = sqls.get(j).execute(stmt, multipleLogicMap, i);
+				for (SqlStatement sql : sqls) {
+					int flag = sql.execute(cardinality4paraInSchema, partitionUsed, stmt, multipleLogicMap, i);
 					if (flag != 1) {
 						return flag;
 					}
@@ -168,6 +162,16 @@ public class Multiple extends TransactionBlock {
 
 	public List<SqlStatement> getSqls() {
 		return sqls;
+	}
+
+	@Override
+	public Map<String, String> getParaId2Name() {
+		Map<String, String> paraId2Name = new HashMap<>();
+		for (SqlStatement sql : sqls) {
+			paraId2Name.putAll(sql.getParaId2Name());
+		}
+
+		return paraId2Name;
 	}
 
 	@Override

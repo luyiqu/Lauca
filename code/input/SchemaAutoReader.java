@@ -1,22 +1,10 @@
 package input;
 
-import java.sql.Connection;
-import java.sql.ResultSet;
-import java.sql.SQLException;
-import java.sql.DatabaseMetaData;
+import java.sql.*;
 import java.util.*;
+import java.util.regex.Pattern;
 
-import config.Configurations;
-import javafx.util.Pair;
-import org.apache.log4j.Logger;
-import org.apache.log4j.PropertyConfigurator;
-
-import abstraction.Column;
-import abstraction.ForeignKey;
-import abstraction.Table;
-import org.omg.CORBA.OBJ_ADAPTER;
-
-import javax.xml.crypto.Data;
+import abstraction.*;
 
 /**
  * 测试数据库Schema信息的自动读取：自动从真实数据库中获取表模式
@@ -138,6 +126,7 @@ public class SchemaAutoReader {
             List<String> tableNameList = getTableNameList(dbmd,databaseType,username);
             for(String tableName : tableNameList){
                 List<Column> columns = getColumnNameList(dbmd,databaseType,username,tableName);
+                Partition partition = getPartition(conn, databaseType, tableName, columns);
                 String[] primaryKey = getPrimaryKey(dbmd,databaseType,username,tableName);
                 List<ForeignKey> foreignKeys = getForeignKey(dbmd,databaseType,username,tableName);
 
@@ -150,11 +139,11 @@ public class SchemaAutoReader {
                     primaryKey = new String[0];
                 }
                 //对主键排序
-                primaryKey = sortPrimaryKeys(primaryKey,tmp1);
-                tmp.put(tableName,new Table(tableName, tableSize, tmp1, primaryKey, tmp2));
+                sortPrimaryKeys(primaryKey, tmp1);
+                tmp.put(tableName,new Table(tableName, tableSize, tmp1, primaryKey, tmp2, partition));
                 if(foreignKeys.size() == 0) {
                     queue.offer(tableName);
-                    tables.add(new Table(tableName, tableSize, tmp1, primaryKey, tmp2));
+                    tables.add(new Table(tableName, tableSize, tmp1, primaryKey, tmp2, partition));
                 }
             }
         } catch (SQLException e){
@@ -167,13 +156,8 @@ public class SchemaAutoReader {
                 String tableName = entry.getKey();
                 List<String> referencedTN = entry.getValue();
                 if(referencedTN.size() == 0) continue;
-                Iterator<String> iterator = referencedTN.iterator();
-                while (iterator.hasNext()) {
-                    String s = iterator.next();
-                    if (name.equals(s)) {
-                        iterator.remove();//使用迭代器的删除方法删除
-                    }
-                }
+                //使用迭代器的删除方法删除
+                referencedTN.removeIf(name::equals);
                 if(referencedTN.size() == 0){
                     tables.add(tmp.get(tableName));
                     queue.offer(tableName);
@@ -183,6 +167,117 @@ public class SchemaAutoReader {
 //        System.out.println(tables);
 //        logger.info("All input table information:\n" + tables);
         return tables;
+    }
+
+    // 从建表语句中得到分区信息，现在只支持ob，int型分区键，列名全小写
+    private Partition getPartition(Connection conn, String databaseType, String tableName, List<Column> columns) throws SQLException {
+        if (!databaseType.equals("mysql")){
+            return null;
+        }
+
+        Statement statement = conn.createStatement();
+
+        ResultSet rs = statement.executeQuery("show create table "+tableName+";");
+        rs.next();
+        String createSQL = rs.getString(2).toLowerCase();
+        if (!createSQL.contains("partition by")){
+            return null;
+        }
+        // 清理sql语句
+        String[] partitionSQLs = createSQL.split("partition by")[1].split("\n");
+        Pattern clearPattern = Pattern.compile("[,()]");
+        for (int i = 0;i < partitionSQLs.length ;++i ) {
+            partitionSQLs[i] = clearPattern.matcher(partitionSQLs[i]).replaceAll(" ");
+        }
+
+        List<String> partitionNameList = new ArrayList<>();
+        PartitionFunction  partitionRule;
+        List<List<Integer>> partitionParam = new ArrayList<>();
+        String partitionKey = partitionSQLs[0].split(" ")[partitionSQLs[0].split(" ").length - 1];
+
+        // 检查是否真的有这个列，并且是否是int类型
+        for (Column c : columns) {
+            if (c.getName().toLowerCase().equals(partitionKey)){
+                if (c.getDataType() >= 3){
+                    System.err.println("not support data type!");
+                    return null;
+                }
+            }
+        }
+
+
+        // 只支持hash list range 三种
+        switch (partitionSQLs[0].trim().split(" ")[0]){
+            case "hash":
+                partitionRule = PartitionFunction.HASH;
+                break;
+            case "range":
+                partitionRule = PartitionFunction.RANGE;
+                break;
+            case "list":
+                partitionRule = PartitionFunction.LIST;
+                break;
+            default:
+                return null;
+        }
+
+        int lowerBound = Integer.MIN_VALUE;
+        for (int i = 1; i < partitionSQLs.length; i++) {
+            String[] token = partitionSQLs[i].trim().split(" ");
+            partitionNameList.add(token[1]);
+            List<Integer> params = new ArrayList<>();
+
+            switch (partitionRule){
+                case HASH:
+                    /*
+                     partition by hash(c_w_id)
+                     (partition p0,
+                     partition p1,
+                     partition p2)
+                     */
+                    params.add(i-1);
+                    break;
+                case RANGE:
+                    /*
+                    partition by range(c1) (
+                        partition p0 values less than(100),
+                        partition p1 values less than(500),
+                        partitions p2 values less than(maxvalue)
+                    );
+                     */
+                    params.add(lowerBound);
+                    int upperBound = Integer.MAX_VALUE;
+                    if (!token[token.length - 1].matches(".*[a-z].*")){ // 如果不是最后一个
+                        upperBound = Integer.parseInt(token[token.length - 1]);
+                    }
+                    params.add(upperBound);
+                    lowerBound = upperBound;
+                    break;
+                case LIST:
+                    /*
+                    partition by list(c1) (
+                        partition p0 values in (1,2,3),
+                        partition p1 values in (5, 6)，
+                        partition p2 values in (default)
+                    );
+                     */
+                    for (int j = 4; j < token.length; j++) {
+                        if (!token[token.length - 1].matches(".*[a-z].*")){ // 如果是最后一个
+                            params.add( Integer.parseInt(token[token.length - 1]) );
+                        }
+                        else {
+                            params.add(null);
+                        }
+                    }
+                    break;
+                default:
+                    break;
+            }
+            partitionParam.add(params);
+        }
+
+
+        return new Partition<>(partitionNameList, partitionRule, partitionParam, partitionKey);
     }
 
     //统一不同数据库的数据类型
@@ -246,12 +341,12 @@ public class SchemaAutoReader {
     }
 
     //按照主键在所有列中的次序排序
-    private String[] sortPrimaryKeys (String[] primaryKey, Column[] columns){
+    private void sortPrimaryKeys (String[] primaryKey, Column[] columns){
         Map<Integer, String> pks = new HashMap<>();
-        for(int i=0;i<primaryKey.length;i++){
-            for(int j=0;j<columns.length;j++){
-                if(primaryKey[i].equals(columns[j].getName()))
-                    pks.put(j,primaryKey[i]);
+        for (String s : primaryKey) {
+            for (int j = 0; j < columns.length; j++) {
+                if (s.equals(columns[j].getName()))
+                    pks.put(j, s);
             }
         }
         int i = 0;
@@ -259,7 +354,6 @@ public class SchemaAutoReader {
             primaryKey[i] = pk;
             i ++;
         }
-        return primaryKey;
     }
 
 }

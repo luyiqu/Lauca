@@ -3,33 +3,27 @@ package abstraction;
 import java.sql.SQLException;
 import java.sql.Statement;
 import java.text.SimpleDateFormat;
-import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.Date;
-import java.util.Map;
-import java.util.concurrent.atomic.AtomicInteger;
+import java.util.*;
 
 import accessdistribution.DataAccessDistribution;
 import accessdistribution.DistributionTypeInfo;
-import com.sun.org.apache.bcel.internal.generic.LADD;
-import workloadgenerator.LaucaTestingEnv;
-
-import javax.swing.plaf.synth.SynthOptionPaneUI;
 
 public class WriteOperation extends SqlStatement {
 
 	private boolean batchExecute;
 
-
+	// tableName_columnName
+	private List<String> paraSchemaInfos = new ArrayList<>();
 
 	public WriteOperation(int operationId, String sql, int[] paraDataTypes, 
-			DistributionTypeInfo[] paraDistTypeInfos, boolean batchExecute) {
+			DistributionTypeInfo[] paraDistTypeInfos,List<String> paraSchemaInfos , boolean batchExecute) {
 		super();
 		this.operationId = operationId;
 		this.sql = sql;
 		this.paraDataTypes = paraDataTypes;
 		this.paraDistTypeInfos = paraDistTypeInfos;
-		
+
+		this.paraSchemaInfos = paraSchemaInfos;
 		this.batchExecute = batchExecute;
 		
 		windowParaGenerators = new DataAccessDistribution[paraDataTypes.length];
@@ -44,6 +38,9 @@ public class WriteOperation extends SqlStatement {
 		this.sql = writeOperation.sql;
 		this.paraDataTypes = writeOperation.paraDataTypes;
 		this.paraDistTypeInfos = writeOperation.paraDistTypeInfos;
+
+		if (writeOperation.paraSchemaInfos != null)
+			this.paraSchemaInfos = new ArrayList<>(writeOperation.paraSchemaInfos);
 		this.batchExecute = writeOperation.batchExecute;
 		windowParaGenerators = new DataAccessDistribution[paraDataTypes.length];
 		fullLifeCycleParaGenerators = new DataAccessDistribution[paraDataTypes.length];
@@ -55,7 +52,7 @@ public class WriteOperation extends SqlStatement {
 	}
 
 	@Override
-	public int execute() {
+	public int execute(Map<String, Integer> cardinality4paraInSchema, Map<String, Map<Object, List<Object>>> partitionUsed) {
 //		long startTime = System.currentTimeMillis();
 //		long para = -1; //lyqu: 照理说不应该为long类型，而是int主键类型
 //		LaucaTestingEnv.writeOperationTimes.getAndIncrement();
@@ -66,7 +63,15 @@ public class WriteOperation extends SqlStatement {
 //				if(i == paraDataTypes.length-1){
 //					para = (long)parameter;
 //				}
-				setParameter(i + 1, paraDataTypes[i], geneParameter(i));
+
+				Object parameter = checkParaOutOfCardinality(
+						i,
+						this.paraSchemaInfos.get(i),
+						cardinality4paraInSchema,
+						partitionUsed
+				);
+
+				setParameter(i + 1, paraDataTypes[i], parameter);
 
 			}
 //			long endTime = System.currentTimeMillis();
@@ -96,29 +101,42 @@ public class WriteOperation extends SqlStatement {
 			}
 			return 1;
 		} catch (Exception e) {
-//			e.printStackTrace();
-			if (e.getMessage().contains("Deadlock")) {
+//			return -1;
+			if (e instanceof  SQLException) {
 				return -1;
 			}
+//			e.printStackTrace();
 //			System.err.println("ERROR!!!");
 			System.out.println("aaaaaaaa"+pstmt.toString());
 			System.out.println(this.getClass().getName());
 			System.out.println(sql);
-			System.out.println(e.getMessage());
+//			System.out.println(e.getMessage());
 ////			System.exit(1);
 			return 0;
 		}
 	}
 
+	// add by wsy
+	public List<String> getParaSchemaInfos(){
+		return paraSchemaInfos;
+	}
+
 	@Override
-	public int execute(Statement stmt) {
+	public int execute(Map<String, Integer> cardinality4paraInSchema, Map<String, Map<Object, List<Object>>> partitionUsed, Statement stmt) {
 		
 		String tmp = sql; // 方便程序调试
 		
 		try {
 			// String tmp = sql;
 			for (int i = 0; i < paraDataTypes.length; i++) {
-				Object parameter = geneParameter(i);
+
+				Object parameter = checkParaOutOfCardinality(
+						i,
+						this.paraSchemaInfos.get(i),
+						cardinality4paraInSchema,
+						partitionUsed
+				);
+
 				if (paraDataTypes[i] == 3) {
 					tmp = tmp.replaceFirst("\\?", " '" + sdf.format(new Date((Long)parameter)) + "' ");
 				} else if (paraDataTypes[i] == 4) {
@@ -134,29 +152,48 @@ public class WriteOperation extends SqlStatement {
 //			e.printStackTrace();
 //			System.out.println(tmp);
 //			System.exit(0);
-			if (e.getMessage().contains("Deadlock")) {
-				return -1;
-			}
-			System.out.println(e.getMessage());
-			System.out.println(sql);
-			System.err.println("ERROR!!!");
-			return 0;
+			return -1;
 		}
 	}
 
 	@Override
-	public int execute(Map<String, Double> multipleLogicMap, int round) {
+	public Map<String, String> getParaId2Name() {
+		Map<String, String> paraId2Name = new HashMap<>();
+		for (int i = 0; i < paraSchemaInfos.size(); i++) {
+			String paraIdentifier = operationId + "_" + i;
+			paraId2Name.put(paraIdentifier, paraSchemaInfos.get(i));
+		}
+
+		return paraId2Name;
+	}
+
+	@Override
+	public int execute(Map<String, Integer> cardinality4paraInSchema, Map<String, Map<Object, List<Object>>> partitionUsed,
+					   Map<String, Double> multipleLogicMap, int round) {
 		try {
 			for (int i = 0; i < paraDataTypes.length; i++) {
-				Object parameter = geneParameterByMultipleLogic(i, multipleLogicMap, round);
+
+				Object parameter = checkParaOutOfCardinality(i,
+						geneParameterByMultipleLogic(i, multipleLogicMap, round),
+						this.paraSchemaInfos.get(i),
+						cardinality4paraInSchema,
+						partitionUsed
+				);
+				while (parameter == null){
+					parameter = checkParaOutOfCardinality(i,
+							geneParameterByMultipleLogic(i, multipleLogicMap, round),
+							this.paraSchemaInfos.get(i),
+							cardinality4paraInSchema,
+							partitionUsed
+					);
+				}
+
 				setParameter(i + 1, paraDataTypes[i], parameter);
 			}
 			if (batchExecute) {
 				pstmt.addBatch();
 			} else {
-
 				pstmt.executeUpdate();
-
 			}
 			return 1;
 		} catch (SQLException e) {
@@ -174,11 +211,26 @@ public class WriteOperation extends SqlStatement {
 	}
 
 	@Override
-	public int execute(Statement stmt, Map<String, Double> multipleLogicMap, int round) {
+	public int execute(Map<String, Integer> cardinality4paraInSchema, Map<String, Map<Object, List<Object>>> partitionUsed,
+					   Statement stmt, Map<String, Double> multipleLogicMap, int round) {
 		try {
 			String tmp = sql;
 			for (int i = 0; i < paraDataTypes.length; i++) {
-				Object parameter = geneParameterByMultipleLogic(i, multipleLogicMap, round);
+
+				Object parameter = checkParaOutOfCardinality(i,
+						geneParameterByMultipleLogic(i, multipleLogicMap, round),
+						this.paraSchemaInfos.get(i),
+						cardinality4paraInSchema,
+						partitionUsed
+				);
+				while (parameter == null){
+					parameter = checkParaOutOfCardinality(i,
+							geneParameterByMultipleLogic(i, multipleLogicMap, round),
+							this.paraSchemaInfos.get(i),
+							cardinality4paraInSchema,
+							partitionUsed
+					);
+				}
 				if (paraDataTypes[i] == 3) {
 					tmp = tmp.replaceFirst("\\?", " '" + sdf.format(new Date((Long)parameter)) + "' ");
 				} else if (paraDataTypes[i] == 4) {
@@ -191,13 +243,8 @@ public class WriteOperation extends SqlStatement {
 			return 1;
 		} catch (SQLException e) {
 //			e.printStackTrace();
-			if (e.getMessage().contains("Deadlock")) {
-				return -1;
-			}
-			System.out.println(e.getMessage());
-			System.out.println(sql);
-			System.err.println("ERROR!!!");
-			return 0;
+			return -1;
+
 		}
 	}
 
@@ -232,14 +279,7 @@ public class WriteOperation extends SqlStatement {
 			}
 			return 1;
 		} catch (SQLException e) {
-//			e.printStackTrace();
-			if (e.getMessage().contains("Deadlock")) {
-				return -1;
-			}
-			System.err.println("ERROR!!!");
-			System.out.println(e.getMessage());
-			System.out.println(sql);
-			return 0;
+			return -1;
 		}
 	}
 

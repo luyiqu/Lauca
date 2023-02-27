@@ -1,11 +1,6 @@
 package workloadgenerator;
 
-import java.util.ArrayList;
-import java.util.Collections;
-import java.util.List;
-import java.util.Timer;
-import java.util.TimerTask;
-import java.util.Vector;
+import java.util.*;
 import java.util.concurrent.CountDownLatch;
 
 import config.Configurations;
@@ -67,21 +62,21 @@ public class Monitor implements Runnable {
 				responceTimeInfo = newResponceTimeInfo();
 
 				List<Float> allResponceTimes = new ArrayList<>();
-				for (int i = 0; i < tmp.size(); i++) {
-					allResponceTimes.addAll(tmp.get(i));
+				for (Vector<Float> floats : tmp) {
+					allResponceTimes.addAll(floats);
 				}
 
 				// failureTxNum: 非死锁导致的执行失败事务数；deadlockTxNum：死锁导致的执行失败事务数
 				int successTxNum = 0, failureTxNum = 0, deadlockTxNum = 0, errorNum = 0;
 				float successTxResponceTimeSum = 0;
 
-				for (int i = 0; i < allResponceTimes.size(); i++) {
-					if (allResponceTimes.get(i) > 0) { //感觉bug在这边，失败吞吐的响应时间真的为0吗？
+				for (Float allResponceTime : allResponceTimes) {
+					if (allResponceTime > 0) { //感觉bug在这边，失败吞吐的响应时间真的为0吗？
 						successTxNum++;
-						successTxResponceTimeSum += allResponceTimes.get(i);
-					} else if (allResponceTimes.get(i) == 0) {
+						successTxResponceTimeSum += allResponceTime;
+					} else if (allResponceTime == 0) {
 						failureTxNum++;
-					} else if (allResponceTimes.get(i) == -1) {
+					} else if (allResponceTime == -1) {
 						deadlockTxNum++;
 					} else {
 						errorNum++;
@@ -117,7 +112,7 @@ public class Monitor implements Runnable {
 							+ (cumuFailureThroughput / timesCount) + ", " + deadlockThroughput + ", " + (cumuDeadlockThroughput / timesCount));
 				}
 			}
-		}, 1000, statWindowSize * 1000);
+		}, 1000, statWindowSize * 1000L);
 	}
 
 	private List<Vector<Float>> newResponceTimeInfo() {

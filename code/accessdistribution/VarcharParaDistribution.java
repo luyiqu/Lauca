@@ -24,6 +24,19 @@ public class VarcharParaDistribution extends DataAccessDistribution {
 		super(hFItemFrequencies, intervalCardinalities, intervalFrequencies);
 	}
 
+	public VarcharParaDistribution(VarcharParaDistribution distribution){
+		super(distribution);
+
+		String[] seedStrings = new String[distribution.seedStrings.length];
+		System.arraycopy(distribution.seedStrings, 0, seedStrings, 0, seedStrings.length);
+
+		setColumnInfo(distribution.columnCardinality, distribution.minLength, distribution.maxLength, seedStrings);
+	}
+
+	public VarcharParaDistribution copy(){
+		return new VarcharParaDistribution(this);
+	}
+
 	public void setColumnInfo(long columnCardinality, int minLength, int maxLength, String[] seedStrings) {
 		this.columnCardinality = columnCardinality;
 		this.minLength = minLength;
@@ -34,7 +47,7 @@ public class VarcharParaDistribution extends DataAccessDistribution {
 	public void init4VarcharParaGene() {
 		highFrequencyItems = new String[highFrequencyItemNum];
 		// 假设每个时间窗口中字符串的参数空间是相应属性的全域（故无需根据当前时间窗口的参数值确定一个基数索引的范围）
-		if (columnCardinality > highFrequencyItemNum * 2) {
+		if (columnCardinality > highFrequencyItemNum * 2L) {
 			Set<Long> hFItemIndexSet = new HashSet<>();
 			while (hFItemIndexSet.size() < highFrequencyItemNum) {
 				long randomParaIndex = (long)(Math.random() * columnCardinality);

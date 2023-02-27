@@ -38,7 +38,7 @@ public class DBConnector {
 	public Connection getMySQLConnection() {
 		String driver = "com.mysql.jdbc.Driver";
 		// 支持批处理执行
-		String url = "jdbc:mysql://" + ip + ":" + port + "/" + dbName + "?rewriteBatchedStatements=true&useSSL=false";
+		String url = "jdbc:mysql://" + ip + ":" + port + "/" + dbName + "?rewriteBatchedStatements=true&useSSL=false&allowMultiQueries=true";
 		// String url = "jdbc:mysql://" + ip + ":" + port + "/" + dbName;
 		Connection conn = null;
 		try {

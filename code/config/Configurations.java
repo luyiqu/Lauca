@@ -1,5 +1,9 @@
 package config;
 
+import java.io.FileInputStream;
+import java.io.FileNotFoundException;
+import java.io.InputStream;
+
 public class Configurations {
 
 	private static String log4jConfigFile = ".//lib//log4j.properties";
@@ -135,6 +139,22 @@ public class Configurations {
 
 	//保存匿名化对应关系的中间状态文件
 	private static String anonymitySaveFile = "";
+
+	//平均化多段分布的权重
+	private static int backwardLength = 0;
+
+	public static boolean isUsePartitionRule() {
+		return usePartitionRule;
+	}
+
+	public static void setUsePartitionRule(boolean usePartitionRule) {
+		Configurations.usePartitionRule = usePartitionRule;
+	}
+
+	// 是否启用分区统计
+	private static boolean usePartitionRule = false;
+
+	private static int quantileNum= 10;
 
 	//启用存储过程
 	private static boolean useStoredProcedure = true;
@@ -621,4 +641,12 @@ public class Configurations {
 	public static void setDataIncreaseRate(Double dataIncreaseRate){ Configurations.dataIncreaseRate = dataIncreaseRate;}
 
 	public static Double getDataIncreaseRate(){return dataIncreaseRate;}
+
+	public static void setBackwardLength(int backwardLength){Configurations.backwardLength = backwardLength;}
+
+	public static int getBackwardLength(){return backwardLength;}
+
+	public static void setQuantileNum(int quantileNum){Configurations.quantileNum = quantileNum;}
+
+	public static int getQuantileNum(){return quantileNum;}
 }

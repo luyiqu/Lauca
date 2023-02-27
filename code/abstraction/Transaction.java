@@ -4,15 +4,11 @@ import java.math.BigDecimal;
 import java.sql.Connection;
 import java.sql.SQLException;
 import java.sql.Statement;
-import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
+import java.util.*;
 
 import accessdistribution.DataAccessDistribution;
 import transactionlogic.ParameterNode;
-import workloadgenerator.LaucaTestingEnv;
+import workloadgenerator.Stats;
 
 public class Transaction{
 
@@ -37,6 +33,8 @@ public class Transaction{
 	private Map<String, ParameterNode> parameterNodeMap = null;
 	// Multiple块内SQL操作的逻辑（目前仅考虑SQL输入参数是否保持不变或者单调改变）
 	private Map<String, Double> multipleLogicMap = null;
+	// 以访问的列为单位统计的基数
+	private Map<String, Map<Integer,Double>> cardinality4paraInSchema = new HashMap<>();
 	// 操作ID -> 平均执行次数，用来确定：if/else分支执行比例，multiple内操作平均执行次数
 	private Map<Integer, Double> operationId2AvgRunTimes = null;
 
@@ -59,10 +57,12 @@ public class Transaction{
 
 	// 设置事务逻辑信息
 	public void setTransactionLogicInfo(Map<String, ParameterNode> parameterNodeMap,
-			Map<String, Double> multipleLogicMap, Map<Integer, Double> operationId2AvgRunTimes) {
+			Map<String, Double> multipleLogicMap, Map<Integer, Double> operationId2AvgRunTimes,
+										Map<String, Map<Integer,Double>> cardinality4paraInSchema) {
 		this.parameterNodeMap = parameterNodeMap;
 		this.multipleLogicMap = multipleLogicMap;
 		this.operationId2AvgRunTimes = operationId2AvgRunTimes;
+		this.cardinality4paraInSchema = cardinality4paraInSchema;
 	}
 
 	// 深拷贝Transaction对象，主要保证数据库操作执行器（stmt、pstmt）是独立的
@@ -73,15 +73,23 @@ public class Transaction{
 		this.prepared = transaction.prepared;
 		this.transactionBlocks = new ArrayList<>();
 
+		if (transaction.cardinality4paraInSchema != null)
+			this.cardinality4paraInSchema = new HashMap<>(transaction.cardinality4paraInSchema);
+
 		for (TransactionBlock txBlock : transaction.transactionBlocks) {
-			if (txBlock.getClass().getSimpleName().equals("Multiple")) {
-				this.transactionBlocks.add(new Multiple((Multiple) txBlock));
-			} else if (txBlock.getClass().getSimpleName().equals("Branch")) {
-				this.transactionBlocks.add(new Branch((Branch) txBlock));
-			} else if (txBlock.getClass().getSimpleName().equals("ReadOperation")) {
-				this.transactionBlocks.add(new ReadOperation((ReadOperation) txBlock));
-			} else if (txBlock.getClass().getSimpleName().equals("WriteOperation")) {
-				this.transactionBlocks.add(new WriteOperation((WriteOperation) txBlock));
+			switch (txBlock.getClass().getSimpleName()) {
+				case "Multiple":
+					this.transactionBlocks.add(new Multiple((Multiple) txBlock));
+					break;
+				case "Branch":
+					this.transactionBlocks.add(new Branch((Branch) txBlock));
+					break;
+				case "ReadOperation":
+					this.transactionBlocks.add(new ReadOperation((ReadOperation) txBlock));
+					break;
+				case "WriteOperation":
+					this.transactionBlocks.add(new WriteOperation((WriteOperation) txBlock));
+					break;
 			}
 		}
 
@@ -95,8 +103,8 @@ public class Transaction{
 	public void init(Connection conn) {
 		this.conn = conn;
 		if (prepared) {
-			for (int i = 0; i < transactionBlocks.size(); i++) {
-				transactionBlocks.get(i).prepare(conn);
+			for (TransactionBlock transactionBlock : transactionBlocks) {
+				transactionBlock.prepare(conn);
 			}
 		} else {
 			try {
@@ -134,10 +142,10 @@ public class Transaction{
 			} else if (txBlock.getClass().getSimpleName().equals("Branch")) {
 				Branch branch = (Branch) txBlock;
 				List<List<SqlStatement>> branches = branch.getBranches();
-				for (int i = 0; i < branches.size(); i++) {
-					for (int j = 0; j < branches.get(i).size(); j++) {
-						branches.get(i).get(j).setIntermediateState(intermediateState);
-						branches.get(i).get(j).setParameterNodeMap(parameterNodeMap);
+				for (List<SqlStatement> sqlStatements : branches) {
+					for (SqlStatement sqlStatement : sqlStatements) {
+						sqlStatement.setIntermediateState(intermediateState);
+						sqlStatement.setParameterNodeMap(parameterNodeMap);
 					}
 				}
 				double[] branchRatios = new double[branches.size()];
@@ -159,11 +167,30 @@ public class Transaction{
 		}
 	}
 
-	public float exectue(){
+	public float execute(){
 		intermediateState.clear();
 
 		long startTime = System.nanoTime();
 		int flag = 1;
+
+		Map<String, Map<Object, List<Object>>>  partitionUsed = new HashMap<>();
+		for (String para : cardinality4paraInSchema.keySet()){
+			partitionUsed.put(para, new HashMap<>());
+		}
+
+		Map<String, Integer> cardUsed = new HashMap<>();
+		Random random = new Random();
+		for (String columnName : cardinality4paraInSchema.keySet()){
+			double idx = random.nextDouble();
+			double sum = 0;
+			for (Integer k: cardinality4paraInSchema.get(columnName).keySet()) {
+				sum += cardinality4paraInSchema.get(columnName).get(k);
+				if (sum > idx - 1e-7){
+					cardUsed.put(columnName, k);
+					break;
+				}
+			}
+		}
 
 
 //		if(transactionBlocks.size()!=1){
@@ -175,20 +202,13 @@ public class Transaction{
 //		}
 		for (int i = 0; i < transactionBlocks.size(); i++) {
 			if (prepared) {
-				flag = transactionBlocks.get(i).execute();
-				if (flag != 1) {
-//					System.out.println("prepared"+this.name+" "+i);
-					break;
-				}
+				flag = transactionBlocks.get(i).execute(cardUsed, partitionUsed);
 			} else {
-
-				flag = transactionBlocks.get(i).execute(stmt);
-//				System.out.println("NoPrepared: "+transactionBlocks.get(i));
-				if (flag != 1) {
-					break;
-				}
+				flag = transactionBlocks.get(i).execute(cardUsed, partitionUsed, stmt);
 			}
-
+			if (flag != 1) {
+				break;
+			}
 			// mainly for smallbank workload. 针对其他负载，rollbackProbabilities[i]都为0
 			if (Math.random() < rollbackProbabilities[i]) {
 				flag = 0;
@@ -201,6 +221,24 @@ public class Transaction{
 			if (flag == 1) {
 				this.cleanBatch(transactionBlocks);
 				conn.commit();
+
+				// wsy 统计该事务访问的分区数
+				int partitionCnt = 0;
+				for (Map<Object, List<Object>> paraList4partition: partitionUsed.values()){
+					if (paraList4partition.size() == 0){
+						continue;
+					}
+
+					int cnt = 0;
+					for (Object key : paraList4partition.keySet()){
+						if (paraList4partition.get(key).size() > 0){// 只统计带分区的基数
+							cnt ++;
+						}
+					}
+					cnt = cnt == 0 ? 1 : cnt;
+					partitionCnt = Math.max(partitionCnt, cnt);
+				}
+				Stats.addPartitionCnt(partitionCnt);
 			} else {
 				this.cleanBatch(transactionBlocks);
 				conn.rollback();
@@ -236,6 +274,8 @@ public class Transaction{
 		return responceTime;
 	}
 
+
+
 	public void setRatio(double ratio) {
 		this.ratio = ratio;
 	}
@@ -254,15 +294,15 @@ public class Transaction{
 			if (txBlock.getClass().getSimpleName().equals("Multiple")) {
 				Multiple multiple = (Multiple) txBlock;
 				List<SqlStatement> sqls = multiple.getSqls();
-				for (int i = 0; i < sqls.size(); i++) {
-					sqls.get(i).setParaDistribution(paraId2Distribution, type);
+				for (SqlStatement sql : sqls) {
+					sql.setParaDistribution(paraId2Distribution, type);
 				}
 			} else if (txBlock.getClass().getSimpleName().equals("Branch")) {
 				Branch branch = (Branch) txBlock;
 				List<List<SqlStatement>> branches = branch.getBranches();
-				for (int i = 0; i < branches.size(); i++) {
-					for (int j = 0; j < branches.get(i).size(); j++) {
-						branches.get(i).get(j).setParaDistribution(paraId2Distribution, type);
+				for (List<SqlStatement> sqlStatements : branches) {
+					for (SqlStatement sqlStatement : sqlStatements) {
+						sqlStatement.setParaDistribution(paraId2Distribution, type);
 					}
 				}
 			} else {
@@ -280,10 +320,10 @@ public class Transaction{
 				List<SqlStatement> sqls = multiple.getSqls();
 				if (multiple.isBatchExecute()) {
 					// bug fix: clearBatch
-					for (int j = 0; j < sqls.size(); j++) {
-						if (sqls.get(j).getClass().getSimpleName().equals("WriteOperation")) {
+					for (SqlStatement sql : sqls) {
+						if (sql.getClass().getSimpleName().equals("WriteOperation")) {
 							try {
-								sqls.get(j).pstmt.clearBatch();
+								sql.pstmt.clearBatch();
 							} catch (SQLException e) {
 								e.printStackTrace();
 							}
@@ -364,6 +404,20 @@ public class Transaction{
 		}
 		return true;
 	}
+
+	/**
+	 * 获取事务中所有的操作id和对应的tableName_columnName
+	 * @return
+	 */
+	public Map<String, String> getParaId2Name() {
+		Map<String, String> paraId2Name = new HashMap<>();
+		for (TransactionBlock transactionBlock :transactionBlocks) {
+			Map<String, String> paraId2NameInBlock = transactionBlock.getParaId2Name();
+			paraId2Name.putAll(paraId2NameInBlock);
+		}
+
+		return paraId2Name;
+	}
 }
 
 // 事务运行过程中一些中间状态的值，包含SQL操作的输入参数和返回结果集
@@ -426,10 +480,10 @@ class TxRunningValue {
 		case 0:
 		case 3:
 			paraValue = (Long) value + increment;
-			return new Long((long) paraValue);
+			return (long) paraValue;
 		case 1:
 			paraValue = (Double) value + increment;
-			return new Double(paraValue);
+			return paraValue;
 		case 2:
 			paraValue = new BigDecimal(value.toString()).doubleValue() + increment;
 			return new BigDecimal(paraValue);

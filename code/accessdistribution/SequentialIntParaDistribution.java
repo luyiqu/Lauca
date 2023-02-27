@@ -32,13 +32,50 @@ public class SequentialIntParaDistribution extends SequentialParaDistribution {
 	private long[] highFrequencyItems = null;
 	private long[][] currentParaCandidates = null;
 
-	public SequentialIntParaDistribution(long windowMinValue, long windowMaxValue, 
-			double[] hFItemFrequencies, long[] intervalCardinalities, double[] intervalFrequencies, 
-			double[] intervalParaRepeatRatios, double hFItemRepeatRatio) {
+	public SequentialIntParaDistribution(long windowMinValue, long windowMaxValue,
+										 double[] hFItemFrequencies, long[] intervalCardinalities, double[] intervalFrequencies,
+										 double[][] intervalParaRepeatRatios, double hFItemRepeatRatio) {
 		super(hFItemFrequencies, intervalCardinalities, intervalFrequencies, intervalParaRepeatRatios);
 		this.windowMinValue = windowMinValue;
 		this.windowMaxValue = windowMaxValue;
 		this.hFItemRepeatRatio = hFItemRepeatRatio;
+	}
+
+	public SequentialIntParaDistribution(long windowMinValue, long windowMaxValue,
+										 double[] hFItemFrequencies, long[] intervalCardinalities, double[] intervalFrequencies,
+										 double[] intervalParaRepeatRatios, double hFItemRepeatRatio) {
+		this(windowMinValue, windowMaxValue, hFItemFrequencies, intervalCardinalities, intervalFrequencies, new double[1][0], hFItemRepeatRatio);
+		this.intervalParaRepeatRatios[0] = new double[intervalParaRepeatRatios.length];
+		System.arraycopy(intervalParaRepeatRatios, 0, this.intervalParaRepeatRatios[0], 0, intervalParaRepeatRatios.length);
+	}
+
+	public SequentialIntParaDistribution(long windowMinValue, long windowMaxValue, 
+			double[] hFItemFrequencies, long[] intervalCardinalities, double[] intervalFrequencies,
+										 double[][] intervalParaRepeatRatios, double hFItemRepeatRatio, ArrayList<ArrayList<Double>> quantilePerInterval) {
+		super(hFItemFrequencies, intervalCardinalities, intervalFrequencies, intervalParaRepeatRatios, quantilePerInterval);
+		this.windowMinValue = windowMinValue;
+		this.windowMaxValue = windowMaxValue;
+		this.hFItemRepeatRatio = hFItemRepeatRatio;
+	}
+
+	public SequentialIntParaDistribution(SequentialIntParaDistribution sequentialIntParaDistribution){
+		super(sequentialIntParaDistribution);
+		this.windowMinValue = sequentialIntParaDistribution.windowMinValue;
+		this.windowMaxValue = sequentialIntParaDistribution.windowMaxValue;
+		this.highFrequencyItems = new long[sequentialIntParaDistribution.highFrequencyItems.length];
+
+		System.arraycopy(sequentialIntParaDistribution.highFrequencyItems, 0, highFrequencyItems, 0, highFrequencyItems.length);
+		if (sequentialIntParaDistribution.currentParaCandidates != null){
+			geneCandidates(sequentialIntParaDistribution.currentParaCandidates);
+		}
+
+		setColumnInfo(sequentialIntParaDistribution.columnMinValue,sequentialIntParaDistribution.columnMaxValue,
+				sequentialIntParaDistribution.columnCardinality,sequentialIntParaDistribution.coefficient);
+		init();
+	}
+
+	public SequentialIntParaDistribution copy(){
+		return new SequentialIntParaDistribution(this);
 	}
 
 	public void setColumnInfo(long columnMinValue, long columnMaxValue, 
@@ -134,10 +171,10 @@ public class SequentialIntParaDistribution extends SequentialParaDistribution {
 		for (int i = 0; i < intervalNum; i++) {
 			// 对于区间内参数基数超过int最大值的情形暂不考虑~
 			currentParaCandidates[i] = new long[(int)intervalCardinalities[i]];
-			if (intervalParaRepeatRatios == null) {
+			if (intervalParaRepeatRatios == null || intervalParaRepeatRatios.length == 0) {
 				repeatedParaNums[i] = 0;
 			} else {
-				repeatedParaNums[i] = (int)(intervalCardinalities[i] * intervalParaRepeatRatios[i]);
+				repeatedParaNums[i] = (int)(intervalCardinalities[i] * intervalParaRepeatRatios[intervalParaRepeatRatios.length - 1][i]);
 			}
 		}
 

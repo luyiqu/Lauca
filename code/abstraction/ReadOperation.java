@@ -4,16 +4,10 @@ import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.sql.Statement;
 import java.sql.Timestamp;
-import java.text.SimpleDateFormat;
-import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.Date;
-import java.util.List;
-import java.util.Map;
+import java.util.*;
 
 import accessdistribution.DataAccessDistribution;
 import accessdistribution.DistributionTypeInfo;
-import workloadgenerator.LaucaTestingEnv;
 
 public class ReadOperation extends SqlStatement {
 
@@ -21,20 +15,24 @@ public class ReadOperation extends SqlStatement {
 	private int[] returnDataTypes = null;
 	private boolean filterPrimaryKey;
 
-	public ReadOperation(int operationId, String sql, int[] paraDataTypes, DistributionTypeInfo[] paraDistTypeInfos, 
+	// tableName@columnName
+	private List<String> paraSchemaInfos = new ArrayList<>();
+
+	public ReadOperation(int operationId, String sql, int[] paraDataTypes, DistributionTypeInfo[] paraDistTypeInfos,List<String> paraSchemaInfos,
 			String[] returnItems, int[] returnDataTypes, boolean filterPrimaryKey) {
 		super();
 		this.operationId = operationId;
 		this.sql = sql;
 		this.paraDataTypes = paraDataTypes;
 		this.paraDistTypeInfos = paraDistTypeInfos;
+		this.paraSchemaInfos = paraSchemaInfos;
 		
 		this.returnItems = returnItems;
 		this.returnDataTypes = returnDataTypes;
 		this.filterPrimaryKey = filterPrimaryKey;
 		
-		windowParaGenerators = new DataAccessDistribution[paraDataTypes.length];
-		fullLifeCycleParaGenerators = new DataAccessDistribution[paraDataTypes.length];
+		windowParaGenerators = new DataAccessDistribution[paraDataTypes == null ? 0 : paraDataTypes.length];
+		fullLifeCycleParaGenerators = new DataAccessDistribution[paraDataTypes == null ? 0 : paraDataTypes.length];
 //		sdf = new SimpleDateFormat("yyyy-MM-dd HH:mm:ss");
 	}
 
@@ -70,13 +68,16 @@ public class ReadOperation extends SqlStatement {
 		this.returnDataTypes = readOperation.returnDataTypes;
 		this.filterPrimaryKey = readOperation.filterPrimaryKey;
 
-		windowParaGenerators = new DataAccessDistribution[paraDataTypes.length];
-		fullLifeCycleParaGenerators = new DataAccessDistribution[paraDataTypes.length];
+		if (readOperation.paraSchemaInfos != null)
+			this.paraSchemaInfos = new ArrayList<>(readOperation.paraSchemaInfos);
+
+		windowParaGenerators = new DataAccessDistribution[paraDataTypes == null ? 0 : paraDataTypes.length];
+		fullLifeCycleParaGenerators = new DataAccessDistribution[paraDataTypes == null ? 0 : paraDataTypes.length];
 //		sdf = new SimpleDateFormat("yyyy-MM-dd HH:mm:ss");
 	}
 
 	@Override
-	public int execute() {
+	public int execute(Map<String, Integer> cardinality4paraInSchema, Map<String, Map<Object, List<Object>>> partitionUsed) {
 //		long startTime = System.currentTimeMillis();
 		try {
 			for (int i = 0; i < paraDataTypes.length; i++) {
@@ -85,7 +86,15 @@ public class ReadOperation extends SqlStatement {
 //				System.out.println(para+" "+para.getClass());
 //				System.out.println(paraDataTypes[i]);
 //				System.out.println("**************");
-				setParameter(i + 1, paraDataTypes[i], geneParameter(i));
+				Object parameter = checkParaOutOfCardinality(
+						i,
+						this.paraSchemaInfos.get(i),
+						cardinality4paraInSchema,
+						partitionUsed
+				);
+
+
+				setParameter(i + 1, paraDataTypes[i], parameter);
 			}
 //			long endTime = System.currentTimeMillis();
 //			LaucaTestingEnv.geneTime += endTime - startTime;
@@ -96,23 +105,18 @@ public class ReadOperation extends SqlStatement {
 			saveResultSet(rs);
 			return 1;
 		} catch (Exception e) {
-//			e.printStackTrace();
-			if (e.getMessage().contains("Deadlock")) {
+			if (e instanceof  SQLException) {
 				return -1;
 			}
-			System.out.println(e.getMessage());
+			System.out.println("bbbbbbb"+pstmt.toString());
+			e.printStackTrace();
 			System.out.println(sql);
-			System.err.println("ERROR!!!");
-//			System.out.println(this.getClass().getName());
-//			System.out.println(sql);
-//			System.out.println(e.getMessage());
-//			System.exit(1);
 			return 0;
 		}
 	}
 
 	@Override
-	public int execute(Statement stmt) {
+	public int execute(Map<String, Integer> cardinality4paraInSchema, Map<String, Map<Object, List<Object>>> partitionUsed, Statement stmt) {
 		try {
 			String tmp = sql;
 			for (int i = 0; i < paraDataTypes.length; i++) {
@@ -139,12 +143,28 @@ public class ReadOperation extends SqlStatement {
 	}
 
 	@Override
-	public int execute(Map<String, Double> multipleLogicMap, int round) {
+	public int execute(Map<String, Integer> cardinality4paraInSchema, Map<String, Map<Object, List<Object>>> partitionUsed,
+					   Map<String, Double> multipleLogicMap, int round) {
 //		long startTime = System.currentTimeMillis();
 //		System.out.println("照例说Read操作肯定会走这里，但这里是指multiple的事务逻辑");
 		try {
 			for (int i = 0; i < paraDataTypes.length; i++) {
-				setParameter(i + 1, paraDataTypes[i], geneParameterByMultipleLogic(i, multipleLogicMap, round));
+				Object parameter = checkParaOutOfCardinality(i,
+						geneParameterByMultipleLogic(i, multipleLogicMap, round),
+						this.paraSchemaInfos.get(i),
+						cardinality4paraInSchema,
+						partitionUsed
+				);
+				while (parameter == null){
+					parameter = checkParaOutOfCardinality(i,
+							geneParameterByMultipleLogic(i, multipleLogicMap, round),
+							this.paraSchemaInfos.get(i),
+							cardinality4paraInSchema,
+							partitionUsed
+					);
+				}
+
+				setParameter(i + 1, paraDataTypes[i], parameter);
 			}
 
 //			long endTime = System.currentTimeMillis();
@@ -157,22 +177,18 @@ public class ReadOperation extends SqlStatement {
 //			long endTime1 = System.currentTimeMillis();
 //			LaucaTestingEnv.updateTime += endTime1 - startTime1;
 			return 1;
-		} catch (SQLException e) {
-//			e.printStackTrace();
-			if (e.getMessage().contains("Deadlock")) {
+		} catch (Exception e) {
+			if ( e instanceof SQLException) {
 				return -1;
 			}
-			System.out.println(this.getClass().getName());
-			System.out.println(sql);
-			System.out.println(e.getMessage());
-//			System.exit(1);
-//			System.err.println("ERROR!!!");
+			e.printStackTrace();
 			return 0;
 		}
 	}
 
 	@Override
-	public int execute(Statement stmt, Map<String, Double> multipleLogicMap, int round) {
+	public int execute(Map<String, Integer> cardinality4paraInSchema, Map<String, Map<Object, List<Object>>> partitionUsed,
+					   Statement stmt, Map<String, Double> multipleLogicMap, int round) {
 		try {
 			String tmp = sql;
 			for (int i = 0; i < paraDataTypes.length; i++) {
@@ -196,6 +212,17 @@ public class ReadOperation extends SqlStatement {
 //			System.err.println("ERROR!!!");
 			return 0;
 		}
+	}
+
+	@Override
+	public Map<String, String> getParaId2Name() {
+		Map<String, String> paraId2Name = new HashMap<>();
+		for (int i = 0; i < paraSchemaInfos.size(); i++) {
+			String paraIdentifier = operationId + "_" + i;
+			paraId2Name.put(paraIdentifier, paraSchemaInfos.get(i));
+		}
+
+		return paraId2Name;
 	}
 
 	private void saveResultSet(ResultSet rs) throws SQLException {
@@ -235,23 +262,23 @@ public class ReadOperation extends SqlStatement {
 	private Object getReturnValue(int index, int dataType, ResultSet rs) throws SQLException {
 		switch (dataType) {
 		case 0:
-			return new Long(rs.getLong(index));
+			return rs.getLong(index);
 		case 1:
-			return new Double(rs.getDouble(index));
+			return rs.getDouble(index);
 		case 2:
 			return rs.getBigDecimal(index);
 		case 3:
 			// bug fix：对于TPC-C，这里返回的日期可能为null
 			Timestamp time = rs.getTimestamp(index);
 			if (time != null) {
-				return new Long(time.getTime());
+				return time.getTime();
 			} else {
 				return null;
 			}
 		case 4:
 			return rs.getString(index);
 		case 5:
-			return new Boolean(rs.getBoolean(index));
+			return rs.getBoolean(index);
 		default:
 			System.err.println("Unrecognized data type!");
 			return null;
@@ -260,6 +287,10 @@ public class ReadOperation extends SqlStatement {
 
 	public int[] getReturnDataTypes() {
 		return returnDataTypes;
+	}
+
+	public List<String> getParaSchemaInfos() {
+		return paraSchemaInfos;
 	}
 
 	public boolean isFilterPrimaryKey() {

@@ -16,7 +16,7 @@ public class IncludeRelationAnalyzer {
 	 * @function: 统计事务中参数与返回结果集之间的包含依赖关系。大致策略是依次统计事务中所有操作的输入参数与前面操作的返回结果
 	 *     集（返回结果集必须是多个tuple）之间的包含关联关系。同样，针对Multiple内部操作的多次执行数据，这里仅取其第一次执行的
 	 *     数据供统计之用。输入参数的包含依赖关系对资源竞争强度，死锁发生的可能性和分布式事务的比例有一定的影响。
-	 * @see EqualRelationAnalyzer.countEqualInfo，两者代码具有一定相似性
+	 * @see EqualRelationAnalyzer，两者代码具有一定相似性
 	 */
 	@SuppressWarnings("unchecked")
 	public Map<String, Map<String, Integer>> countIncludeInfo(List<TransactionData> txDataList) {
@@ -105,19 +105,18 @@ public class IncludeRelationAnalyzer {
 	
 	/**
 	 * @param parameterNodeMap：此时等于依赖关系必须已维护完成（等于、包含和线性依赖关系都会维护在ParameterNode中）
-	 * @param formatedCounter：经格式化后的包含依赖关系的计数器（新计数器的特征：事务实例个数转化成相应比例 & 按照一定规则进行了排序）
+	 * @param formattedCounter：经格式化后的包含依赖关系的计数器（新计数器的特征：事务实例个数转化成相应比例 & 按照一定规则进行了排序）
 	 * @param identicalSets：数值大小完全相等的输入参数和返回结果集元素的集合，该输入与
 	 *     EqualRelationAnalyzer.constructDependency输入中的identicalSets完全相同。
 	 * @function：依据formatedCounter中的统计信息 以及 identicalSets，构建参数与 返回结果集 之间的包含依赖关系。
 	 */
 	public void constructDependency(Map<String, ParameterNode> parameterNodeMap, 
-			List<Entry<String, List<Entry<String, Double>>>> formatedCounter, List<Set<String>> identicalSets) {
+			List<Entry<String, List<Entry<String, Double>>>> formattedCounter, List<Set<String>> identicalSets) {
 		// 若两个参数完全相同，当前一个参数构建完包含依赖关系后，后一个参数无需再构建包含依赖关系（其值已完全确定）
 		Set<String> identicalItems = new HashSet<>();
-		
-		for (int i = 0; i < formatedCounter.size(); i++) {
-			Entry<String, List<Entry<String, Double>>> paraIncludeInfo = formatedCounter.get(i);
-			if (identicalItems.contains(paraIncludeInfo.getKey())) { 
+
+		for (Entry<String, List<Entry<String, Double>>> paraIncludeInfo : formattedCounter) {
+			if (identicalItems.contains(paraIncludeInfo.getKey())) {
 				// 前面有个参数与当前参数的值完全相同，当前参数的值已确定~ 无需维护包含依赖关系
 				continue;
 			}
@@ -137,15 +136,14 @@ public class IncludeRelationAnalyzer {
 				dependencies = new ArrayList<>();
 				parameterNode.setDependencies(dependencies);
 			}
-			
+
 			// paraDependencyInfo为当前参数上统计得到的包含依赖关系
-			List<Entry<String, Double>> paraDependencyInfo = new ArrayList<>();
 			// 因为paraDependencyInfo上有更新操作，这样处理是不想破坏原有统计数据
-			paraDependencyInfo.addAll(paraIncludeInfo.getValue());
+			List<Entry<String, Double>> paraDependencyInfo = new ArrayList<>(paraIncludeInfo.getValue());
 
 			double probabilitySum = 0; // 已维护依赖关系的概率之和
-			for (int j = 0; j < dependencies.size(); j++) {
-				probabilitySum += dependencies.get(j).getProbability();
+			for (ParameterDependency dependency : dependencies) {
+				probabilitySum += dependency.getProbability();
 			}
 
 			List<ParameterDependency> appendedIncludeDependencies = new ArrayList<>();
@@ -154,7 +152,7 @@ public class IncludeRelationAnalyzer {
 				Entry<String, Double> includeDependency = paraDependencyInfo.get(j);
 				if (probabilitySum + includeDependency.getValue() <= 1) {
 					appendedIncludeDependencies.add(
-							new ParameterDependency(includeDependency.getKey(), includeDependency.getValue(), 1));
+							new ParameterDependency(includeDependency.getKey(), includeDependency.getValue(), ParameterDependency.DependencyType.INCLUDE));
 					probabilitySum += includeDependency.getValue();
 					paraDependencyInfo.remove(j--);
 				}
@@ -163,18 +161,9 @@ public class IncludeRelationAnalyzer {
 			// 对于剩下的包含依赖关系，根据其关联关系强弱选择性地替换掉原来的等于依赖关系
 			// 替换规则：关联概率probability大于原等于依赖关系的两倍，才可替换（前提是总依赖关系的概率和不超过1）
 			// 选择这样的替换规则的原因是我们认为等于依赖关系相比包含依赖关系更重要~
-			for (int j = 0; j < paraDependencyInfo.size(); j++) {
-				Entry<String, Double> includeDependency = paraDependencyInfo.get(j);
+			for (Entry<String, Double> includeDependency : paraDependencyInfo) {
 				// 我们更看重等于依赖关系，替换时也从关联概率最小的等于关系替换
-				for (int k = dependencies.size() - 1; k >= 0; k--) {
-					if (dependencies.get(k).getDependencyType() == 0 
-							&& includeDependency.getValue() >= dependencies.get(k).getProbability() * 2 
-							&& probabilitySum - dependencies.get(k).getProbability() + includeDependency.getValue() <= 1.00000001) {
-						dependencies.set(k, new ParameterDependency(includeDependency.getKey(), includeDependency.getValue(), 1));
-						probabilitySum = probabilitySum - dependencies.get(k).getProbability() + includeDependency.getValue();
-						break;
-					}
-				}
+				probabilitySum = getProbabilitySum(dependencies, probabilitySum, includeDependency);
 			}
 
 			dependencies.addAll(appendedIncludeDependencies); // 等于关联概率逆序，包含关联概率先升序后逆序（大致情况）
@@ -187,9 +176,22 @@ public class IncludeRelationAnalyzer {
 					break;
 				}
 			}
-		}  //  for all paraIncludeInfo in formatedCounter
+		}  //  for all paraIncludeInfo in formattedCounter
 
 //		System.out.println("IncludeRelationAnalyzer.constructDependency -> parameterNodeMap: \n\t" + parameterNodeMap);
 	}
-	
+
+	static double getProbabilitySum(List<ParameterDependency> dependencies, double probabilitySum, Entry<String, Double> includeDependency) {
+		for (int k = dependencies.size() - 1; k >= 0; k--) {
+			if (dependencies.get(k).getDependencyType() == ParameterDependency.DependencyType.EQUAL
+					&& includeDependency.getValue() >= dependencies.get(k).getProbability() * 2
+					&& probabilitySum - dependencies.get(k).getProbability() + includeDependency.getValue() <= 1.00000001) {
+				dependencies.set(k, new ParameterDependency(includeDependency.getKey(), includeDependency.getValue(), ParameterDependency.DependencyType.INCLUDE));
+				probabilitySum = probabilitySum - dependencies.get(k).getProbability() + includeDependency.getValue();
+				break;
+			}
+		}
+		return probabilitySum;
+	}
+
 }

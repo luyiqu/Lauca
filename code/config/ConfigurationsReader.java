@@ -5,11 +5,13 @@ import java.io.File;
 import java.io.FileInputStream;
 import java.io.IOException;
 import java.io.InputStreamReader;
+import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
 
 public class ConfigurationsReader {
 
 	public static void read(File configFile) {
-		try (BufferedReader br = new BufferedReader(new InputStreamReader(new FileInputStream(configFile), "utf-8"))) {
+		try (BufferedReader br = new BufferedReader(new InputStreamReader(Files.newInputStream(configFile.toPath()), StandardCharsets.UTF_8))) {
 			String inputLine = null;
 			while ((inputLine = br.readLine()) != null) {
 				if (inputLine.matches("[\\s]*") || inputLine.matches("[ ]*##[\\s\\S]*")) {
@@ -204,7 +206,15 @@ public class ConfigurationsReader {
 				case "useSkywalking":
 					Configurations.setUseSkywalking(Boolean.parseBoolean(arr[1].trim()));
 					break;
-
+				case "backwardLength":
+					Configurations.setBackwardLength(Integer.parseInt(arr[1].trim()));
+					break;
+				case "quantileNum":
+					Configurations.setQuantileNum(Integer.parseInt(arr[1].trim()));
+					break;
+				case "usePartitionRule":
+					Configurations.setUsePartitionRule(Boolean.parseBoolean(arr[1].trim()));
+					break;
 				}
 			}
 		} catch (IOException e) {

@@ -1,7 +1,8 @@
 package accessdistribution;
 
+
 import java.math.BigDecimal;
-import java.util.Arrays;
+import java.util.*;
 
 /**
  * 参数空间是连续的，此时参数的生成不需要考虑miss的情形（miss是指利用该参数值过滤无返回tuple，即没有记录满足谓词）
@@ -31,11 +32,39 @@ public class ContinuousParaDistribution <T extends Number> extends DataAccessDis
 		this.highFrequencyItems = highFrequencyItems;
 	}
 
+	public ContinuousParaDistribution(T minValue, T maxValue, T[] highFrequencyItems, double[] hFItemFrequencies,
+									  long[] intervalCardinalities, double[] intervalFrequencies,
+									  ArrayList<ArrayList<Double>> quantilePerInterval) {
+		super(hFItemFrequencies, intervalCardinalities, intervalFrequencies, quantilePerInterval);
+		this.minValue = minValue;
+		this.maxValue = maxValue;
+		this.highFrequencyItems = highFrequencyItems;
+	}
+
+	public ContinuousParaDistribution(ContinuousParaDistribution<T> continuousParaDistribution){
+		super(continuousParaDistribution);
+		this.minValue = continuousParaDistribution.minValue;
+		this.maxValue = continuousParaDistribution.maxValue;
+
+		this.highFrequencyItems = Arrays.copyOf(continuousParaDistribution.highFrequencyItems, continuousParaDistribution.highFrequencyItems.length); //(T[]) freqItem.toArray();
+	}
+
+	public ContinuousParaDistribution copy(){
+		return new ContinuousParaDistribution(this);
+	}
+
 	@Override
 	public T geneValue() {
 //		System.out.println(this.getClass());
 //		System.out.println("高频项："+highFrequencyItems[2]);
-		int randomIndex = binarySearch();
+		int randomIndex = 0;
+		try {
+			 randomIndex = binarySearch();
+		}
+		catch (Exception e){
+			e.printStackTrace();
+		}
+
 		if (randomIndex < highFrequencyItemNum) {
 //			System.out.println(highFrequencyItems);
 			return highFrequencyItems[randomIndex];
@@ -44,33 +73,206 @@ public class ContinuousParaDistribution <T extends Number> extends DataAccessDis
 		}
 	}
 
-	@SuppressWarnings("unchecked")
 	// 获取指定区间中的随机参数值
 	private T getIntervalInnerRandomValue(int randomIndex) {
 		int intervalIndex = randomIndex - highFrequencyItemNum;
-		long intervalCardinality = intervalCardinalities[intervalIndex];
 
 		// 可保证区间内生成参数的基数
 		// long intervalInnerIndex = intervalInnerIndexes[intervalIndex]++ % intervalCardinality;
-		long intervalInnerIndex = (long)(Math.random() * intervalCardinality);
+		double intervalInnerIndex = Math.random();
+
+		// 根据频数分位点先做一次映射，从均匀分布映射到基于频数的分段分布上
+		if (this.quantileNum > 0){
+			ArrayList<Double> quantile = this.quantilePerInterval.get(intervalIndex);
+			for(int i = 1;i < quantile.size() ; ++i){
+				double cdfNow = (double) i / (quantile.size() - 1);
+				if (intervalInnerIndex < cdfNow
+						+ 1e-7){// eps for float compare
+					// 概率上小于第i分位点的概率差
+					// 需要将该概率差映射到分段分布上，变成距离第i分位点的长度
+					double bias = cdfNow - intervalInnerIndex;
+					// 第i-1到i分位点在新分布上的区间长度
+					double intervalLength = quantile.get(i) - quantile.get(i-1);
+					// 偏差概率bias : 区间总概率(1/quantile.size) = 新区间上的长度biasLength : 区间长度
+					double biasLength = bias * (quantile.size() - 1) * intervalLength;
+
+					// 映射后的位置应该是第i分位点向左偏移biasLength
+					intervalInnerIndex = quantile.get(i) - biasLength;
+					break;
+				}
+			}
+		}
+
 
 		double avgIntervalLength = (maxValue.doubleValue() - minValue.doubleValue()) / intervalNum;
-		double value = ((double)intervalInnerIndex / intervalCardinality + intervalIndex) * 
+		double value = (intervalInnerIndex + intervalIndex) *
 				avgIntervalLength + minValue.doubleValue();
 
 		// 将 double value 转化成目标数据类型的参数
+		return transferValue(value);
+	}
+
+	private T transferValue(double value) {
 		String dataType = maxValue.getClass().getSimpleName();
-		if (dataType.equals("Long")) {
-			return (T)(new Long((long)value));
-		} else if (dataType.equals("Double")) {
-			return (T)(new Double(value));
-		} else if (dataType.equals("BigDecimal")) {
-			return (T)(new BigDecimal(value));
-		} else {
-			return null; // 理论上不可能进入该分支
+		switch (dataType) {
+			case "Long":
+				return (T) (new Long((long) value));
+			case "Double":
+				return (T) (new Double(value));
+			case "BigDecimal":
+				return (T) (new BigDecimal(value));
+			default:
+				return null; // 理论上不可能进入该分支
+
 		}
 	}
-	
+
+	@Override
+	public double getSimilarity(DataAccessDistribution dataAccessDistribution){
+
+		ContinuousParaDistribution mergeDistribution = (ContinuousParaDistribution) dataAccessDistribution;
+		// 还原概率分布
+		List<Map.Entry<Double,Double>> baseQuantile = getQuantile(1.0);
+		List<Map.Entry<Double,Double>> mergeQuantile = mergeDistribution.getQuantile(1.0);
+
+		baseQuantile.sort(Map.Entry.comparingByKey());
+		mergeQuantile.sort(Map.Entry.comparingByKey());
+		// 按分位点切割全区间
+		Set<Double> allQuantilePosAsSet = new HashSet<>();
+		for (Map.Entry<Double,Double> quantile: baseQuantile){
+			if (quantile.getValue().isNaN() ){
+				continue;
+			}
+			allQuantilePosAsSet.add(quantile.getKey());
+		}
+		for (Map.Entry<Double,Double> quantile: mergeQuantile){
+			if (quantile.getValue().isNaN() ){
+				continue;
+			}
+			allQuantilePosAsSet.add(quantile.getKey());
+		}
+
+		List<Double> allQuantilePos = new ArrayList<>(allQuantilePosAsSet);
+
+
+		Collections.sort(allQuantilePos);
+
+		double sim = 0.0;
+
+		// 分别将两个分布的概率投射到分位点切割的每个子区间内
+		for (int i = 1;i < allQuantilePos.size(); ++i){
+			double left = allQuantilePos.get(i - 1);
+			double right = allQuantilePos.get(i);
+
+			double prob1 = getOverlapProb(baseQuantile, left, right);
+			double prob2 = getOverlapProb(mergeQuantile,left, right);
+
+			sim += Math.min(prob1, prob2);
+		}
+
+		return sim;
+	}
+
+	private void constructQuantile(ArrayList<Double>allQuantilePos, List<Double>allQuantileProb, double avgIntervalLength){
+		this.quantilePerInterval = new ArrayList<>();
+		for (int i = 0;i < this.intervalNum ; ++i){
+			ArrayList<Double> quantiles = new ArrayList<>();
+			quantiles.add(0.0);
+			// 当前区间每个分位点实际占有的概率
+			double prob = this.intervalFrequencies[i] / (this.quantileNum - 1);
+			if (prob < 1e-5){
+				for(int j = 0 ; j < this.quantileNum; ++j){
+					quantiles.add(1.0 * j / this.quantileNum);
+				}
+				quantiles.add(1.0);
+				this.quantilePerInterval.add(quantiles);
+				continue;
+			}
+			// 先获取当前区间
+			Map<Double,Double> quantilesUsedNowAsMap = new HashMap<>();
+			double left = i * avgIntervalLength + this.minValue.doubleValue();
+
+
+			for (int j = getStart(allQuantilePos, left);j < allQuantilePos.size(); ++j){
+				double length = allQuantilePos.get(j) - allQuantilePos.get(j - 1);
+				double leftEndPoint =  allQuantilePos.get(j - 1) > left ? allQuantilePos.get(j - 1) : left;
+				double rightEndPoint = allQuantilePos.get(j) < (left + avgIntervalLength) ? allQuantilePos.get(j) : (left + avgIntervalLength);
+				if (leftEndPoint < rightEndPoint){
+					if (quantilesUsedNowAsMap.containsKey(rightEndPoint)){
+						quantilesUsedNowAsMap.put(rightEndPoint, quantilesUsedNowAsMap.get(rightEndPoint) + allQuantileProb.get(j) * (rightEndPoint - leftEndPoint) / length);
+					}
+					else{
+						quantilesUsedNowAsMap.put(rightEndPoint, allQuantileProb.get(j) * (rightEndPoint - leftEndPoint) / length);
+					}
+
+				}
+			}
+			if (!quantilesUsedNowAsMap.containsKey(left)){
+				quantilesUsedNowAsMap.put(left,0.0);
+			}
+			ArrayList<Map.Entry<Double,Double>> quantilesUsedNow = new ArrayList<>(quantilesUsedNowAsMap.entrySet());
+			quantilesUsedNow.sort(Map.Entry.comparingByKey());
+
+			double sum = 0;
+			double base = quantilesUsedNow.get(0).getKey();
+			for (Map.Entry<Double,Double> quantile: quantilesUsedNow){
+				double value = quantile.getValue();
+				while (sum + value > prob - 1e-7 && value > 1e-7){
+					double delta = prob - sum;
+					double length = quantile.getKey() - base;
+					double pos = base + length * delta / value;
+					quantiles.add((pos - left)/avgIntervalLength); // 保存归一化的分位点位置
+
+					base = pos;
+					value -= delta;
+					sum = 0;
+				}
+
+				base = quantile.getKey();
+				sum += value;
+			}
+			while (quantiles.size() < this.quantileNum){
+				quantiles.add(1.0);
+			}
+			this.quantilePerInterval.add(quantiles);
+		}
+	}
+
+	// 提取每个分位点，得到分位点的<实际位置,实际概率 * 1/直方图全概率(按直方图部分的概率进行归一化) * 权重>
+	private List<Map.Entry<Double,Double>> getQuantile(double p){
+		HashMap<Double,Double> quantiles = new HashMap<>();
+		double intervalProbSum = 0;
+		for( int i = 0; i < this.intervalNum ; ++i){
+			intervalProbSum += this.intervalFrequencies[i];
+		}
+		if (intervalProbSum < 1e-7) intervalProbSum = 1;
+		// 补充左端点
+		quantiles.put(minValue.doubleValue(),0.0);
+		double avgIntervalLength = (maxValue.doubleValue() - minValue.doubleValue()) / intervalNum;
+		for (int i = 0; i < intervalNum; i++) {
+			// 当前区间的起始偏移量
+			double bias = i * avgIntervalLength + minValue.doubleValue();
+			// 当前区间每个分位点实际占有的概率
+			double prob = this.intervalFrequencies[i] / (this.quantileNum - 1);
+			// 如果没有分位点，就补充1分位点，即右端点
+			if (quantileNum == -1){
+				quantiles.put(bias + avgIntervalLength, this.intervalFrequencies[i] / intervalProbSum * p);
+			}
+			for (int j = 1; j < this.quantilePerInterval.get(i).size(); j++) {
+				// 当前分位点的实际位置
+				double pos = bias + avgIntervalLength * this.quantilePerInterval.get(i).get(j);
+				// 第一个分位点是左端点，不对应任何概率
+				if (quantiles.containsKey(pos)){
+					quantiles.put(pos,quantiles.get(pos) + prob / intervalProbSum * p);
+				}
+				else{
+					quantiles.put(pos, prob / intervalProbSum * p);
+				}
+
+			}
+		}
+		return new ArrayList<>(quantiles.entrySet());
+	}
 
 	public T getMinValue() {
 		return minValue;
@@ -91,23 +293,73 @@ public class ContinuousParaDistribution <T extends Number> extends DataAccessDis
 
 	// for testing
 	public static void main(String[] args) {
-		long minValue = 12, maxValue = 329962;
-		long[] highFrequencyItems = {234, 980, 62000, 41900, 7302, 220931, 120002, 218400, 38420, 1520};
-		// 0.7214
-		double[] hFItemFrequencies = {0.05, 0.1101, 0.065, 0.127, 0.087, 0.049, 0.1195, 0.023, 0.031, 0.0598};
-		long[] intervalCardinalities = {52, 34, 123, 78, 45, 32, 901, 234, 41, 15, 34, 90, 210, 40, 98};
-		// 0.2786
-		double[] intervalFrequencies = {0.0175, 0.04024, 0.009808, 0.00874, 0.0245, 0.0257, 0.00754, 0.00695, 
-				0.0325, 0.01871, 0.048147, 0.0147, 0.008585, 0.00258, 0.0124};
+
+//		long startTime = System.nanoTime();
+//		long cnt = 0;
+//		long endTime = System.nanoTime();
+//		while ((endTime - startTime) < 1e9){
+//			cnt ++;
+//			endTime = System.nanoTime();
+//		}
+//		System.out.println(cnt);
+		long minValue = 0, maxValue = 100;
+		long[] highFrequencyItems = {0,25,45};
+		// 0.18
+		double[] hFItemFrequencies = {0.005, 0.11, 0.065};
+		double[] hFItemFrequencies2 = {0.005, 0.01, 0.065};
+		long[] intervalCardinalities = {52, 34, 123, 78};
+		// 0.82
+		double[] intervalFrequencies = {0.2,0.27,0.03,0.32};
+		double[] intervalFrequencies2 = {0.3,0.17,0.23,0.22};
 
 		Long[] highFrequencyItems2 = new Long[highFrequencyItems.length];
 		for (int i = 0; i < highFrequencyItems.length; i++) {
 			highFrequencyItems2[i] = highFrequencyItems[i];
 		}
 
-		ContinuousParaDistribution<Long> distribution = new ContinuousParaDistribution<Long>(minValue, maxValue, 
+		ArrayList<ArrayList<Double>> quantiles = new ArrayList<>();
+		for (int i=0;i<4;++i){
+			ArrayList<Double> quantile = new ArrayList<>();
+			quantile.add(0.0);
+			quantile.add(0.1);
+			quantile.add(0.3);
+			quantile.add(0.6);
+			quantile.add(1.0);
+			quantiles.add(quantile);
+		}
+
+        ArrayList<ArrayList<Double>> quantiles2 = new ArrayList<>();
+        for (int i=0;i<4;++i){
+            ArrayList<Double> quantile = new ArrayList<>();
+            quantile.add(0.0);
+            quantile.add(0.4);
+            quantile.add(0.7);
+            quantile.add(0.9);
+            quantile.add(1.0);
+            quantiles2.add(quantile);
+        }
+
+		ContinuousParaDistribution<Long> distribution = new ContinuousParaDistribution<>(minValue, maxValue,
 				highFrequencyItems2, hFItemFrequencies, intervalCardinalities, intervalFrequencies);
-		for (int i = 0; i < 1000000; i++) {
+		ContinuousParaDistribution<Long> distribution1 = new ContinuousParaDistribution<>(minValue+10, maxValue/2,
+				highFrequencyItems2, hFItemFrequencies2, intervalCardinalities, intervalFrequencies2);
+
+
+
+//		File file = new File("output.txt");
+//		try {
+////			file.createNewFile();
+//			FileWriter fw = new FileWriter("output.txt",false);
+//			PrintWriter pw = new PrintWriter(fw);
+//			for (int i = 0; i < 100000; i++) {
+//				pw.println(distribution.geneValue());
+//			}
+//			pw.flush();
+//		} catch (IOException e) {
+//			e.printStackTrace();
+//		}
+
+		for (int i = 0; i < 100; i++) {
 			System.out.println(distribution.geneValue());
 		}
 	}
@@ -117,22 +369,21 @@ public class ContinuousParaDistribution <T extends Number> extends DataAccessDis
 	public boolean inDomain(Object parameter) {
 		String dataType = maxValue.getClass().getSimpleName();
 		double para = 0;
-		if (dataType.equals("Long")) {
-			para = (Long)parameter;
-		} else if (dataType.equals("Double")) {
-			para = (Double)parameter;
-		} else if (dataType.equals("BigDecimal")) {
-			para = new BigDecimal(parameter.toString()).doubleValue();
+		switch (dataType) {
+			case "Long":
+				para = (Long) parameter;
+				break;
+			case "Double":
+				para = (Double) parameter;
+				break;
+			case "BigDecimal":
+				para = new BigDecimal(parameter.toString()).doubleValue();
+				break;
 		}
-		if (para < minValue.doubleValue() || para > maxValue.doubleValue()) {
-			return false;
-		} else {
-			return true;
-		}
+		return !(para < minValue.doubleValue()) && !(para > maxValue.doubleValue());
 	}
 
 	// 为了做实验后续添加的，生成完全随机的（即均匀分布）的参数
-	@SuppressWarnings("unchecked")
 	@Override
 	public T geneUniformValue() {
 		double value = Math.random() * (maxValue.doubleValue() - minValue.doubleValue()) 
@@ -140,15 +391,6 @@ public class ContinuousParaDistribution <T extends Number> extends DataAccessDis
 		
 		// 下面这段代码 copy from 函数 "getIntervalInnerRandomValue"
 		// 将 double value 转化成目标数据类型的参数
-		String dataType = maxValue.getClass().getSimpleName();
-		if (dataType.equals("Long")) {
-			return (T)(new Long((long)value));
-		} else if (dataType.equals("Double")) {
-			return (T)(new Double(value));
-		} else if (dataType.equals("BigDecimal")) {
-			return (T)(new BigDecimal(value));
-		} else {
-			return null; // 理论上不可能进入该分支
-		}
+		return transferValue(value);
 	}
 }

@@ -5,7 +5,6 @@ import java.util.Arrays;
 import java.util.List;
 
 import input.TraceInfo;
-import org.omg.CORBA.OBJECT_NOT_EXIST;
 
 /**
  * 一个操作的数据
@@ -51,7 +50,6 @@ public class OperationData implements Comparable<OperationData> {
 	/**
 	 * 
 	 * @param oneTrace 一条操作的负载轨迹
-	 * @param index    处理轨迹中的第几组参数
 	 * @return 当前操作的一个具体数据对象
 	 * @author Shuyan Zhang
 	 */
@@ -75,13 +73,7 @@ public class OperationData implements Comparable<OperationData> {
 		returnItems = null;
 		returnItemsOfTuples = null;
 		if (oneTrace.results == null || oneTrace.results.size() == 0) {
-			if (returnDataTypes != null) { // 当前操作虽然是select操作,但是没有满足谓词的记录
-				return new OperationData(operationId, Arrays.copyOf(returnDataTypes, returnDataTypes.length),
-						filterPrimaryKey, null, null, Arrays.copyOf(paraDataTypes, paraDataTypes.length), parameters);
-			} else {
-				return new OperationData(operationId, null, filterPrimaryKey, null, null,
-						Arrays.copyOf(paraDataTypes, paraDataTypes.length), parameters);
-			}
+			return getOperationData();
 		}
 
 		if (filterPrimaryKey) {
@@ -118,6 +110,20 @@ public class OperationData implements Comparable<OperationData> {
 	}
 
 	/**
+	 * 构造operationData
+	 * @return
+	 */
+	private OperationData getOperationData() {
+		if (returnDataTypes != null) { // 当前操作虽然是select操作,但是没有满足谓词的记录
+			return new OperationData(operationId, Arrays.copyOf(returnDataTypes, returnDataTypes.length),
+					filterPrimaryKey, null, null, Arrays.copyOf(paraDataTypes, paraDataTypes.length), parameters);
+		} else {
+			return new OperationData(operationId, null, filterPrimaryKey, null, null,
+					Arrays.copyOf(paraDataTypes, paraDataTypes.length), parameters);
+		}
+	}
+
+	/**
 	 * @param runningLog: 运行日志,格式为:'para1, para2, ...; res1, res2, ...# ...'
 	 *                    ('#'分隔的是返回的多个tuple)
 	 * @return 当前操作的一个具体数据对象
@@ -134,13 +140,7 @@ public class OperationData implements Comparable<OperationData> {
 		returnItems = null;
 		returnItemsOfTuples = null;
 		if (arr.length == 1) {
-			if (returnDataTypes != null) { // 当前操作虽然是select操作,但是没有满足谓词的记录
-				return new OperationData(operationId, Arrays.copyOf(returnDataTypes, returnDataTypes.length),
-						filterPrimaryKey, null, null, Arrays.copyOf(paraDataTypes, paraDataTypes.length), parameters);
-			} else {
-				return new OperationData(operationId, null, filterPrimaryKey, null, null,
-						Arrays.copyOf(paraDataTypes, paraDataTypes.length), parameters);
-			}
+			return getOperationData();
 		}
 
 		if (filterPrimaryKey) {
@@ -206,6 +206,9 @@ public class OperationData implements Comparable<OperationData> {
 	}
 
 	public int[] getParaDataTypes() {
+		if (paraDataTypes == null){
+			return new int[0];
+		}
 		return paraDataTypes;
 	}
 
@@ -215,13 +218,7 @@ public class OperationData implements Comparable<OperationData> {
 
 	@Override
 	public int compareTo(OperationData o) {
-		if (this.operationId < o.operationId) {
-			return -1;
-		} else if (this.operationId > o.operationId) {
-			return 1;
-		} else {
-			return 0;
-		}
+		return Integer.compare(this.operationId, o.operationId);
 	}
 
 	@Override

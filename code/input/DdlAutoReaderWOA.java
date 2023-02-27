@@ -7,6 +7,7 @@ import config.Configurations;
 
 import java.io.*;
 import java.nio.charset.Charset;
+import java.nio.charset.StandardCharsets;
 import java.sql.Connection;
 import java.sql.ResultSet;
 import java.sql.SQLException;
@@ -47,9 +48,9 @@ public class DdlAutoReaderWOA {
             Statement laucaStmt = laucaConn.createStatement();
             //获取所有表的ddl
             String ddl = null;
-            for (int i=0;i<tables.size();i++) {
+            for (Table value : tables) {
                 Set<String> cols = new HashSet<>();
-                Table table = tables.get(i);
+                Table table = value;
                 String originalTableName = table.getName();
                 //String anonymousTableName = entry.getValue();
 
@@ -83,7 +84,7 @@ public class DdlAutoReaderWOA {
                             strbuf.append(line + "\r\n");
 
                     }
-                }catch (IOException e){
+                } catch (IOException e) {
                     e.printStackTrace();
                 }
                 ddl = strbuf.toString();
@@ -93,7 +94,7 @@ public class DdlAutoReaderWOA {
                     if ((index2 = ddl.indexOf("\"", index1 + 1)) == -1) break;
                     String originalColumnName = ddl.substring(index1 + 1, index2).toLowerCase();
                     cols.add(originalColumnName.trim());
- //                   String anonymousColumnName = null;
+                    //                   String anonymousColumnName = null;
 //                    if(table2Columns2Anonymity.get(originalTableName).containsKey(originalColumnName))
 //                        anonymousColumnName = table2Columns2Anonymity.get(originalTableName).get(originalColumnName);
 //                    else anonymousColumnName = geneRandomName(originalColumnName.length());
@@ -104,22 +105,22 @@ public class DdlAutoReaderWOA {
                 index1 = ddl.lastIndexOf(",");
                 index2 = ddl.lastIndexOf(")");
                 Pattern p = Pattern.compile("\\w+");
-                Matcher m = p.matcher(ddl.substring(index1,index2));
-                if(!m.find()) ddl = ddl.substring(0,index1) + ')';
+                Matcher m = p.matcher(ddl.substring(index1, index2));
+                if (!m.find()) ddl = ddl.substring(0, index1) + ')';
                 //连接测试数据库，通过读取并修改的ddl语句建表
-                laucaStmt.addBatch("BEGIN EXECUTE IMMEDIATE 'DROP TABLE " +originalTableName
-                        +" CASCADE CONSTRAINTS PURGE'; EXCEPTION WHEN OTHERS THEN IF SQLCODE != -942 THEN RAISE; END IF; END;");
+                laucaStmt.addBatch("BEGIN EXECUTE IMMEDIATE 'DROP TABLE " + originalTableName
+                        + " CASCADE CONSTRAINTS PURGE'; EXCEPTION WHEN OTHERS THEN IF SQLCODE != -942 THEN RAISE; END IF; END;");
                 laucaStmt.addBatch(ddl);
                 //System.out.println(ddl);
 
                 //增加字段
                 Column[] columns = table.getColumns();
-                for(int j=0;j<columns.length;j++){//将真实数据库中的列与table中的列对比
-                    String addColumnSQL = "ALTER TABLE " + originalTableName +" ADD ";
-                    String colName = columns[j].getName();
-                    int dataType = columns[j].getDataType();
-                    if(!cols.contains(colName)){
-                        addColumnSQL += colName +" "+Int2dataType(dataType);
+                for (Column column : columns) {//将真实数据库中的列与table中的列对比
+                    String addColumnSQL = "ALTER TABLE " + originalTableName + " ADD ";
+                    String colName = column.getName();
+                    int dataType = column.getDataType();
+                    if (!cols.contains(colName)) {
+                        addColumnSQL += colName + " " + Int2dataType(dataType);
                         laucaStmt.addBatch(addColumnSQL);
                     }
                 }
@@ -128,7 +129,7 @@ public class DdlAutoReaderWOA {
                 sql = "SELECT DBMS_METADATA.GET_DDL('INDEX',u.index_name) FROM USER_INDEXES u WHERE TABLE_NAME = '"
                         + originalTableName + "'";
                 rs = oriStmt.executeQuery(sql);
-                while(rs.next()) {
+                while (rs.next()) {
                     String indexSQL = rs.getString(1);
                     indexSQL = indexSQL.replaceAll("[ \\t]+", " ");
                     //“USER_NAME”."INDEX_NAME"——去除用户名
@@ -162,8 +163,7 @@ public class DdlAutoReaderWOA {
                 }
             }
             //创建外键
-            for(int i=0;i<tables.size();i++) {
-                Table table = tables.get(i);
+            for (Table table : tables) {
                 String tableName = table.getName();
                 ForeignKey[] foreignKeys = table.getForeignKeys();
                 for (ForeignKey fk : foreignKeys) {
@@ -218,14 +218,13 @@ public class DdlAutoReaderWOA {
             //获取所有表的ddl
             String ddl = null;
             List<String> createFK = new ArrayList<>();
-//            laucaStmt.addBatch("SET @OLD_UNIQUE_CHECKS=@@UNIQUE_CHECKS, UNIQUE_CHECKS=0");
-//            laucaStmt.addBatch("SET @OLD_FOREIGN_KEY_CHECKS=@@FOREIGN_KEY_CHECKS, FOREIGN_KEY_CHECKS=0");
-            for (int i=0;i<tables.size();i++) {
+            laucaStmt.addBatch("SET @OLD_UNIQUE_CHECKS=@@UNIQUE_CHECKS, UNIQUE_CHECKS=0");
+            laucaStmt.addBatch("SET @OLD_FOREIGN_KEY_CHECKS=@@FOREIGN_KEY_CHECKS, FOREIGN_KEY_CHECKS=0");
+            for (Table value : tables) {
                 Set<String> cols = new HashSet<>();
-                Table table = tables.get(i);
-                String originalTableName = table.getName();
+                String originalTableName = value.getName();
                 //String anonymousTableName = entry.getValue();
-                String sql = "SHOW CREATE TABLE " + originalTableName ;
+                String sql = "SHOW CREATE TABLE " + originalTableName;
                 // 发送sql语句，执行sql语句,得到返回结果
                 ResultSet rs = oriStmt.executeQuery(sql);
                 if (rs.next())
@@ -233,31 +232,39 @@ public class DdlAutoReaderWOA {
                 ddl = ddl.replaceAll("[ \\t]+", " ");
 
                 int index = ddl.lastIndexOf(")");
+                String partitionRule = null;
+                if (ddl.contains("partition by")){
+                    index = ddl.lastIndexOf("partition by") - 1;
+                    partitionRule = ddl.substring(index + 1);
+                }
                 ddl = ddl.substring(0, index + 1);
 
                 //一行一行处理ddl语句
-                BufferedReader br = new BufferedReader(new InputStreamReader(new ByteArrayInputStream(ddl.getBytes(Charset.forName("utf8"))), Charset.forName("utf8")));
+                BufferedReader br = new BufferedReader(new InputStreamReader(new ByteArrayInputStream(ddl.getBytes(StandardCharsets.UTF_8)), StandardCharsets.UTF_8));
                 String line;
-                StringBuffer strbuf = new StringBuffer();
+                StringBuilder strbuf = new StringBuilder();
                 ArrayList<String> constraints = new ArrayList<String>();
                 try {
                     while ((line = br.readLine()) != null) {
                         line = line.trim();
                         if (line.equals("")) continue;
-                        else if (line.startsWith("FOREIGN KEY ")||line.startsWith("UNIQUE KEY")
-                                ||line.startsWith("CONSTRAINT")||line.startsWith("KEY"))
+                        else if (line.startsWith("FOREIGN KEY ") || line.startsWith("UNIQUE KEY")
+                                || line.startsWith("CONSTRAINT") || line.startsWith("KEY"))
                             constraints.add(line);
                         else
                             strbuf.append(line + "\r\n");
 
                     }
-                }catch (IOException e){
+                } catch (IOException e) {
                     e.printStackTrace();
                 }
                 ddl = strbuf.toString();
 
+                Pattern commentPattern = Pattern.compile("/\\*.*\\*/");
+                ddl = commentPattern.matcher(ddl).replaceAll("");
+
                 //列名
-                int index1 = 0,index2 = 0;
+                int index1 = 0, index2 = 0;
                 while ((index1 = ddl.indexOf("`", index2 + 1)) != -1) {
                     if ((index2 = ddl.indexOf("`", index1 + 1)) == -1) break;
                     String originalColumnName = ddl.substring(index1 + 1, index2).toLowerCase();
@@ -277,23 +284,26 @@ public class DdlAutoReaderWOA {
                 //去除末尾多余的逗号
                 index1 = ddl.lastIndexOf(",");
                 index2 = ddl.lastIndexOf(")");
-                Pattern p = Pattern.compile("\\w+");
-                Matcher m = p.matcher(ddl.substring(index1,index2));
-                if(!m.find()) ddl = ddl.substring(0,index1) + ')';
+                Pattern lastCommaWithBracket = Pattern.compile(",\\s+\\)");
+                ddl = lastCommaWithBracket.matcher(ddl).replaceAll(")");
                 //连接测试数据库，通过读取并修改的ddl语句建表
                 laucaStmt.addBatch("DROP TABLE IF EXISTS " + originalTableName);
-                laucaStmt.addBatch(ddl);
-                //System.out.println(ddl);
+                if (partitionRule != null){
+                    ddl = ddl + partitionRule;
+                }
+                System.out.println(ddl);
+
+                laucaStmt.addBatch(ddl  );
 
                 //增加字段
-                Column[] columns = table.getColumns();
-                for(int j=0;j<columns.length;j++){//将真实数据库中的列与table中的列对比
-                    String addColumnSQL = "ALTER TABLE " + originalTableName +" ADD COLUMN ";
-                    String colName = columns[j].getName();
-                    int dataType = columns[j].getDataType();
-                    if(!cols.contains(colName)){
-                        addColumnSQL += colName +" "+Int2dataType(dataType);
-                        laucaStmt.addBatch(addColumnSQL);
+                Column[] columns = value.getColumns();
+                for (Column column : columns) {//将真实数据库中的列与table中的列对比
+                    String addColumnSQL = "ALTER TABLE " + originalTableName + " ADD COLUMN ";
+                    String colName = column.getName();
+                    int dataType = column.getDataType();
+                    if (!cols.contains(colName)) {
+                        addColumnSQL += colName + " " + Int2dataType(dataType);
+                        laucaStmt.execute(addColumnSQL);
                     }
                 }
                 //处理外键，UNIQUE，索引等
@@ -330,14 +340,15 @@ public class DdlAutoReaderWOA {
 //                    laucaStmt.addBatch(fkSQL);
 //                }
 //            }
-//            laucaStmt.addBatch("SET FOREIGN_KEY_CHECKS=@OLD_FOREIGN_KEY_CHECKS");
-//            laucaStmt.addBatch("SET UNIQUE_CHECKS=@OLD_UNIQUE_CHECKS");
+            laucaStmt.addBatch("SET FOREIGN_KEY_CHECKS=@OLD_FOREIGN_KEY_CHECKS");
+            laucaStmt.addBatch("SET UNIQUE_CHECKS=@OLD_UNIQUE_CHECKS");
             laucaStmt.executeBatch();
             System.out.println("建表成功！");
             oriStmt.close();
             laucaStmt.close();
         }catch (SQLException e ) {
             e.printStackTrace();
+            System.exit(0);
         }
         return FKs_Indexes;
     }
