@@ -97,7 +97,7 @@ public class OperationData implements Comparable<OperationData> {
 			returnItemsOfTuples = new Object[oneTrace.results.size()][];
 			for (int i = 0; i < oneTrace.results.size(); ++i) {
 				Object[] tmp = new Object[oneTrace.results.get(i).size()];
-				for (int j = 0; j < tmp.length; j++) {
+				for (int j = 0; j < returnDataTypes.length; j++) {
 					tmp[j] = str2Object(oneTrace.results.get(i).get(j), returnDataTypes[j]);
 				}
 				returnItemsOfTuples[i] = tmp;

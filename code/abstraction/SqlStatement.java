@@ -411,7 +411,7 @@ public abstract class SqlStatement extends TransactionBlock {
 					paraPartition = new ArrayList<>(partitionUsedPara.keySet()).get(partitionIdx);
 
 					partitionIdx = new Random().nextInt(partitionUsedPara.get(paraPartition).size());
-						parameter = partitionUsedPara.get(paraPartition).get(partitionIdx);
+					parameter = partitionUsedPara.get(paraPartition).get(partitionIdx);
 				}
 			}
 			else{
@@ -466,6 +466,7 @@ public abstract class SqlStatement extends TransactionBlock {
 					partitionIdx = new Random().nextInt(partitionUsedPara.get(paraPartition).size());
 
 					parameter = partitionUsedPara.get(paraPartition).get(partitionIdx);
+					parameter = getParameterInSamePartitionByIdx(idx,parameter);
 				}
 			}
 			else{

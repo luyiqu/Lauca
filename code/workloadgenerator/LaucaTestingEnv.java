@@ -160,6 +160,14 @@ public class LaucaTestingEnv {
 						String tableName = tableDataFile.getName().substring(0, tableDataFile.getName().length() - 6);
 						switch (databaseType) {
 							case "mysql":
+								try {
+									System.out.println(tableDataFile.getCanonicalPath());
+									stmt.execute("LOAD DATA LOCAL INFILE '" + tableDataFile.getCanonicalPath() + "' INTO TABLE "
+											+ tableName + " FIELDS TERMINATED BY ',' LINES TERMINATED BY '\r\n'");
+								} catch (SQLException | IOException e) {
+									throw new RuntimeException(e);
+								}
+								break;
 							case "tidb":
 								try {
 									System.out.println(tableDataFile.getCanonicalPath());
