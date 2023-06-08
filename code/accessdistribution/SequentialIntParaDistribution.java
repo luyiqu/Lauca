@@ -107,11 +107,11 @@ public class SequentialIntParaDistribution extends SequentialParaDistribution {
 	public void geneHighFrequencyItems(long[] priorHighFrequencyItems) {
 		List<Long> priorHighFrequencyItemList = new ArrayList<>();
 		if (priorHighFrequencyItems != null) {
-			for (int i = 0; i < priorHighFrequencyItems.length; i++) {
-				if (priorHighFrequencyItems[i] == Long.MIN_VALUE) {
+			for (long priorHighFrequencyItem : priorHighFrequencyItems) {
+				if (priorHighFrequencyItem == Long.MIN_VALUE) {
 					break;
 				}
-				priorHighFrequencyItemList.add(priorHighFrequencyItems[i]);
+				priorHighFrequencyItemList.add(priorHighFrequencyItem);
 			}
 			Collections.shuffle(priorHighFrequencyItemList);
 		}
@@ -194,8 +194,7 @@ public class SequentialIntParaDistribution extends SequentialParaDistribution {
 		// System.out.println("SequentialIntParaDistribution.geneCandidates - repeatedParaNumsCopy: \n\t" + 
 		// 		Arrays.toString(repeatedParaNumsCopy));
 
-		Set<Long> priorParameterSet = new HashSet<>();
-		priorParameterSet.addAll(priorParaCandidateList);
+		Set<Long> priorParameterSet = new HashSet<>(priorParaCandidateList);
 
 		// 补齐各个分区剩下的候选参数集
 		for (int i = 0; i < intervalNum; i++) {

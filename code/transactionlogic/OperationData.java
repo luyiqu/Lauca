@@ -58,6 +58,9 @@ public class OperationData implements Comparable<OperationData> {
 //		String[] arr = runningLog.trim().split(";");
 
 		String[] paraArr = oneTrace.parameters.toArray(new String[0]);
+		if (paraDataTypes == null){
+			paraDataTypes = new int[0];
+		}
 		parameters = new Object[paraDataTypes.length];
 		try{
 			for (int i = 0; i < paraDataTypes.length; i++) {
