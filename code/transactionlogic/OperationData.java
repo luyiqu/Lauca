@@ -58,6 +58,9 @@ public class OperationData implements Comparable<OperationData> {
 //		String[] arr = runningLog.trim().split(";");
 
 		String[] paraArr = oneTrace.parameters.toArray(new String[0]);
+		if (paraDataTypes == null){
+			paraDataTypes = new int[0];
+		}
 		parameters = new Object[paraDataTypes.length];
 		try{
 			for (int i = 0; i < paraDataTypes.length; i++) {
@@ -97,7 +100,7 @@ public class OperationData implements Comparable<OperationData> {
 			returnItemsOfTuples = new Object[oneTrace.results.size()][];
 			for (int i = 0; i < oneTrace.results.size(); ++i) {
 				Object[] tmp = new Object[oneTrace.results.get(i).size()];
-				for (int j = 0; j < tmp.length; j++) {
+				for (int j = 0; j < returnDataTypes.length; j++) {
 					tmp[j] = str2Object(oneTrace.results.get(i).get(j), returnDataTypes[j]);
 				}
 				returnItemsOfTuples[i] = tmp;

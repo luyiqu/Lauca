@@ -57,8 +57,14 @@ public class SequentialVcharParaDistribution extends SequentialParaDistribution 
 		this.columnCardinality = columnCardinality;
 		this.minLength = minLength;
 		this.maxLength = maxLength;
-		this.seedStrings = new String[seedStrings.length];
-		System.arraycopy(seedStrings, 0, this.seedStrings, 0, seedStrings.length);
+		if (seedStrings != null){
+			this.seedStrings = new String[seedStrings.length];
+			System.arraycopy(seedStrings, 0, this.seedStrings, 0, seedStrings.length);
+		}
+		else{
+			this.seedStrings = new String[1];
+			this.seedStrings[0] = "aaaaa";
+		}
 	}
 
 	public void geneHighFrequencyItems(String[] priorHighFrequencyItems) {
@@ -126,6 +132,10 @@ public class SequentialVcharParaDistribution extends SequentialParaDistribution 
 		double avgIntervalIndexSize = columnCardinality / (double)intervalNum;
 		int[] repeatedParaNumsCopy = Arrays.copyOf(repeatedParaNums, repeatedParaNums.length);
 		for (String para : priorParaCandidateList) {
+			if (!para.contains("#") || para.split("#")[0].isBlank()){
+				continue;
+			}
+
 			long parameterIndex = Long.parseLong(para.split("#")[0]);
 			int intervalIndex = (int)(parameterIndex / avgIntervalIndexSize); // intervalIndex必然存在
 			if (repeatedParaNumsCopy[intervalIndex] > 0) {
@@ -177,6 +187,11 @@ public class SequentialVcharParaDistribution extends SequentialParaDistribution 
 	public String geneValue() {
 //		System.out.println(this.getClass());
 		int randomIndex = binarySearch();
+		for (int i = 0; i < highFrequencyItemNum; i++) {
+			if (highFrequencyItems[i].isBlank()){
+				highFrequencyItems[i] = i + "#aaaaa";
+			}
+		}
 		if (randomIndex < highFrequencyItemNum) {
 			return highFrequencyItems[randomIndex];
 		} else {
